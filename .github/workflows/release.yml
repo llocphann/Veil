@@ -29,7 +29,8 @@ jobs:
       - name: Verify release tag
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: node -e "const m=require('./manifest.json'); if (m.version !== process.env.RELEASE_TAG) { throw new Error('Tag must equal manifest version: ' + m.version); }"
+        run: |
+          node -e "const m=require('./manifest.json'); if (m.version !== process.env.RELEASE_TAG) { throw new Error('Tag must equal manifest version: ' + m.version); }"
 
       - name: Lint, test, and build
         run: npm run check

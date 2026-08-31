@@ -28,10 +28,4 @@ export default defineConfig(
     },
   },
   ...obsidianmd.configs.recommended,
-  {
-    rules: {
-      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
-      "@typescript-eslint/no-deprecated": "off",
-    },
-  },
 );

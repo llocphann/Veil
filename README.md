@@ -43,6 +43,14 @@ Open **Settings → Community plugins → Veil** and choose a wallpaper file. Al
 
 For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V, or OGV file plays depends on the codecs available in the user's Obsidian desktop runtime.
 
+## Support
+
+If Veil is useful to you, you can support its continued development:
+
+<a href="https://www.buymeacoffee.com/llocphann">
+  <img src="assets/buy-me-a-coffee.svg" alt="Buy me a coffee" width="217">
+</a>
+
 ## Development
 
 Requirements: Node.js 20 or newer.

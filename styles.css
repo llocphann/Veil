@@ -147,30 +147,6 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 /* Settings styles are confined to Veil's own controls. */
-.vault-dashboard-background-settings .vault-dashboard-path-setting {
-  flex-wrap: wrap;
-}
-
-.vault-dashboard-background-settings .vault-dashboard-path-setting .setting-item-control {
-  flex: 1 1 340px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.vault-dashboard-background-settings .vault-dashboard-path-setting input[type="text"] {
-  flex: 1 1 220px;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.vault-dashboard-setting-value {
-  min-width: 3.8em;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  text-align: end;
-}
-
 .vault-dashboard-wallpaper-status {
   margin: 0 0 18px;
   padding: 10px 12px;
@@ -188,4 +164,34 @@ body.is-mobile > .vault-dashboard-wallpaper {
 
 .vault-dashboard-wallpaper-status[data-tone="success"] {
   color: var(--text-success, var(--text-accent));
+}
+
+.veil-support-link {
+  display: inline-flex;
+  gap: var(--size-2-2, 8px);
+  align-items: center;
+  justify-content: center;
+  padding: var(--size-4-1, 4px) var(--size-4-3, 12px);
+  border-radius: var(--button-radius, 5px);
+  color: var(--text-on-accent);
+  background-color: var(--interactive-accent);
+  box-shadow: var(--input-shadow);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  line-height: var(--line-height-tight);
+  text-decoration: none;
+}
+
+.veil-support-link:hover,
+.veil-support-link:focus-visible {
+  color: var(--text-on-accent);
+  background-color: var(--interactive-accent-hover);
+  text-decoration: none;
+}
+
+.veil-support-link-icon,
+.veil-support-link-icon > svg {
+  display: inline-flex;
+  width: var(--icon-size, 16px);
+  height: var(--icon-size, 16px);
 }
