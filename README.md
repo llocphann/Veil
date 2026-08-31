@@ -5,12 +5,14 @@ Veil places a vault-local image, animated GIF, or video behind the Obsidian work
 ## Features
 
 - Pick media directly from the current vault or enter a vault-relative path.
+- Route different wallpapers to a note name, exact path, folder, or tag; the first matching rule wins.
+- Exclude selected notes, paths, folders, or tags from pane-surface and whole-pane opacity.
 - Use static images, animated GIFs, MP4, WebM, OGV, M4V, or MOV files.
 - Choose fill, fit, center, stretch, or scale-down sizing.
 - Adjust wallpaper opacity independently from pane surfaces.
 - Optionally fade each pane and all of its descendants as one visual group.
 - Add elliptical or circular vignette, blur, and dim effects.
-- Navigate compact tabbed settings for wallpaper, effects, video, actions, and support.
+- Navigate compact tabbed settings for wallpaper, rules, effects, video, actions, and support.
 - Apply the wallpaper to the main window and desktop pop-out windows.
 - Pause video in hidden windows and respect the operating system's reduced-motion preference.
 
@@ -18,7 +20,7 @@ Veil is desktop-only because reliable video wallpaper playback and multi-window 
 
 ## Privacy and file access
 
-Veil only reads the wallpaper file selected from the current vault. It does not make network requests, collect telemetry, run analytics, modify media files, or install updates by itself. Wallpaper paths must be vault-relative; URLs and paths outside the vault are rejected.
+Veil reads the selected wallpaper files and Obsidian's already-indexed path and tag metadata for the active file. It does not make network requests, collect telemetry, run analytics, modify media files, or install updates by itself. Wallpaper paths must be vault-relative; URLs and paths outside the vault are rejected.
 
 ## Installation
 
@@ -40,7 +42,16 @@ The plugin ID is `veil`, which is also the name of its folder inside `.obsidian/
 
 ## Usage
 
-Open **Settings → Community plugins → Veil**, choose the **Wallpaper** tab, and select a wallpaper file. The remaining tabs separate effects, video playback, actions, and support. All visual controls preview immediately. Veil stores only its settings in `data.json`; the selected media remains in its original vault location.
+Open **Settings → Community plugins → Veil**, choose the **Wallpaper** tab, and select the fallback wallpaper. Use **Rules** to add ordered wallpaper routes and opacity exclusions.
+
+Rules can match:
+
+- **Note name** without requiring the `.md` extension;
+- **Exact path** to one vault file;
+- **Folder** and every descendant file;
+- **Tag**, including nested tags such as `#media/movie` when matching `#media`.
+
+Wallpaper routes are evaluated from top to bottom, and the first enabled match replaces the fallback wallpaper. Opacity exclusions are additive: a matching rule can keep pane surfaces, pane content, or both at 100% opacity. All visual controls preview immediately. Veil stores only its settings in `data.json`; selected media remains in its original vault location.
 
 For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V, or OGV file plays depends on the codecs available in the user's Obsidian desktop runtime.
 

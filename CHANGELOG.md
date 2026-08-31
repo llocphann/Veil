@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Organize settings into accessible Wallpaper, Effects, Video, Actions, and Support tabs.
+- Add ordered wallpaper routing by note name, exact path, folder, or tag.
+- Add context-specific exclusions for pane-background and whole-pane content opacity.
+- Refresh wallpaper and opacity rules when the active file or its indexed tags change.
 - Use Community-compatible Markdown for the Buy Me a Coffee button.
 - Keep the settings support button on one yellow line at narrow widths.
 

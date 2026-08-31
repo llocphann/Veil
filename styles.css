@@ -214,6 +214,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 .veil-settings-root:not([data-veil-settings-tab="wallpaper"]) .veil-settings-panel-wallpaper,
+.veil-settings-root:not([data-veil-settings-tab="rules"]) .veil-settings-panel-rules,
 .veil-settings-root:not([data-veil-settings-tab="effects"]) .veil-settings-panel-effects,
 .veil-settings-root:not([data-veil-settings-tab="video"]) .veil-settings-panel-video,
 .veil-settings-root:not([data-veil-settings-tab="actions"]) .veil-settings-panel-actions,

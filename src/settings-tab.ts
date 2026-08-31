@@ -3,20 +3,29 @@ import type {
   App,
   SettingDefinition,
   SettingDefinitionItem,
+  SettingDefinitionPage,
   TFile,
 } from "obsidian";
 import type VeilPlugin from "./main";
 import {
   DEFAULT_SETTINGS,
   DISPLAY_MODES,
+  MATCH_TYPES,
+  createOpacityExclusionRule,
+  createWallpaperRule,
   mediaKind,
   normalizeSettings,
+  type ContextRule,
+  type MatchType,
+  type OpacityExclusionRule,
   type VeilSettings,
+  type WallpaperRule,
 } from "./settings";
 
 const FUNDING_URL = "https://www.buymeacoffee.com/llocphann";
 const SETTINGS_TABS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
+  { id: "rules", label: "Rules", icon: "list-filter" },
   { id: "effects", label: "Effects", icon: "sparkles" },
   { id: "video", label: "Video", icon: "video" },
   { id: "actions", label: "Actions", icon: "rotate-ccw" },
@@ -46,11 +55,32 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   getControlValue(key: string): unknown {
+    const ruleKey = this.parseRuleKey(key);
+    if (ruleKey) {
+      const rule = this.findRule(ruleKey.kind, ruleKey.id);
+      return rule?.[ruleKey.field as keyof typeof rule];
+    }
     if (!(key in DEFAULT_SETTINGS)) return undefined;
     return this.plugin.settings[key as SettingKey];
   }
 
   setControlValue(key: string, value: unknown): void {
+    const ruleKey = this.parseRuleKey(key);
+    if (ruleKey) {
+      const rule = this.findRule(ruleKey.kind, ruleKey.id);
+      if (!rule) return;
+      this.setRuleValue(rule, ruleKey.field, value);
+      this.plugin.updateSettings({
+        wallpaperRules: this.plugin.settings.wallpaperRules,
+        opacityExclusions: this.plugin.settings.opacityExclusions,
+      });
+      if (["matchType", "enabled", "excludePaneSurface", "excludePaneContent"].includes(
+        ruleKey.field,
+      )) {
+        this.update();
+      }
+      return;
+    }
     if (!(key in DEFAULT_SETTINGS)) return;
     const settings = normalizeSettings(
       { ...this.plugin.settings, [key]: value },
@@ -73,7 +103,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     maximum = 100,
     unit = "%",
     disabled?: () => boolean,
-  ): SettingDefinition<SettingKey> {
+  ): SettingDefinition<string> {
     return {
       name,
       desc,
@@ -89,7 +119,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private tabNavigationDefinitions(): SettingDefinitionItem<SettingKey> {
+  private tabNavigationDefinitions(): SettingDefinitionItem<string> {
     return {
       type: "group",
       cls: "veil-settings-tabs-group",
@@ -165,7 +195,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
+  getSettingDefinitions(): SettingDefinitionItem<string>[] {
     return [
       this.tabNavigationDefinitions(),
       {
@@ -236,6 +266,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           ),
         ],
       },
+      this.wallpaperRuleDefinitions(),
+      this.opacityExclusionDefinitions(),
       {
         type: "group",
         heading: "Effects",
@@ -378,6 +410,224 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   private documentActiveButtonIndex(buttons: HTMLButtonElement[]): number {
     const activeElement = this.containerEl.ownerDocument.activeElement;
     return Math.max(0, buttons.findIndex((button) => button === activeElement));
+  }
+
+  private wallpaperRuleDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "list",
+      heading: "Wallpaper routing",
+      cls: "veil-settings-panel-rules",
+      emptyState: "No wallpaper rules. The default wallpaper applies everywhere.",
+      items: this.plugin.settings.wallpaperRules.map((rule, index) =>
+        this.wallpaperRulePage(rule, index)),
+      addItem: {
+        name: "Add wallpaper rule",
+        action: () => {
+          this.plugin.settings.wallpaperRules.push(
+            createWallpaperRule(this.plugin.settings.wallpaperRules),
+          );
+          this.plugin.updateSettings({ wallpaperRules: this.plugin.settings.wallpaperRules });
+          this.update();
+        },
+      },
+      onReorder: (oldIndex, newIndex) => {
+        const [rule] = this.plugin.settings.wallpaperRules.splice(oldIndex, 1);
+        if (!rule) return;
+        this.plugin.settings.wallpaperRules.splice(newIndex, 0, rule);
+        this.plugin.updateSettings({ wallpaperRules: this.plugin.settings.wallpaperRules });
+        this.update();
+      },
+      onDelete: (index) => {
+        this.plugin.settings.wallpaperRules.splice(index, 1);
+        this.plugin.updateSettings({ wallpaperRules: this.plugin.settings.wallpaperRules });
+        this.update();
+      },
+    };
+  }
+
+  private opacityExclusionDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "list",
+      heading: "Opacity exclusions",
+      cls: "veil-settings-panel-rules",
+      emptyState: "No exclusions. Global pane opacity applies everywhere.",
+      items: this.plugin.settings.opacityExclusions.map((rule, index) =>
+        this.opacityExclusionPage(rule, index)),
+      addItem: {
+        name: "Add opacity exclusion",
+        action: () => {
+          this.plugin.settings.opacityExclusions.push(
+            createOpacityExclusionRule(this.plugin.settings.opacityExclusions),
+          );
+          this.plugin.updateSettings({ opacityExclusions: this.plugin.settings.opacityExclusions });
+          this.update();
+        },
+      },
+      onReorder: (oldIndex, newIndex) => {
+        const [rule] = this.plugin.settings.opacityExclusions.splice(oldIndex, 1);
+        if (!rule) return;
+        this.plugin.settings.opacityExclusions.splice(newIndex, 0, rule);
+        this.plugin.updateSettings({ opacityExclusions: this.plugin.settings.opacityExclusions });
+        this.update();
+      },
+      onDelete: (index) => {
+        this.plugin.settings.opacityExclusions.splice(index, 1);
+        this.plugin.updateSettings({ opacityExclusions: this.plugin.settings.opacityExclusions });
+        this.update();
+      },
+    };
+  }
+
+  private wallpaperRulePage(rule: WallpaperRule, index: number): SettingDefinitionPage<string> {
+    const key = (field: string): string => `wallpaper-rule:${rule.id}:${field}`;
+    return {
+      type: "page",
+      name: rule.matchValue || `Wallpaper rule ${index + 1}`,
+      desc: rule.wallpaperPath || "No wallpaper selected",
+      displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
+      status: () => !rule.enabled || this.wallpaperRuleReady(rule) ? null : "warning",
+      items: [
+        ...this.matchRuleSettings(rule, key),
+        {
+          name: "Wallpaper file",
+          desc: "This wallpaper replaces the default when the rule is the first enabled match.",
+          control: {
+            type: "file",
+            key: key("wallpaperPath"),
+            placeholder: "Media/Wallpapers/context.webp",
+            filter: (file: TFile) => Boolean(mediaKind(file)),
+          },
+        },
+      ],
+    };
+  }
+
+  private opacityExclusionPage(
+    rule: OpacityExclusionRule,
+    index: number,
+  ): SettingDefinitionPage<string> {
+    const key = (field: string): string => `opacity-rule:${rule.id}:${field}`;
+    return {
+      type: "page",
+      name: rule.matchValue || `Opacity exclusion ${index + 1}`,
+      desc: "Keep selected pane layers at full opacity in this context.",
+      displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
+      status: () => !rule.enabled || (rule.matchValue
+        && (rule.excludePaneSurface || rule.excludePaneContent))
+        ? null
+        : "warning",
+      items: [
+        ...this.matchRuleSettings(rule, key),
+        {
+          name: "Exclude pane background opacity",
+          desc: "Use a fully opaque pane surface instead of the global pane background opacity.",
+          control: { type: "toggle", key: key("excludePaneSurface") },
+        },
+        {
+          name: "Exclude pane & content opacity",
+          desc: "Keep nested backgrounds, text, icons, and images at full opacity.",
+          control: { type: "toggle", key: key("excludePaneContent") },
+        },
+      ],
+    };
+  }
+
+  private matchRuleSettings(
+    rule: ContextRule,
+    key: (field: string) => string,
+  ): SettingDefinition<string>[] {
+    return [
+      {
+        name: "Enabled",
+        control: { type: "toggle", key: key("enabled") },
+      },
+      {
+        name: "Match by",
+        desc: "Tag rules also match nested tags. Folder rules include every descendant file.",
+        control: { type: "dropdown", key: key("matchType"), options: MATCH_TYPES },
+      },
+      {
+        name: "Exact file path",
+        desc: "Choose one file in the vault.",
+        control: {
+          type: "file",
+          key: key("matchValue"),
+          placeholder: "Folder/Note.md",
+        },
+        visible: () => rule.matchType === "path",
+      },
+      {
+        name: rule.matchType === "note"
+          ? "Note name"
+          : rule.matchType === "folder"
+            ? "Folder path"
+            : "Tag",
+        desc: rule.matchType === "note"
+          ? "The note name is matched without requiring the .md extension."
+          : rule.matchType === "folder"
+            ? "Use a vault-relative folder path."
+            : "A leading # is optional.",
+        control: {
+          type: "text",
+          key: key("matchValue"),
+          placeholder: rule.matchType === "note"
+            ? "Homepage"
+            : rule.matchType === "folder"
+              ? "20_Personal_Life/25_Media_Tracker"
+              : "#media/movies",
+        },
+        visible: () => rule.matchType !== "path",
+      },
+    ];
+  }
+
+  private wallpaperRuleReady(rule: WallpaperRule): boolean {
+    if (!rule.matchValue || !rule.wallpaperPath) return false;
+    const file = this.app.vault.getFileByPath(normalizePath(rule.wallpaperPath));
+    return Boolean(file && mediaKind(file));
+  }
+
+  private parseRuleKey(
+    key: string,
+  ): { kind: "wallpaper" | "opacity"; id: string; field: string } | null {
+    const [prefix, id, ...fieldParts] = key.split(":");
+    if (!id || fieldParts.length === 0) return null;
+    if (prefix !== "wallpaper-rule" && prefix !== "opacity-rule") return null;
+    return {
+      kind: prefix === "wallpaper-rule" ? "wallpaper" : "opacity",
+      id,
+      field: fieldParts.join(":"),
+    };
+  }
+
+  private findRule(
+    kind: "wallpaper" | "opacity",
+    id: string,
+  ): WallpaperRule | OpacityExclusionRule | undefined {
+    return kind === "wallpaper"
+      ? this.plugin.settings.wallpaperRules.find((rule) => rule.id === id)
+      : this.plugin.settings.opacityExclusions.find((rule) => rule.id === id);
+  }
+
+  private setRuleValue(
+    rule: WallpaperRule | OpacityExclusionRule,
+    field: string,
+    value: unknown,
+  ): void {
+    if (["enabled", "excludePaneSurface", "excludePaneContent"].includes(field)) {
+      if (field in rule) rule[field as "enabled"] = value === true;
+      return;
+    }
+    if (field === "matchType") {
+      rule.matchType = Object.keys(MATCH_TYPES).includes(String(value))
+        ? value as MatchType
+        : "path";
+      return;
+    }
+    if (field === "matchValue") rule.matchValue = typeof value === "string" ? value : "";
+    if (field === "wallpaperPath" && "wallpaperPath" in rule) {
+      rule.wallpaperPath = typeof value === "string" ? value : "";
+    }
   }
 
   hide(): void {
