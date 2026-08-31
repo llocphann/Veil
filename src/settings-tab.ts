@@ -357,7 +357,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
             searchable: false,
             render: (setting) => {
               const link = setting.controlEl.createEl("a", {
-                cls: "mod-cta veil-support-link",
+                cls: "veil-support-link",
                 attr: {
                   href: FUNDING_URL,
                   target: "_blank",
@@ -367,7 +367,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
               });
               const icon = link.createSpan({ cls: "veil-support-link-icon" });
               setIcon(icon, "coffee");
-              link.createSpan({ text: "Buy me a coffee" });
+              link.createSpan({ cls: "veil-support-link-label", text: "Buy me a coffee" });
             },
           },
         ],

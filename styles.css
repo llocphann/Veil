@@ -244,17 +244,22 @@ body.is-mobile > .vault-dashboard-wallpaper {
   --veil-support-background: #fd0;
   --veil-support-foreground: #000;
 
+  box-sizing: border-box;
+  width: max-content;
+  max-width: none;
   min-width: max-content;
   display: inline-flex;
   gap: var(--size-2-2, 8px);
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   flex-wrap: nowrap;
   padding: var(--size-4-1, 4px) var(--size-4-3, 12px);
   border: 1px solid var(--veil-support-foreground);
   border-radius: var(--button-radius, 5px);
   color: var(--veil-support-foreground);
   background-color: var(--veil-support-background);
+  background-image: none;
   box-shadow: var(--input-shadow);
   font-size: var(--font-ui-small);
   font-weight: var(--font-semibold);
@@ -270,10 +275,25 @@ body.is-mobile > .vault-dashboard-wallpaper {
   text-decoration: none;
 }
 
+.veil-support-link:focus-visible {
+  outline: 2px solid var(--veil-support-foreground);
+  outline-offset: 2px;
+}
+
+.veil-support-link:active {
+  transform: translateY(1px);
+}
+
 .veil-support-link-icon,
 .veil-support-link-icon > svg {
   flex: 0 0 auto;
   display: inline-flex;
   width: var(--icon-size, 16px);
   height: var(--icon-size, 16px);
+}
+
+.veil-support-link-label {
+  flex: 0 0 auto;
+  display: block;
+  white-space: nowrap;
 }

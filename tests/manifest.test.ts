@@ -57,3 +57,14 @@ void test("release files and required repository documents exist", () => {
   assert.doesNotMatch(readme, /\.obsidian\/plugins\/vault-dashboard-background\//);
   assert.doesNotMatch(readme, /<script\b/i);
 });
+
+void test("support button is branded and independent from theme button classes", () => {
+  const source = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const styles = fs.readFileSync("styles.css", "utf8");
+
+  assert.match(source, /cls: "veil-support-link"/);
+  assert.doesNotMatch(source, /mod-cta veil-support-link/);
+  assert.match(source, /cls: "veil-support-link-label"/);
+  assert.match(styles, /--veil-support-background: #fd0;/);
+  assert.match(styles, /\.veil-support-link-label[\s\S]*white-space: nowrap;/);
+});
