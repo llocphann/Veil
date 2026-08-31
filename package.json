@@ -1,6 +1,6 @@
 {
   "name": "veil-obsidian-plugin",
-  "version": "1.2.1",
+  "version": "1.0.0",
   "description": "A configurable local wallpaper layer for Obsidian workspaces.",
   "main": "main.js",
   "private": true,

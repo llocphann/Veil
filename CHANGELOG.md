@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.1
+## 1.0.0
 
 - License the project under GNU GPL v3.0 only.
 - Publish the maintained source as TypeScript.
