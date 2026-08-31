@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Use Community-compatible Markdown for the Buy Me a Coffee button.
+- Keep the settings support button on one yellow line at narrow widths.
+
 ## 1.0.0
 
 - License the project under GNU GPL v3.0 only.

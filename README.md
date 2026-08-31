@@ -47,9 +47,7 @@ For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V
 
 If Veil is useful to you, you can support its continued development:
 
-<a href="https://www.buymeacoffee.com/llocphann">
-  <img src="assets/buy-me-a-coffee.svg" alt="Buy me a coffee" width="217">
-</a>
+[![Buy me a coffee](https://raw.githubusercontent.com/llocphann/Veil/main/assets/buy-me-a-coffee.svg)](https://www.buymeacoffee.com/llocphann)
 
 ## Development
 

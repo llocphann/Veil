@@ -49,7 +49,10 @@ void test("release files and required repository documents exist", () => {
 
   const readme = fs.readFileSync("README.md", "utf8");
   assert.match(readme, /https:\/\/www\.buymeacoffee\.com\/llocphann/);
-  assert.match(readme, /assets\/buy-me-a-coffee\.svg/);
+  assert.match(
+    readme,
+    /https:\/\/raw\.githubusercontent\.com\/llocphann\/Veil\/main\/assets\/buy-me-a-coffee\.svg/,
+  );
   assert.match(readme, /\.obsidian\/plugins\/veil\//);
   assert.doesNotMatch(readme, /\.obsidian\/plugins\/vault-dashboard-background\//);
   assert.doesNotMatch(readme, /<script\b/i);
