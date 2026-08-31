@@ -1,0 +1,191 @@
+/* Veil keeps the wallpaper in its own layer. Pane surface opacity and optional
+ * whole-pane opacity are independent controls. All colors come from the active
+ * Obsidian theme; the plugin does not hard-code a light or dark palette. */
+body.vault-dashboard-background:not(.is-mobile) {
+  --vault-dashboard-root-pane: color-mix(
+    in srgb,
+    var(--background-mod-root-split, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+  --vault-dashboard-left-pane: color-mix(
+    in srgb,
+    var(--background-mod-left-split, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+  --vault-dashboard-right-pane: color-mix(
+    in srgb,
+    var(--background-mod-right-split, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+}
+
+/* Border exposes separate light/dark semantic pane colors. These fallbacks keep
+ * Veil compatible with that palette without requiring the theme. */
+body.vault-dashboard-background.theme-dark:not(.is-mobile) {
+  --vault-dashboard-root-pane: color-mix(
+    in srgb,
+    var(--background-mod-root-split-dark, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+  --vault-dashboard-left-pane: color-mix(
+    in srgb,
+    var(--background-mod-left-split-dark, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+  --vault-dashboard-right-pane: color-mix(
+    in srgb,
+    var(--background-mod-right-split-dark, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+}
+
+body.vault-dashboard-background.theme-light:not(.is-mobile) {
+  --vault-dashboard-root-pane: color-mix(
+    in srgb,
+    var(--background-mod-root-split-light, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+  --vault-dashboard-left-pane: color-mix(
+    in srgb,
+    var(--background-mod-left-split-light, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+  --vault-dashboard-right-pane: color-mix(
+    in srgb,
+    var(--background-mod-right-split-light, var(--background-primary)) var(--vault-dashboard-pane-opacity, 70%),
+    transparent
+  );
+}
+
+body.vault-dashboard-background:not(.is-mobile) .workspace-split.mod-root {
+  background-color: var(--vault-dashboard-root-pane) !important;
+}
+
+body.vault-dashboard-background:not(.is-mobile) .workspace-split.mod-left-split {
+  background-color: var(--vault-dashboard-left-pane) !important;
+}
+
+body.vault-dashboard-background:not(.is-mobile) .workspace-split.mod-right-split {
+  background-color: var(--vault-dashboard-right-pane) !important;
+}
+
+body.vault-dashboard-background:not(.is-mobile)
+  .workspace-split:is(.mod-root, .mod-left-split, .mod-right-split)
+  :is(.workspace-tabs, .workspace-tab-container, .workspace-leaf, .workspace-leaf-content, .view-content) {
+  background-color: transparent;
+}
+
+/* Fade only each outer pane group. Nested splits must not multiply opacity. */
+body.vault-dashboard-background.vault-dashboard-fade-pane-content:not(.is-mobile)
+  .workspace-split:is(.mod-root, .mod-left-split, .mod-right-split):not(
+    .workspace-split:is(.mod-root, .mod-left-split, .mod-right-split) .workspace-split
+  ) {
+  opacity: var(--vault-dashboard-pane-content-opacity, 1) !important;
+}
+
+/* The negative layer sits above the body background and below app content.
+ * Wallpaper filters therefore never reach native panes or note content. */
+body.vault-dashboard-background:not(.is-mobile):has(> .app-container):is(.theme-light, .theme-dark) {
+  isolation: isolate;
+  background-color: var(--background-underlying, var(--background-primary)) !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+}
+
+.vault-dashboard-wallpaper {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  contain: strict;
+  pointer-events: none;
+  user-select: none;
+  opacity: var(--vdb-opacity, 0.15);
+}
+
+.vault-dashboard-wallpaper[hidden],
+body:not(.vault-dashboard-background) > .vault-dashboard-wallpaper,
+body.is-mobile > .vault-dashboard-wallpaper {
+  display: none;
+}
+
+.vault-dashboard-wallpaper > .vault-dashboard-wallpaper-media {
+  position: absolute;
+  inset: calc(0px - var(--vdb-blur-bleed, 0px));
+  display: block;
+  width: calc(100% + var(--vdb-blur-bleed, 0px) * 2);
+  height: calc(100% + var(--vdb-blur-bleed, 0px) * 2);
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: var(--vdb-fit, cover);
+  object-position: center;
+  filter: var(--vdb-filter, none);
+  pointer-events: none;
+}
+
+.vault-dashboard-wallpaper-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    var(--vdb-vignette-shape, ellipse) farthest-corner at center,
+    transparent var(--vdb-vignette-radius, 55%),
+    var(--shadow, var(--background-modifier-cover, var(--background-primary))) 100%
+  );
+  opacity: var(--vdb-vignette-intensity, 0.4);
+  pointer-events: none;
+}
+
+.vault-dashboard-wallpaper-vignette[hidden] {
+  display: none;
+}
+
+/* Settings styles are confined to Veil's own controls. */
+.vault-dashboard-background-settings .vault-dashboard-path-setting {
+  flex-wrap: wrap;
+}
+
+.vault-dashboard-background-settings .vault-dashboard-path-setting .setting-item-control {
+  flex: 1 1 340px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.vault-dashboard-background-settings .vault-dashboard-path-setting input[type="text"] {
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vault-dashboard-setting-value {
+  min-width: 3.8em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.vault-dashboard-wallpaper-status {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  overflow-wrap: anywhere;
+  font-size: var(--font-ui-small);
+}
+
+.vault-dashboard-wallpaper-status[data-tone="error"] {
+  color: var(--text-error);
+}
+
+.vault-dashboard-wallpaper-status[data-tone="success"] {
+  color: var(--text-success, var(--text-accent));
+}
