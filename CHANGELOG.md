@@ -2,6 +2,7 @@
 
 ## 1.2.1
 
+- License the project under GNU GPL v3.0 only.
 - Publish the maintained source as TypeScript.
 - Support vault-local images, animated GIFs, and videos.
 - Add fill, fit, center, stretch, and scale-down display modes.

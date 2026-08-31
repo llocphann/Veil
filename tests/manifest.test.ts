@@ -14,11 +14,15 @@ interface Manifest {
 void test("manifest is ready for a Community Plugins submission", () => {
   const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8")) as Manifest;
   const versions = JSON.parse(fs.readFileSync("versions.json", "utf8")) as Record<string, string>;
-  const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as { version: string };
+  const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
+    version: string;
+    license: string;
+  };
 
   assert.equal(manifest.id, "vault-dashboard-background");
   assert.equal(manifest.name, "Veil");
   assert.equal(manifest.version, packageJson.version);
+  assert.equal(packageJson.license, "GPL-3.0-only");
   assert.equal(versions[manifest.version], manifest.minAppVersion);
   assert.equal(manifest.isDesktopOnly, true);
   assert.ok(manifest.description.length <= 250);
@@ -29,4 +33,8 @@ void test("release files and required repository documents exist", () => {
   for (const path of ["manifest.json", "styles.css", "README.md", "LICENSE"]) {
     assert.equal(fs.existsSync(path), true, `${path} is required`);
   }
+
+  const license = fs.readFileSync("LICENSE", "utf8");
+  assert.match(license, /^GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007/);
+  assert.doesNotMatch(license, /^(<<<<<<<|=======|>>>>>>>)/m);
 });

@@ -72,4 +72,4 @@ The Git tag must exactly match the version in `manifest.json`.
 
 ## License
 
-[MIT](LICENSE)
+[GNU General Public License v3.0](LICENSE)
