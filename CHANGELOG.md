@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.1
+
 - Replace broad CSS overrides with scoped, higher-specificity pane selectors.
 - Remove the relational `:has()` selector to avoid broad style invalidation.
 
