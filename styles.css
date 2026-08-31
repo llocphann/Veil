@@ -57,16 +57,22 @@ body.vault-dashboard-background.theme-light:not(.is-mobile) {
   );
 }
 
-body.vault-dashboard-background:not(.is-mobile) .workspace-split.mod-root {
-  background-color: var(--vault-dashboard-root-pane) !important;
+body.vault-dashboard-background:not(.is-mobile)
+  > .app-container
+  .workspace-split.mod-root {
+  background-color: var(--vault-dashboard-root-pane);
 }
 
-body.vault-dashboard-background:not(.is-mobile) .workspace-split.mod-left-split {
-  background-color: var(--vault-dashboard-left-pane) !important;
+body.vault-dashboard-background:not(.is-mobile)
+  > .app-container
+  .workspace-split.mod-left-split {
+  background-color: var(--vault-dashboard-left-pane);
 }
 
-body.vault-dashboard-background:not(.is-mobile) .workspace-split.mod-right-split {
-  background-color: var(--vault-dashboard-right-pane) !important;
+body.vault-dashboard-background:not(.is-mobile)
+  > .app-container
+  .workspace-split.mod-right-split {
+  background-color: var(--vault-dashboard-right-pane);
 }
 
 body.vault-dashboard-background:not(.is-mobile)
@@ -77,19 +83,20 @@ body.vault-dashboard-background:not(.is-mobile)
 
 /* Fade only each outer pane group. Nested splits must not multiply opacity. */
 body.vault-dashboard-background.vault-dashboard-fade-pane-content:not(.is-mobile)
+  > .app-container
   .workspace-split:is(.mod-root, .mod-left-split, .mod-right-split):not(
     .workspace-split:is(.mod-root, .mod-left-split, .mod-right-split) .workspace-split
   ) {
-  opacity: var(--vault-dashboard-pane-content-opacity, 1) !important;
+  opacity: var(--vault-dashboard-pane-content-opacity, 1);
 }
 
 /* The negative layer sits above the body background and below app content.
  * Wallpaper filters therefore never reach native panes or note content. */
-body.vault-dashboard-background:not(.is-mobile):has(> .app-container):is(.theme-light, .theme-dark) {
+html body.vault-dashboard-background:not(.is-mobile):is(.theme-light, .theme-dark) {
   isolation: isolate;
-  background-color: var(--background-underlying, var(--background-primary)) !important;
-  background-image: none !important;
-  background-blend-mode: normal !important;
+  background-color: var(--background-underlying, var(--background-primary));
+  background-image: none;
+  background-blend-mode: normal;
 }
 
 .vault-dashboard-wallpaper {

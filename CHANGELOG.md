@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Replace broad CSS overrides with scoped, higher-specificity pane selectors.
+- Remove the relational `:has()` selector to avoid broad style invalidation.
+
 ## 1.1.0
 
 - Organize settings into accessible Wallpaper, Effects, Video, Actions, and Support tabs.
