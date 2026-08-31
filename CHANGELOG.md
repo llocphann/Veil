@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Organize settings into accessible Wallpaper, Effects, Video, Actions, and Support tabs.
 - Use Community-compatible Markdown for the Buy Me a Coffee button.
 - Keep the settings support button on one yellow line at narrow widths.
 

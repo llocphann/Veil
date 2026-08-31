@@ -147,6 +147,80 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 /* Settings styles are confined to Veil's own controls. */
+.veil-settings-tabs-setting {
+  padding-top: 0;
+  border: 0;
+}
+
+.veil-settings-tabs-setting .setting-item-info {
+  display: none;
+}
+
+.veil-settings-tabs-setting .setting-item-control {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.veil-settings-tabs {
+  width: 100%;
+  display: flex;
+  gap: var(--size-4-1);
+  padding: var(--size-4-1);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.veil-settings-tab {
+  min-width: max-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-4-1);
+  padding: var(--size-4-2) var(--size-4-3);
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.veil-settings-tab:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.veil-settings-tab[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--interactive-accent) 48%, transparent);
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  color: var(--text-accent);
+}
+
+.veil-settings-tab:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.veil-settings-tab-icon,
+.veil-settings-tab-icon > svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+  display: block;
+}
+
+.veil-settings-root:not([data-veil-settings-tab="wallpaper"]) .veil-settings-panel-wallpaper,
+.veil-settings-root:not([data-veil-settings-tab="effects"]) .veil-settings-panel-effects,
+.veil-settings-root:not([data-veil-settings-tab="video"]) .veil-settings-panel-video,
+.veil-settings-root:not([data-veil-settings-tab="actions"]) .veil-settings-panel-actions,
+.veil-settings-root:not([data-veil-settings-tab="support"]) .veil-settings-panel-support {
+  display: none;
+}
+
 .vault-dashboard-wallpaper-status {
   margin: 0 0 18px;
   padding: 10px 12px;

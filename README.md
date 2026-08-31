@@ -10,6 +10,7 @@ Veil places a vault-local image, animated GIF, or video behind the Obsidian work
 - Adjust wallpaper opacity independently from pane surfaces.
 - Optionally fade each pane and all of its descendants as one visual group.
 - Add elliptical or circular vignette, blur, and dim effects.
+- Navigate compact tabbed settings for wallpaper, effects, video, actions, and support.
 - Apply the wallpaper to the main window and desktop pop-out windows.
 - Pause video in hidden windows and respect the operating system's reduced-motion preference.
 
@@ -39,7 +40,7 @@ The plugin ID is `veil`, which is also the name of its folder inside `.obsidian/
 
 ## Usage
 
-Open **Settings → Community plugins → Veil** and choose a wallpaper file. All visual controls preview immediately. Veil stores only its settings in `data.json`; the selected media remains in its original vault location.
+Open **Settings → Community plugins → Veil**, choose the **Wallpaper** tab, and select a wallpaper file. The remaining tabs separate effects, video playback, actions, and support. All visual controls preview immediately. Veil stores only its settings in `data.json`; the selected media remains in its original vault location.
 
 For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V, or OGV file plays depends on the codecs available in the user's Obsidian desktop runtime.
 

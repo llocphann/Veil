@@ -15,8 +15,16 @@ import {
 } from "./settings";
 
 const FUNDING_URL = "https://www.buymeacoffee.com/llocphann";
+const SETTINGS_TABS = [
+  { id: "wallpaper", label: "Wallpaper", icon: "image" },
+  { id: "effects", label: "Effects", icon: "sparkles" },
+  { id: "video", label: "Video", icon: "video" },
+  { id: "actions", label: "Actions", icon: "rotate-ccw" },
+  { id: "support", label: "Support", icon: "heart" },
+] as const;
 
 type SettingKey = keyof VeilSettings;
+type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
 type NumericSettingKey =
   | "opacity"
   | "paneOpacity"
@@ -30,6 +38,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   private readonly plugin: VeilPlugin;
   private statusEl: HTMLElement | null = null;
   private statusRowEl: HTMLElement | null = null;
+  private activeTab: SettingsTabId = "wallpaper";
 
   constructor(app: App, plugin: VeilPlugin) {
     super(app, plugin);
@@ -80,12 +89,89 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
+  private tabNavigationDefinitions(): SettingDefinitionItem<SettingKey> {
+    return {
+      type: "group",
+      cls: "veil-settings-tabs-group",
+      items: [
+        {
+          name: "Settings sections",
+          searchable: false,
+          render: (setting) => {
+            this.containerEl.classList.add("veil-settings-root");
+            this.containerEl.dataset.veilSettingsTab = this.activeTab;
+            setting.settingEl.classList.add("veil-settings-tabs-setting");
+
+            const tabList = setting.controlEl.createDiv({ cls: "veil-settings-tabs" });
+            tabList.setAttribute("role", "tablist");
+            tabList.setAttribute("aria-label", "Veil settings sections");
+            const buttons: HTMLButtonElement[] = [];
+            const cleanups: Array<() => void> = [];
+
+            const activate = (tabId: SettingsTabId, focus = false): void => {
+              this.activeTab = tabId;
+              this.containerEl.dataset.veilSettingsTab = tabId;
+              for (const candidate of buttons) {
+                const selected = candidate.dataset.tabId === tabId;
+                candidate.setAttribute("aria-selected", String(selected));
+                candidate.tabIndex = selected ? 0 : -1;
+                if (selected && focus) candidate.focus();
+              }
+            };
+
+            for (const tab of SETTINGS_TABS) {
+              const button = tabList.createEl("button", {
+                cls: "veil-settings-tab",
+                attr: {
+                  type: "button",
+                  role: "tab",
+                  "data-tab-id": tab.id,
+                  "aria-selected": "false",
+                },
+              });
+              const icon = button.createSpan({ cls: "veil-settings-tab-icon" });
+              setIcon(icon, tab.icon);
+              button.createSpan({ text: tab.label });
+              const onClick = (): void => activate(tab.id);
+              button.addEventListener("click", onClick);
+              cleanups.push(() => button.removeEventListener("click", onClick));
+              buttons.push(button);
+            }
+
+            const onKeyDown = (event: KeyboardEvent): void => {
+              if (!new Set(["ArrowLeft", "ArrowRight", "Home", "End"]).has(event.key)) {
+                return;
+              }
+              const currentIndex = this.documentActiveButtonIndex(buttons);
+              let nextIndex = currentIndex;
+              if (event.key === "ArrowLeft") {
+                nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+              }
+              if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+              if (event.key === "Home") nextIndex = 0;
+              if (event.key === "End") nextIndex = buttons.length - 1;
+              const nextTab = SETTINGS_TABS[nextIndex];
+              if (!nextTab) return;
+              event.preventDefault();
+              activate(nextTab.id, true);
+            };
+            tabList.addEventListener("keydown", onKeyDown);
+            cleanups.push(() => tabList.removeEventListener("keydown", onKeyDown));
+            activate(this.activeTab);
+            return () => cleanups.forEach((cleanup) => cleanup());
+          },
+        },
+      ],
+    };
+  }
+
   getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
     return [
+      this.tabNavigationDefinitions(),
       {
         type: "group",
         heading: "Wallpaper",
-        cls: "vault-dashboard-background-settings",
+        cls: "veil-settings-panel-wallpaper",
         items: [
           {
             name: "Live preview",
@@ -153,7 +239,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       {
         type: "group",
         heading: "Effects",
-        cls: "vault-dashboard-background-settings",
+        cls: "veil-settings-panel-effects",
         items: [
           {
             name: "Vignette mode",
@@ -211,7 +297,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       {
         type: "group",
         heading: "Video playback",
-        cls: "vault-dashboard-background-settings",
+        cls: "veil-settings-panel-video",
         items: [
           {
             name: "Video compatibility",
@@ -233,7 +319,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       {
         type: "group",
         heading: "Actions",
-        cls: "vault-dashboard-background-settings",
+        cls: "veil-settings-panel-actions",
         items: [
           {
             name: "Reload wallpaper",
@@ -263,7 +349,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       {
         type: "group",
         heading: "Support Veil",
-        cls: "vault-dashboard-background-settings",
+        cls: "veil-settings-panel-support",
         items: [
           {
             name: "Buy me a coffee",
@@ -287,6 +373,11 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         ],
       },
     ];
+  }
+
+  private documentActiveButtonIndex(buttons: HTMLButtonElement[]): number {
+    const activeElement = this.containerEl.ownerDocument.activeElement;
+    return Math.max(0, buttons.findIndex((button) => button === activeElement));
   }
 
   hide(): void {
