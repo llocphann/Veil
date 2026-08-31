@@ -32,10 +32,10 @@ After Veil is accepted into the Obsidian Community Plugins directory:
 ### Manual installation
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the matching GitHub release.
-2. Place them in `<vault>/.obsidian/plugins/vault-dashboard-background/`.
+2. Place them in `<vault>/.obsidian/plugins/veil/`.
 3. Reload Obsidian and enable **Veil** under Community plugins.
 
-The internal plugin ID remains `vault-dashboard-background` so existing installations keep their saved settings when upgrading to the TypeScript release.
+The plugin ID is `veil`, which is also the name of its folder inside `.obsidian/plugins`.
 
 ## Usage
 

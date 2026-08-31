@@ -20,7 +20,7 @@ void test("manifest is ready for a Community Plugins submission", () => {
     license: string;
   };
 
-  assert.equal(manifest.id, "vault-dashboard-background");
+  assert.equal(manifest.id, "veil");
   assert.equal(manifest.name, "Veil");
   assert.equal(manifest.version, packageJson.version);
   assert.equal(packageJson.license, "GPL-3.0-only");
@@ -50,5 +50,7 @@ void test("release files and required repository documents exist", () => {
   const readme = fs.readFileSync("README.md", "utf8");
   assert.match(readme, /https:\/\/www\.buymeacoffee\.com\/llocphann/);
   assert.match(readme, /assets\/buy-me-a-coffee\.svg/);
+  assert.match(readme, /\.obsidian\/plugins\/veil\//);
+  assert.doesNotMatch(readme, /\.obsidian\/plugins\/vault-dashboard-background\//);
   assert.doesNotMatch(readme, /<script\b/i);
 });
