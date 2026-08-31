@@ -10,6 +10,25 @@ export type DisplayMode = keyof typeof DISPLAY_MODES;
 export type VignetteMode = "off" | "ellipse" | "circle";
 export type MediaKind = "image" | "video" | "";
 
+export const COLOR_OVERLAY_BLEND_MODES = {
+  color: "Color — recolor while preserving luminance",
+  "soft-light": "Soft light — gentle tint",
+  overlay: "Overlay — stronger contrast tint",
+  multiply: "Multiply — darker tint",
+  screen: "Screen — lighter tint",
+  normal: "Normal — flat color layer",
+} as const;
+
+export const EFFECT_PRESETS = {
+  none: "None",
+  retro: "Retro film",
+  glitch: "Glitch",
+  "tv-noise": "TV noise",
+} as const;
+
+export type ColorOverlayBlendMode = keyof typeof COLOR_OVERLAY_BLEND_MODES;
+export type EffectPreset = keyof typeof EFFECT_PRESETS;
+
 export const MATCH_TYPES = {
   note: "Note name",
   path: "Exact path",
@@ -49,6 +68,12 @@ export interface VeilSettings {
   blurIntensity: number;
   dimEnabled: boolean;
   dimIntensity: number;
+  colorOverlayEnabled: boolean;
+  colorOverlayColor: string;
+  colorOverlayOpacity: number;
+  colorOverlayBlendMode: ColorOverlayBlendMode;
+  effectPreset: EffectPreset;
+  effectIntensity: number;
   pauseWhenHidden: boolean;
   respectReducedMotion: boolean;
   wallpaperRules: WallpaperRule[];
@@ -69,6 +94,12 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   blurIntensity: 8,
   dimEnabled: false,
   dimIntensity: 30,
+  colorOverlayEnabled: false,
+  colorOverlayColor: "#7dd3fc",
+  colorOverlayOpacity: 30,
+  colorOverlayBlendMode: "color",
+  effectPreset: "none",
+  effectIntensity: 35,
   pauseWhenHidden: true,
   respectReducedMotion: true,
   wallpaperRules: [],
@@ -114,6 +145,20 @@ function isDisplayMode(value: unknown): value is DisplayMode {
 
 function isMatchType(value: unknown): value is MatchType {
   return typeof value === "string" && Object.keys(MATCH_TYPES).includes(value);
+}
+
+function isColorOverlayBlendMode(value: unknown): value is ColorOverlayBlendMode {
+  return typeof value === "string" && Object.keys(COLOR_OVERLAY_BLEND_MODES).includes(value);
+}
+
+function isEffectPreset(value: unknown): value is EffectPreset {
+  return typeof value === "string" && Object.keys(EFFECT_PRESETS).includes(value);
+}
+
+function colorValue(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const color = value.trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
 }
 
 function stringValue(value: unknown, fallback = "", maximumLength = 500): string {
@@ -193,6 +238,7 @@ export function normalizeSettings(
     "enabled",
     "blurEnabled",
     "dimEnabled",
+    "colorOverlayEnabled",
     "pauseWhenHidden",
     "respectReducedMotion",
   ] as const;
@@ -213,6 +259,14 @@ export function normalizeSettings(
   ) {
     settings.vignetteMode = stored.vignetteMode;
   }
+  if (isColorOverlayBlendMode(stored.colorOverlayBlendMode)) {
+    settings.colorOverlayBlendMode = stored.colorOverlayBlendMode;
+  }
+  if (isEffectPreset(stored.effectPreset)) settings.effectPreset = stored.effectPreset;
+  settings.colorOverlayColor = colorValue(
+    stored.colorOverlayColor,
+    DEFAULT_SETTINGS.colorOverlayColor,
+  );
 
   const percentageKeys = [
     "opacity",
@@ -221,6 +275,8 @@ export function normalizeSettings(
     "vignetteIntensity",
     "vignetteRadius",
     "dimIntensity",
+    "colorOverlayOpacity",
+    "effectIntensity",
   ] as const;
   for (const key of percentageKeys) {
     settings[key] = boundedNumber(stored[key], DEFAULT_SETTINGS[key], 0, 100);

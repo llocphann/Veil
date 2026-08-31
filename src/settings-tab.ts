@@ -1,4 +1,4 @@
-import { PluginSettingTab, normalizePath, setIcon } from "obsidian";
+import { Notice, PluginSettingTab, normalizePath, setIcon } from "obsidian";
 import type {
   App,
   SettingDefinition,
@@ -9,7 +9,9 @@ import type {
 import type VeilPlugin from "./main";
 import {
   DEFAULT_SETTINGS,
+  COLOR_OVERLAY_BLEND_MODES,
   DISPLAY_MODES,
+  EFFECT_PRESETS,
   MATCH_TYPES,
   createOpacityExclusionRule,
   createWallpaperRule,
@@ -21,8 +23,10 @@ import {
   type VeilSettings,
   type WallpaperRule,
 } from "./settings";
+import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-transfer";
 
 const FUNDING_URL = "https://www.buymeacoffee.com/llocphann";
+const MAX_IMPORT_BYTES = 1024 * 1024;
 const SETTINGS_TABS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
   { id: "rules", label: "Rules", icon: "list-filter" },
@@ -41,7 +45,9 @@ type NumericSettingKey =
   | "vignetteIntensity"
   | "vignetteRadius"
   | "blurIntensity"
-  | "dimIntensity";
+  | "dimIntensity"
+  | "colorOverlayOpacity"
+  | "effectIntensity";
 
 export class WallpaperSettingsTab extends PluginSettingTab {
   private readonly plugin: VeilPlugin;
@@ -324,6 +330,59 @@ export class WallpaperSettingsTab extends PluginSettingTab {
             "%",
             () => !this.plugin.settings.dimEnabled,
           ),
+          {
+            name: "Color overlay",
+            desc: "Place a color layer over the wallpaper without modifying the source file.",
+            control: { type: "toggle", key: "colorOverlayEnabled" },
+          },
+          {
+            name: "Overlay color",
+            control: { type: "color", key: "colorOverlayColor" },
+            visible: () => this.plugin.settings.colorOverlayEnabled,
+          },
+          {
+            ...this.numberSetting(
+              "colorOverlayOpacity",
+              "Overlay opacity",
+              "Strength of the selected color layer.",
+              100,
+              "%",
+              () => !this.plugin.settings.colorOverlayEnabled,
+            ),
+            visible: () => this.plugin.settings.colorOverlayEnabled,
+          },
+          {
+            name: "Overlay blend mode",
+            desc: "Color preserves image detail most closely; other modes change brightness and contrast.",
+            control: {
+              type: "dropdown",
+              key: "colorOverlayBlendMode",
+              options: COLOR_OVERLAY_BLEND_MODES,
+            },
+            visible: () => this.plugin.settings.colorOverlayEnabled,
+          },
+          {
+            name: "Effect preset",
+            desc: "Apply one optimized preset at a time. The original wallpaper file is never changed.",
+            control: {
+              type: "dropdown",
+              key: "effectPreset",
+              options: EFFECT_PRESETS,
+            },
+          },
+          this.numberSetting(
+            "effectIntensity",
+            "Effect intensity",
+            "Controls the strength and, for animated effects, the update speed.",
+            100,
+            "%",
+            () => this.plugin.settings.effectPreset === "none",
+          ),
+          {
+            name: "Performance guide",
+            desc: "Color overlay, dim, and vignette are low cost. Retro is low to moderate. Blur is GPU-heavy at high radius. Glitch and TV noise animate continuously and can use substantial GPU; combining video, blur, and an animated preset is the most demanding setup. Reduced motion freezes preset animation when enabled.",
+            searchable: false,
+          },
         ],
       },
       {
@@ -361,6 +420,30 @@ export class WallpaperSettingsTab extends PluginSettingTab {
                 button
                   .setButtonText("Reload")
                   .onClick(() => this.plugin.refreshWallpaper(true)),
+              );
+            },
+          },
+          {
+            name: "Export settings",
+            desc: "Download a versioned JSON backup containing Veil settings and rules. Wallpaper media files are not included.",
+            render: (setting) => {
+              setting.addButton((button) =>
+                button
+                  .setButtonText("Export")
+                  .setIcon("download")
+                  .onClick(() => this.exportSettings()),
+              );
+            },
+          },
+          {
+            name: "Import settings",
+            desc: "Replace the current configuration with a validated Veil JSON backup. Invalid and unsupported files are rejected.",
+            render: (setting) => {
+              setting.addButton((button) =>
+                button
+                  .setButtonText("Import")
+                  .setIcon("upload")
+                  .onClick(() => this.chooseImportFile()),
               );
             },
           },
@@ -438,9 +521,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         this.update();
       },
       onDelete: (index) => {
-        this.plugin.settings.wallpaperRules.splice(index, 1);
-        this.plugin.updateSettings({ wallpaperRules: this.plugin.settings.wallpaperRules });
-        this.update();
+        const rule = this.plugin.settings.wallpaperRules[index];
+        if (rule) this.deleteWallpaperRule(rule.id);
       },
     };
   }
@@ -471,9 +553,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         this.update();
       },
       onDelete: (index) => {
-        this.plugin.settings.opacityExclusions.splice(index, 1);
-        this.plugin.updateSettings({ opacityExclusions: this.plugin.settings.opacityExclusions });
-        this.update();
+        const rule = this.plugin.settings.opacityExclusions[index];
+        if (rule) this.deleteOpacityRule(rule.id);
       },
     };
   }
@@ -496,6 +577,19 @@ export class WallpaperSettingsTab extends PluginSettingTab {
             key: key("wallpaperPath"),
             placeholder: "Media/Wallpapers/context.webp",
             filter: (file: TFile) => Boolean(mediaKind(file)),
+          },
+        },
+        {
+          name: "Delete wallpaper rule",
+          desc: "Remove this route from Veil.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Delete rule")
+                .setIcon("trash-2")
+                .setDestructive()
+                .onClick(() => this.deleteWallpaperRule(rule.id)),
+            );
           },
         },
       ],
@@ -527,6 +621,19 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           name: "Exclude pane & content opacity",
           desc: "Keep nested backgrounds, text, icons, and images at full opacity.",
           control: { type: "toggle", key: key("excludePaneContent") },
+        },
+        {
+          name: "Delete opacity exclusion",
+          desc: "Remove this exclusion from Veil.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Delete rule")
+                .setIcon("trash-2")
+                .setDestructive()
+                .onClick(() => this.deleteOpacityRule(rule.id)),
+            );
+          },
         },
       ],
     };
@@ -627,6 +734,71 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (field === "matchValue") rule.matchValue = typeof value === "string" ? value : "";
     if (field === "wallpaperPath" && "wallpaperPath" in rule) {
       rule.wallpaperPath = typeof value === "string" ? value : "";
+    }
+  }
+
+  private deleteWallpaperRule(id: string): void {
+    const rules = this.plugin.settings.wallpaperRules.filter((rule) => rule.id !== id);
+    if (rules.length === this.plugin.settings.wallpaperRules.length) return;
+    this.plugin.updateSettings({ wallpaperRules: rules });
+    void this.plugin.flushSettings().then(() => this.update());
+  }
+
+  private deleteOpacityRule(id: string): void {
+    const rules = this.plugin.settings.opacityExclusions.filter((rule) => rule.id !== id);
+    if (rules.length === this.plugin.settings.opacityExclusions.length) return;
+    this.plugin.updateSettings({ opacityExclusions: rules });
+    void this.plugin.flushSettings().then(() => this.update());
+  }
+
+  private exportSettings(): void {
+    const text = serializeVeilSettings(this.plugin.settings, this.plugin.manifest.version);
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = this.containerEl.createEl("a");
+    link.href = url;
+    link.download = `veil-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    link.hidden = true;
+    link.click();
+    window.setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 0);
+    new Notice("Veil settings exported.");
+  }
+
+  private chooseImportFile(): void {
+    const input = this.containerEl.createEl("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.hidden = true;
+    const cleanup = (): void => input.remove();
+    input.addEventListener("cancel", cleanup, { once: true });
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) {
+        cleanup();
+        return;
+      }
+      void this.importSettings(file).finally(cleanup);
+    }, { once: true });
+    input.click();
+  }
+
+  private async importSettings(file: File): Promise<void> {
+    if (file.size > MAX_IMPORT_BYTES) {
+      new Notice("Veil settings import is limited to one megabyte.");
+      return;
+    }
+    try {
+      const imported = parseVeilSettingsImport(await file.text(), normalizePath);
+      this.plugin.updateSettings(imported);
+      await this.plugin.flushSettings();
+      this.update();
+      new Notice("Veil settings imported.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown import error.";
+      new Notice(`Veil could not import settings: ${message}`);
     }
   }
 

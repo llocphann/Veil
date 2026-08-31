@@ -110,6 +110,26 @@ html body.vault-dashboard-background:not(.is-mobile):is(.theme-light, .theme-dar
   opacity: var(--vdb-opacity, 0.15);
 }
 
+.vault-dashboard-wallpaper::before,
+.vault-dashboard-wallpaper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+
+.vault-dashboard-wallpaper::before {
+  z-index: 2;
+  background: var(--vdb-overlay-color, var(--interactive-accent));
+  opacity: var(--vdb-overlay-opacity, 0.3);
+  mix-blend-mode: var(--vdb-overlay-blend-mode, color);
+}
+
+.vault-dashboard-wallpaper[data-color-overlay="true"]::before {
+  display: block;
+}
+
 .vault-dashboard-wallpaper[hidden],
 body:not(.vault-dashboard-background) > .vault-dashboard-wallpaper,
 body.is-mobile > .vault-dashboard-wallpaper {
@@ -135,6 +155,122 @@ body.is-mobile > .vault-dashboard-wallpaper {
   object-position: center;
   filter: var(--vdb-filter, none);
   pointer-events: none;
+  z-index: 1;
+}
+
+.vault-dashboard-wallpaper[data-effect="retro"]::after {
+  z-index: 3;
+  display: block;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    color-mix(in srgb, var(--text-normal) 16%, transparent) 4px
+  );
+  opacity: calc(var(--vdb-effect-opacity, 0.2) * 0.42);
+  mix-blend-mode: soft-light;
+}
+
+.vault-dashboard-wallpaper[data-effect="glitch"]::after {
+  z-index: 3;
+  display: block;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-red, var(--interactive-accent)) 38%, transparent),
+      transparent 32%,
+      color-mix(in srgb, var(--color-cyan, var(--text-accent)) 34%, transparent)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 5px,
+      color-mix(in srgb, var(--text-normal) 18%, transparent) 6px 7px
+    );
+  opacity: var(--vdb-effect-opacity, 0.24);
+  mix-blend-mode: screen;
+  animation: veil-glitch-overlay var(--vdb-effect-speed, 260ms) steps(2, end) infinite;
+}
+
+.vault-dashboard-wallpaper[data-effect="glitch"] > .vault-dashboard-wallpaper-media {
+  animation: veil-glitch-media var(--vdb-effect-speed, 260ms) steps(2, end) infinite;
+  will-change: transform;
+}
+
+.vault-dashboard-wallpaper[data-effect="tv-noise"]::after {
+  z-index: 3;
+  display: block;
+  background-image:
+    repeating-radial-gradient(
+      circle at 17% 31%,
+      color-mix(in srgb, var(--text-normal) 28%, transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(
+      87deg,
+      transparent 0 2px,
+      color-mix(in srgb, var(--background-primary) 42%, transparent) 2px 3px
+    );
+  background-size: 5px 5px, 7px 4px;
+  opacity: var(--vdb-effect-opacity, 0.24);
+  mix-blend-mode: overlay;
+  animation: veil-tv-noise var(--vdb-effect-speed, 260ms) steps(2, end) infinite;
+  will-change: background-position;
+}
+
+.vault-dashboard-wallpaper[data-animation-paused="true"][data-effect="glitch"]::after,
+.vault-dashboard-wallpaper[data-animation-paused="true"][data-effect="glitch"]
+  > .vault-dashboard-wallpaper-media,
+.vault-dashboard-wallpaper[data-animation-paused="true"][data-effect="tv-noise"]::after {
+  animation-play-state: paused;
+}
+
+@keyframes veil-glitch-media {
+  0%,
+  68%,
+  100% {
+    transform: scale(1.01) translate3d(0, 0, 0);
+  }
+
+  70% {
+    transform: scale(1.01) translate3d(var(--vdb-effect-shift, 3px), 0, 0);
+  }
+
+  74% {
+    transform: scale(1.01) translate3d(calc(0px - var(--vdb-effect-shift, 3px)), 0, 0);
+  }
+}
+
+@keyframes veil-glitch-overlay {
+  0%,
+  62%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  64% {
+    transform: translate3d(var(--vdb-effect-shift, 3px), -1%, 0);
+  }
+
+  70% {
+    transform: translate3d(calc(0px - var(--vdb-effect-shift, 3px)), 1%, 0);
+  }
+}
+
+@keyframes veil-tv-noise {
+  0% { background-position: 0 0, 0 0; }
+  25% { background-position: 13px -7px, -9px 11px; }
+  50% { background-position: -11px 5px, 7px -13px; }
+  75% { background-position: 5px 17px, -15px -3px; }
+  100% { background-position: -17px -11px, 13px 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vault-dashboard-wallpaper[data-reduce-motion="true"][data-effect="glitch"]::after,
+  .vault-dashboard-wallpaper[data-reduce-motion="true"][data-effect="glitch"]
+    > .vault-dashboard-wallpaper-media,
+  .vault-dashboard-wallpaper[data-reduce-motion="true"][data-effect="tv-noise"]::after {
+    animation: none;
+  }
 }
 
 .vault-dashboard-wallpaper-vignette {
@@ -147,6 +283,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
   );
   opacity: var(--vdb-vignette-intensity, 0.4);
   pointer-events: none;
+  z-index: 4;
 }
 
 .vault-dashboard-wallpaper-vignette[hidden] {

@@ -27,6 +27,11 @@ void test("settings use bounded numbers and allowed enum values", () => {
     vignetteIntensity: "80",
     vignetteRadius: Number.NaN,
     dimIntensity: Number.POSITIVE_INFINITY,
+    colorOverlayOpacity: 999,
+    effectIntensity: -10,
+    colorOverlayColor: "url(https://example.com/tracker.png)",
+    colorOverlayBlendMode: "unsafe",
+    effectPreset: "expensive-loop",
     displayMode: "url(unsafe)",
     vignetteMode: "bad",
     enabled: "false",
@@ -38,6 +43,11 @@ void test("settings use bounded numbers and allowed enum values", () => {
   assert.equal(settings.vignetteIntensity, 80);
   assert.equal(settings.vignetteRadius, DEFAULT_SETTINGS.vignetteRadius);
   assert.equal(settings.dimIntensity, DEFAULT_SETTINGS.dimIntensity);
+  assert.equal(settings.colorOverlayOpacity, 100);
+  assert.equal(settings.effectIntensity, 0);
+  assert.equal(settings.colorOverlayColor, DEFAULT_SETTINGS.colorOverlayColor);
+  assert.equal(settings.colorOverlayBlendMode, DEFAULT_SETTINGS.colorOverlayBlendMode);
+  assert.equal(settings.effectPreset, "none");
   assert.equal(settings.displayMode, "cover");
   assert.equal(settings.vignetteMode, "off");
   assert.equal(settings.enabled, true);

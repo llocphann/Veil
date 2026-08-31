@@ -66,6 +66,7 @@ export default class VeilPlugin extends Plugin {
   private saveTimer: number | null = null;
   private pendingSave = false;
   private saveQueue: Promise<void> = Promise.resolve();
+  private refreshFrame: number | null = null;
 
   async onload(): Promise<void> {
     try {
@@ -113,6 +114,8 @@ export default class VeilPlugin extends Plugin {
 
   onunload(): void {
     this.unloaded = true;
+    if (this.refreshFrame !== null) window.cancelAnimationFrame(this.refreshFrame);
+    this.refreshFrame = null;
     void this.flushSettings();
     this.clearAllDocuments();
   }
@@ -149,12 +152,22 @@ export default class VeilPlugin extends Plugin {
   public refreshWallpaper(force = false): void {
     if (this.unloaded || !this.layoutReady) return;
     if (!this.settings.enabled) {
+      if (this.refreshFrame !== null) window.cancelAnimationFrame(this.refreshFrame);
+      this.refreshFrame = null;
       this.clearAllDocuments();
       this.setStatus("Wallpaper is disabled.");
       return;
     }
     if (force) this.sourceRevision += 1;
-    this.applyToWorkspace();
+    this.scheduleApplyToWorkspace();
+  }
+
+  private scheduleApplyToWorkspace(): void {
+    if (this.refreshFrame !== null || this.unloaded) return;
+    this.refreshFrame = window.requestAnimationFrame(() => {
+      this.refreshFrame = null;
+      this.applyToWorkspace();
+    });
   }
 
   private setStatus(message: string, tone: StatusTone = "info"): void {
@@ -246,20 +259,45 @@ export default class VeilPlugin extends Plugin {
     if (this.settings.dimEnabled && this.settings.dimIntensity > 0) {
       filters.push(`brightness(${1 - this.settings.dimIntensity / 100})`);
     }
+    const effectStrength = this.settings.effectIntensity / 100;
+    if (this.settings.effectPreset === "retro" && effectStrength > 0) {
+      filters.push(
+        `sepia(${(effectStrength * 0.72).toFixed(2)})`,
+        `saturate(${(1 + effectStrength * 0.5).toFixed(2)})`,
+        `contrast(${(1 + effectStrength * 0.14).toFixed(2)})`,
+      );
+    }
+    const effectBleed = this.settings.effectPreset === "glitch" ? 8 : 0;
     const variables: Record<string, string> = {
       "--vdb-opacity": String(this.settings.opacity / 100),
       "--vdb-fit": this.settings.displayMode,
       "--vdb-filter": filters.length ? filters.join(" ") : "none",
-      "--vdb-blur-bleed": `${this.settings.blurEnabled ? this.settings.blurIntensity * 2 : 0}px`,
+      "--vdb-blur-bleed": `${
+        (this.settings.blurEnabled ? this.settings.blurIntensity * 2 : 0) + effectBleed
+      }px`,
       "--vdb-vignette-shape": this.settings.vignetteMode === "circle" ? "circle" : "ellipse",
       "--vdb-vignette-intensity": String(this.settings.vignetteIntensity / 100),
       "--vdb-vignette-radius": `${this.settings.vignetteRadius}%`,
+      "--vdb-overlay-color": this.settings.colorOverlayColor,
+      "--vdb-overlay-opacity": String(this.settings.colorOverlayOpacity / 100),
+      "--vdb-overlay-blend-mode": this.settings.colorOverlayBlendMode,
+      "--vdb-effect-opacity": String(0.08 + effectStrength * 0.42),
+      "--vdb-effect-shift": `${Math.max(1, Math.round(effectStrength * 7))}px`,
+      "--vdb-effect-speed": `${Math.max(90, Math.round(420 - effectStrength * 300))}ms`,
     };
     for (const [name, value] of Object.entries(variables)) {
       if (state.layer.style.getPropertyValue(name) !== value) {
         state.layer.style.setProperty(name, value);
       }
     }
+
+    state.layer.dataset.colorOverlay = String(
+      this.settings.colorOverlayEnabled && this.settings.colorOverlayOpacity > 0,
+    );
+    state.layer.dataset.effect = this.settings.effectIntensity > 0
+      ? this.settings.effectPreset
+      : "none";
+    state.layer.dataset.reduceMotion = String(this.settings.respectReducedMotion);
 
     state.vignette.hidden =
       this.settings.vignetteMode === "off" || this.settings.vignetteIntensity === 0;
@@ -279,7 +317,7 @@ export default class VeilPlugin extends Plugin {
     }
     document.body.style.removeProperty(LEGACY_IMAGE_VARIABLE);
     if (state.ready && !state.failed) document.body.classList.add(BODY_CLASS);
-    this.syncVideoPlayback(document, state);
+    this.syncPlaybackAndMotion(document, state);
   }
 
   private applyToDocument(document: Document): void {
@@ -382,10 +420,10 @@ export default class VeilPlugin extends Plugin {
         "error",
       );
     });
-    listen(document, "visibilitychange", () => this.syncVideoPlayback(document, activeState));
+    listen(document, "visibilitychange", () => this.syncPlaybackAndMotion(document, activeState));
     if (activeState.motionQuery?.addEventListener) {
       listen(activeState.motionQuery, "change", () =>
-        this.syncVideoPlayback(document, activeState),
+        this.syncPlaybackAndMotion(document, activeState),
       );
     }
 
@@ -395,21 +433,25 @@ export default class VeilPlugin extends Plugin {
     media.src = source.url;
     if (activeState.kind === "video") {
       (media as HTMLVideoElement).load();
-      this.syncVideoPlayback(document, activeState);
+      this.syncPlaybackAndMotion(document, activeState);
     } else {
       const image = media as HTMLImageElement;
       if (image.complete && image.naturalWidth > 0) ready();
     }
   }
 
-  private syncVideoPlayback(document: Document, state: DocumentState): void {
+  private syncPlaybackAndMotion(document: Document, state: DocumentState): void {
+    const motionPaused =
+      this.settings.opacity === 0
+      || (this.settings.pauseWhenHidden && document.hidden)
+      || (this.settings.respectReducedMotion && Boolean(state.motionQuery?.matches));
+    state.layer.dataset.animationPaused = String(motionPaused);
     if (state.kind !== "video" || state.disposed || state.failed || this.unloaded) return;
     const video = state.media as HTMLVideoElement;
     const shouldPlay =
       this.settings.enabled &&
       this.settings.opacity > 0 &&
-      !(this.settings.pauseWhenHidden && document.hidden) &&
-      !(this.settings.respectReducedMotion && state.motionQuery?.matches);
+      !motionPaused;
     if (!shouldPlay) {
       video.pause();
       return;
@@ -432,7 +474,7 @@ export default class VeilPlugin extends Plugin {
         })
         .finally(() => {
           state.playPromise = null;
-          if (interrupted) this.syncVideoPlayback(document, state);
+          if (interrupted) this.syncPlaybackAndMotion(document, state);
         });
     } catch {
       this.setStatus("Video playback is unavailable in this window.", "error");
