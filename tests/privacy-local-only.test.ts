@@ -11,7 +11,7 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-void test("Veil runtime remains vault-local and does not add telemetry transports", () => {
+void test("Veil runtime remains vault-local and does not add network or telemetry transports", () => {
   const source = sourceFiles("src")
     .map((file) => fs.readFileSync(file, "utf8"))
     .join("\n");
@@ -22,6 +22,11 @@ void test("Veil runtime remains vault-local and does not add telemetry transport
     /\bWebSocket\b/,
     /\bEventSource\b/,
     /\bsendBeacon\s*\(/,
+    /\brequestUrl\s*\(/,
+    /\brequest\s*\(/,
+    /from\s+["'](?:node:)?(?:http|https|net|tls|dns|dgram)["']/,
+    /from\s+["']electron["']/,
+    /from\s+["'](?:axios|got|undici|node-fetch)["']/,
   ]) {
     assert.doesNotMatch(source, forbidden);
   }
