@@ -309,7 +309,7 @@ export function copyAppearance(source: VeilAppearance): VeilAppearance {
   for (const key of APPEARANCE_KEYS) {
     // The key list is constrained to VeilAppearance above.
     (appearance as Record<keyof VeilAppearance, VeilAppearance[keyof VeilAppearance]>)[key] =
-      source[key] as VeilAppearance[keyof VeilAppearance];
+      source[key];
   }
   return appearance;
 }
