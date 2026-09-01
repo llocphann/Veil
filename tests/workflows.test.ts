@@ -34,7 +34,7 @@ void test("prerelease CI cancels superseded verification runs", () => {
 
 void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
-  assert.match(source, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(source, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
   assert.match(source, /github\.ref == 'refs\/heads\/prerelease'/);
   assert.match(source, /retention-days: 7/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
