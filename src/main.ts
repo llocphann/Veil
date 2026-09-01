@@ -38,7 +38,10 @@ import {
   wallpaperLibraryTargetPatch,
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
-import { wallpaperPoolConfigurationChanges } from "./wallpaper-pool-config";
+import {
+  rewriteWallpaperPoolSelectionPaths,
+  wallpaperPoolConfigurationChanges,
+} from "./wallpaper-pool-config";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -451,6 +454,8 @@ export default class VeilPlugin extends Plugin {
           value === oldPath || value.startsWith(`${oldPath}/`)
             ? file.path + value.slice(oldPath.length)
             : value;
+        rewriteWallpaperPoolSelectionPaths(this.poolSelections, rename);
+        rewriteWallpaperPoolSelectionPaths(this.previousPoolSelections, rename);
         const next = normalizeSettings(this.settings, normalizePath);
         let changed = false;
         const wallpaperPath = rename(next.wallpaperPath);
