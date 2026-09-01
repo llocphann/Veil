@@ -2,18 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_SETTINGS,
+  createProfile,
   mediaKind,
   normalizeSettings,
   normalizeWallpaperPath,
 } from "../src/settings";
 
-void test("fresh installs start without a vault-specific wallpaper path", () => {
+void test("fresh installs start without vault-specific appearance state", () => {
   assert.deepEqual(normalizeSettings(null), DEFAULT_SETTINGS);
   assert.equal(DEFAULT_SETTINGS.wallpaperPath, "");
   assert.equal(DEFAULT_SETTINGS.opacity, 15);
   assert.equal(DEFAULT_SETTINGS.paneOpacity, 70);
   assert.equal(DEFAULT_SETTINGS.paneContentOpacity, 100);
   assert.equal(DEFAULT_SETTINGS.vignetteMode, "off");
+  assert.deepEqual(DEFAULT_SETTINGS.profiles, []);
   assert.deepEqual(DEFAULT_SETTINGS.wallpaperRules, []);
   assert.deepEqual(DEFAULT_SETTINGS.opacityExclusions, []);
 });
@@ -82,7 +84,7 @@ void test("zero values and disabled toggles survive loading", () => {
   assert.equal(settings.respectReducedMotion, false);
 });
 
-void test("older data keeps its values and does not opt in to whole-pane fading", () => {
+void test("older data keeps its values and does not opt in to scenes or whole-pane fading", () => {
   const settings = normalizeSettings({
     opacity: 65,
     paneOpacity: 35,
@@ -92,6 +94,7 @@ void test("older data keeps its values and does not opt in to whole-pane fading"
   assert.equal(settings.paneOpacity, 35);
   assert.equal(settings.wallpaperPath, "Media/scene.gif");
   assert.equal(settings.paneContentOpacity, 100);
+  assert.deepEqual(settings.profiles, []);
 });
 
 void test("full-path wikilinks and Windows separators are normalized", () => {
@@ -120,21 +123,33 @@ void test("media detection is case insensitive and rejects unknown files", () =>
   assert.equal(mediaKind(null), "");
 });
 
-void test("context rules are normalized without losing order or exclusion choices", () => {
+void test("profiles and context rules normalize without losing order or compatibility", () => {
   const settings = normalizeSettings({
+    profiles: [
+      {
+        id: "focus",
+        name: "Focus",
+        wallpaperPath: ".\\Media\\focus.webp",
+        opacity: 120,
+        blurEnabled: true,
+        blurIntensity: 80,
+      },
+    ],
     wallpaperRules: [
       {
         id: "same",
         enabled: true,
         matchType: "tag",
         matchValue: "#Media",
-        wallpaperPath: ".\\Media\\wallpaper.webp",
+        profileId: "focus",
+        wallpaperPath: ".\\Media\\legacy.webp",
       },
       {
         id: "same",
         enabled: true,
         matchType: "folder",
         matchValue: "20_Personal_Life/",
+        profileId: "missing-profile",
         wallpaperPath: "Media/second.gif",
       },
     ],
@@ -150,11 +165,40 @@ void test("context rules are normalized without losing order or exclusion choice
     ],
   });
 
+  assert.equal(settings.profiles[0]?.wallpaperPath, "Media/focus.webp");
+  assert.equal(settings.profiles[0]?.opacity, 100);
+  assert.equal(settings.profiles[0]?.blurIntensity, 40);
   assert.deepEqual(settings.wallpaperRules.map((rule) => rule.id), ["same", "same-2"]);
   assert.equal(settings.wallpaperRules[0]?.matchValue, "Media");
-  assert.equal(settings.wallpaperRules[0]?.wallpaperPath, "Media/wallpaper.webp");
+  assert.equal(settings.wallpaperRules[0]?.profileId, "focus");
+  assert.equal(settings.wallpaperRules[0]?.wallpaperPath, "Media/legacy.webp");
   assert.equal(settings.wallpaperRules[1]?.matchValue, "20_Personal_Life");
+  assert.equal(settings.wallpaperRules[1]?.profileId, "");
   assert.equal(settings.opacityExclusions[0]?.matchValue, "Homepage");
   assert.equal(settings.opacityExclusions[0]?.excludePaneSurface, false);
   assert.equal(settings.opacityExclusions[0]?.excludePaneContent, true);
+});
+
+void test("new scenes copy the complete current global appearance", () => {
+  const settings = normalizeSettings({
+    wallpaperPath: "Media/default.webp",
+    opacity: 61,
+    paneOpacity: 47,
+    blurEnabled: true,
+    blurIntensity: 11,
+    effectPreset: "retro",
+    effectIntensity: 32,
+    pauseWhenHidden: false,
+  });
+  const profile = createProfile([], settings);
+
+  assert.equal(profile.name, "Scene 1");
+  assert.equal(profile.wallpaperPath, "Media/default.webp");
+  assert.equal(profile.opacity, 61);
+  assert.equal(profile.paneOpacity, 47);
+  assert.equal(profile.blurEnabled, true);
+  assert.equal(profile.blurIntensity, 11);
+  assert.equal(profile.effectPreset, "retro");
+  assert.equal(profile.effectIntensity, 32);
+  assert.equal(profile.pauseWhenHidden, false);
 });
