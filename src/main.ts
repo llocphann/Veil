@@ -535,14 +535,14 @@ export default class VeilPlugin extends Plugin {
     outgoing.layer.style.setProperty("--vdb-transition-duration", durationValue);
     state.layer.dataset.transitionState = "incoming";
     outgoing.layer.dataset.transitionState = "outgoing";
-    state.layer.style.setProperty(TRANSITION_OPACITY_VARIABLE, "0");
+    state.layer.setCssProps({ [TRANSITION_OPACITY_VARIABLE]: "0" });
     outgoing.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
     void state.layer.offsetWidth;
 
     window.requestAnimationFrame(() => {
       if (state.disposed || outgoing.disposed || this.documents.get(document) !== state) return;
       state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
-      outgoing.layer.style.setProperty(TRANSITION_OPACITY_VARIABLE, "0");
+      outgoing.layer.setCssProps({ [TRANSITION_OPACITY_VARIABLE]: "0" });
     });
 
     state.transitionTimer = window.setTimeout(() => {
