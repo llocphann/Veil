@@ -3,6 +3,8 @@ import { DEFAULT_SETTINGS, normalizeSettings, type VeilSettings } from "./settin
 export const VEIL_SETTINGS_FORMAT = "veil-settings";
 export const VEIL_SETTINGS_SCHEMA_VERSION = 2;
 const OLDEST_SUPPORTED_SCHEMA_VERSION = 1;
+const MAX_IMPORTED_SCENES = 64;
+const MAX_IMPORTED_RULES = 96;
 
 interface VeilSettingsEnvelope {
   format: typeof VEIL_SETTINGS_FORMAT;
@@ -26,6 +28,24 @@ function migrateSettingsEnvelope(schemaVersion: number, settings: unknown): unkn
   }
   if (schemaVersion === VEIL_SETTINGS_SCHEMA_VERSION) return settings;
   throw new Error(`Unsupported Veil settings schema: ${String(schemaVersion)}.`);
+}
+
+function validateCollectionLimit(
+  settings: Record<string, unknown>,
+  key: string,
+  label: string,
+  maximum: number,
+): void {
+  const value = settings[key];
+  if (Array.isArray(value) && value.length > maximum) {
+    throw new Error(`The imported settings contain more than ${maximum} ${label}.`);
+  }
+}
+
+function validateCollectionLimits(settings: Record<string, unknown>): void {
+  validateCollectionLimit(settings, "profiles", "scenes", MAX_IMPORTED_SCENES);
+  validateCollectionLimit(settings, "wallpaperRules", "wallpaper rules", MAX_IMPORTED_RULES);
+  validateCollectionLimit(settings, "opacityExclusions", "opacity exclusions", MAX_IMPORTED_RULES);
 }
 
 export function serializeVeilSettings(
@@ -73,5 +93,6 @@ export function parseVeilSettingsImport(
     throw new Error("This JSON object does not contain Veil settings.");
   }
   if (!isRecord(settings)) throw new Error("The imported Veil settings are missing.");
+  validateCollectionLimits(settings);
   return normalizeSettings(settings, normalizePath);
 }
