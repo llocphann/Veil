@@ -448,7 +448,7 @@ export default class VeilPlugin extends Plugin {
       this.app.vault.on("rename", (file, oldPath) => {
         this.poolCandidates.clear();
         const selectedPoolPathRenamed = Array.from(this.documents.values()).some(
-          (state) => state.path === oldPath,
+          (state) => state.path === oldPath || state.path.startsWith(`${oldPath}/`),
         );
         const rename = (value: string): string =>
           value === oldPath || value.startsWith(`${oldPath}/`)
