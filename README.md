@@ -166,13 +166,14 @@ The production build writes `main.js` at the repository root. `main.js` is inten
 
 ## Releasing
 
-1. Update the version in `package.json`.
-2. Run `npm version patch`, `npm version minor`, or `npm version major` as appropriate.
-3. Push the commit and its version tag.
-4. The release workflow verifies the tag, runs all checks, attests the release files, and creates a draft GitHub release containing `main.js`, `manifest.json`, and `styles.css`.
-5. Review and publish the draft release.
+1. Decide the target semantic version and promote `## Unreleased` in `CHANGELOG.md` to that exact `## x.y.z` heading.
+2. Commit the changelog promotion while the repository still has the previous package version.
+3. Run exactly one of `npm version patch`, `npm version minor`, or `npm version major`. The npm lifecycle updates `package.json` and `package-lock.json`, then Veil's version script synchronizes `manifest.json` and `versions.json` before npm creates the version commit and tag.
+4. Run `npm run check`, then push the version commit and its tag.
+5. The release workflow re-verifies the tag and `main` ancestry before dependency installation, builds in a read-only job, hands only the verified release files to the publish job, attests them, and creates a draft GitHub release containing `main.js`, `manifest.json`, and `styles.css`.
+6. Review and publish the draft release.
 
-The Git tag must exactly match the version in `manifest.json`.
+The Git tag must exactly match the version in `manifest.json`. Do not edit `package.json` to the target version before running `npm version`, or the requested bump would advance it again.
 
 ## License
 
