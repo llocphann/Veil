@@ -6,6 +6,7 @@ import type {
   SettingDefinitionPage,
   TFile,
 } from "obsidian";
+import { contextRuleSyntaxValid } from "./context-rules";
 import type VeilPlugin from "./main";
 import { duplicateSceneProfile } from "./scene-profile-actions";
 import {
@@ -818,7 +819,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       desc: "Keep selected pane layers at full opacity in this context.",
       displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
       status: () =>
-        !rule.enabled || (rule.matchValue && (rule.excludePaneSurface || rule.excludePaneContent))
+        !rule.enabled || (
+          contextRuleSyntaxValid(rule)
+          && (rule.excludePaneSurface || rule.excludePaneContent)
+        )
           ? null
           : "warning",
       items: [
@@ -1168,7 +1172,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private wallpaperRuleReady(rule: WallpaperRule): boolean {
-    if (!rule.matchValue) return false;
+    if (!contextRuleSyntaxValid(rule)) return false;
     const profile = rule.profileId ? this.findProfile(rule.profileId) : undefined;
     const path = profile?.wallpaperPath || rule.wallpaperPath;
     if (!path) return false;
