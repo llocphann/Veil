@@ -27,6 +27,7 @@ const PANE_OPACITY_VARIABLE = "--vault-dashboard-pane-opacity";
 const PANE_CONTENT_CLASS = "vault-dashboard-fade-pane-content";
 const PANE_CONTENT_OPACITY_VARIABLE = "--vault-dashboard-pane-content-opacity";
 const LEGACY_IMAGE_VARIABLE = "--vault-dashboard-banner-image";
+const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
 const TRANSITION_CLEANUP_BUFFER = 80;
 
 interface WallpaperSource {
@@ -513,7 +514,7 @@ export default class VeilPlugin extends Plugin {
     if (!outgoing || outgoing.disposed || !outgoing.ready || outgoing.failed) {
       if (outgoing) this.disposeState(outgoing);
       state.outgoing = null;
-      state.layer.style.removeProperty("opacity");
+      state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
       delete state.layer.dataset.transitionState;
       return;
     }
@@ -524,7 +525,7 @@ export default class VeilPlugin extends Plugin {
     if (duration <= 0) {
       this.disposeState(outgoing);
       state.outgoing = null;
-      state.layer.style.removeProperty("opacity");
+      state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
       delete state.layer.dataset.transitionState;
       return;
     }
@@ -534,14 +535,14 @@ export default class VeilPlugin extends Plugin {
     outgoing.layer.style.setProperty("--vdb-transition-duration", durationValue);
     state.layer.dataset.transitionState = "incoming";
     outgoing.layer.dataset.transitionState = "outgoing";
-    state.layer.style.opacity = "0";
-    outgoing.layer.style.removeProperty("opacity");
+    state.layer.style.setProperty(TRANSITION_OPACITY_VARIABLE, "0");
+    outgoing.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
     void state.layer.offsetWidth;
 
     window.requestAnimationFrame(() => {
       if (state.disposed || outgoing.disposed || this.documents.get(document) !== state) return;
-      state.layer.style.removeProperty("opacity");
-      outgoing.layer.style.opacity = "0";
+      state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
+      outgoing.layer.style.setProperty(TRANSITION_OPACITY_VARIABLE, "0");
     });
 
     state.transitionTimer = window.setTimeout(() => {
@@ -562,7 +563,7 @@ export default class VeilPlugin extends Plugin {
       this.disposeState(state.outgoing);
       state.outgoing = null;
     }
-    state.layer.style.removeProperty("opacity");
+    state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
     delete state.layer.dataset.transitionState;
   }
 
