@@ -76,6 +76,26 @@ void test("system theme rules match light or dark mode without requiring frontma
   );
 });
 
+void test("system fallbacks can resolve without an active note context", () => {
+  const previousDocument = globalThis.document;
+  try {
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        body: {
+          classList: {
+            contains: (value: string) => value === "theme-dark",
+          },
+        },
+      },
+    });
+    assert.equal(contextMatches(wallpaperRule("property", "@theme=dark"), null), true);
+  } finally {
+    if (previousDocument === undefined) delete (globalThis as { document?: unknown }).document;
+    else Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument });
+  }
+});
+
 void test("time, day, and schedule fallbacks use local time and support overnight ranges", () => {
   assert.equal(contextMatches(wallpaperRule("property", "@time=22:00-06:00"), context), true);
   assert.equal(contextMatches(wallpaperRule("property", "@time=06:00-22:00"), context), false);
@@ -101,6 +121,33 @@ void test("time, day, and schedule fallbacks use local time and support overnigh
   );
 });
 
+void test("full-day and wrapped day ranges preserve local-day semantics", () => {
+  const fullDay = wallpaperRule("property", "@time=08:00-08:00");
+  assert.equal(contextMatches(fullDay, { ...context, now: new Date(2026, 8, 1, 7, 59) }), true);
+  assert.equal(contextMatches(fullDay, { ...context, now: new Date(2026, 8, 1, 18, 0) }), true);
+
+  const wrappedDays = wallpaperRule("property", "@day=fri-mon");
+  assert.equal(contextMatches(wrappedDays, { ...context, now: new Date(2026, 8, 4, 12, 0) }), true);
+  assert.equal(contextMatches(wrappedDays, { ...context, now: new Date(2026, 8, 6, 12, 0) }), true);
+  assert.equal(contextMatches(wrappedDays, { ...context, now: new Date(2026, 8, 7, 12, 0) }), true);
+  assert.equal(contextMatches(wrappedDays, { ...context, now: new Date(2026, 8, 8, 12, 0) }), false);
+});
+
+void test("malformed system fallback expressions fail closed", () => {
+  for (const value of [
+    "@theme=blue",
+    "@theme",
+    "@time=25:00-06:00",
+    "@time=22:00",
+    "@day=funday",
+    "@schedule=mon-fri",
+    "@schedule=funday 08:00-18:00",
+    "@unknown=value",
+  ]) {
+    assert.equal(contextMatches(wallpaperRule("property", value), context), false, value);
+  }
+});
+
 void test("scheduled rules expose only their next meaningful boundary", () => {
   const timeRule = wallpaperRule("property", "@time=22:00-06:00");
   const timeNow = new Date(2026, 8, 1, 21, 30);
@@ -121,6 +168,30 @@ void test("scheduled rules expose only their next meaningful boundary", () => {
   assert.equal(
     nextSystemContextBoundary([dayRule], fridayNight),
     new Date(2026, 8, 5, 0, 0).getTime(),
+  );
+});
+
+void test("boundary scheduling chooses the earliest enabled meaningful transition", () => {
+  const disabled = wallpaperRule("property", "@time=20:00-21:00");
+  disabled.enabled = false;
+  const rules = [
+    disabled,
+    wallpaperRule("property", "@theme=dark"),
+    wallpaperRule("property", "@day=weekday"),
+    wallpaperRule("property", "@time=22:00-06:00"),
+  ];
+  const now = new Date(2026, 8, 1, 21, 30);
+  assert.equal(
+    nextSystemContextBoundary(rules, now),
+    new Date(2026, 8, 1, 22, 0).getTime(),
+  );
+  assert.equal(
+    nextSystemContextBoundary([wallpaperRule("property", "@theme=dark")], now),
+    null,
+  );
+  assert.equal(
+    nextSystemContextBoundary([wallpaperRule("property", "@time=08:00-08:00")], now),
+    null,
   );
 });
 
@@ -163,6 +234,31 @@ void test("opacity exclusions combine independently", () => {
       enabled: true,
       matchType: "tag",
       matchValue: "favorite",
+      excludePaneSurface: false,
+      excludePaneContent: true,
+    },
+  ];
+  assert.deepEqual(matchingOpacityExclusions(rules, context), {
+    paneSurface: true,
+    paneContent: true,
+  });
+});
+
+void test("system-context opacity exclusions remain additive", () => {
+  const rules: OpacityExclusionRule[] = [
+    {
+      id: "night-surface",
+      enabled: true,
+      matchType: "property",
+      matchValue: "@time=22:00-06:00",
+      excludePaneSurface: true,
+      excludePaneContent: false,
+    },
+    {
+      id: "dark-content",
+      enabled: true,
+      matchType: "property",
+      matchValue: "@theme=dark",
       excludePaneSurface: false,
       excludePaneContent: true,
     },
