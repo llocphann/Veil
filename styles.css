@@ -107,7 +107,7 @@ html body.vault-dashboard-background:not(.is-mobile):is(.theme-light, .theme-dar
   contain: strict;
   pointer-events: none;
   user-select: none;
-  opacity: var(--vdb-opacity, 0.15);
+  opacity: var(--vdb-transition-opacity, var(--vdb-opacity, 0.15));
   transition: opacity var(--vdb-transition-duration, 320ms) ease;
 }
 
