@@ -145,7 +145,7 @@ For the lightest setup, use a static image, keep blur low or off, and avoid anim
 
 If Veil is useful to you, you can support its continued development:
 
-[![Buy me a coffee](assets/buy-me-a-coffee.svg)](https://www.buymeacoffee.com/llocphann)
+[![Buy me a coffee](https://raw.githubusercontent.com/llocphann/Veil/main/assets/buy-me-a-coffee.svg)](https://www.buymeacoffee.com/llocphann)
 
 ## Development
 
