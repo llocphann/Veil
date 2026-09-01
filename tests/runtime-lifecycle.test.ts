@@ -34,3 +34,10 @@ void test("closing a pop-out drops its leaf cache and wallpaper layer", () => {
     /workspace\.on\("window-close",[\s\S]*?activeRootLeaves\.delete\(window\.document\);[\s\S]*?clearDocument\(window\.document\)/,
   );
 });
+
+void test("folder rename refreshes loaded descendant wallpaper paths", () => {
+  assert.match(
+    source,
+    /state\.path === oldPath \|\| state\.path\.startsWith\(`\$\{oldPath\}\/`\)/,
+  );
+});
