@@ -50,7 +50,7 @@ void test("duplicating a scene copies its complete appearance with a fresh id", 
   assert.equal(source.name, "Focus");
 });
 
-void test("duplicate scene names stay within the settings name limit", () => {
+void test("duplicate scene names keep the copy suffix within the name limit", () => {
   const settings = normalizeSettings({
     profiles: [{
       id: "long",
@@ -61,4 +61,6 @@ void test("duplicate scene names stay within the settings name limit", () => {
   assert.ok(source);
   const duplicate = duplicateSceneProfile(settings.profiles, source, settings);
   assert.equal(duplicate.name.length, 80);
+  assert.equal(duplicate.name.endsWith(" copy"), true);
+  assert.notEqual(duplicate.name, source.name);
 });
