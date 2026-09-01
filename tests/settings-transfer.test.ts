@@ -88,3 +88,36 @@ void test("Veil import accepts raw settings but rejects foreign or future envelo
     /Unsupported Veil settings schema/,
   );
 });
+
+void test("imports above collection caps fail instead of silently truncating data", () => {
+  const profiles = Array.from({ length: 65 }, (_, index) => ({
+    id: `scene-${index}`,
+    name: `Scene ${index}`,
+  }));
+  const wallpaperRules = Array.from({ length: 97 }, (_, index) => ({
+    id: `wallpaper-${index}`,
+    enabled: false,
+    matchType: "path",
+    matchValue: `Notes/${index}.md`,
+    wallpaperPath: "",
+  }));
+  const opacityExclusions = Array.from({ length: 97 }, (_, index) => ({
+    id: `opacity-${index}`,
+    enabled: false,
+    matchType: "path",
+    matchValue: `Notes/${index}.md`,
+  }));
+
+  assert.throws(
+    () => parseVeilSettingsImport(JSON.stringify({ opacity: 10, profiles })),
+    /more than 64 scenes/,
+  );
+  assert.throws(
+    () => parseVeilSettingsImport(JSON.stringify({ opacity: 10, wallpaperRules })),
+    /more than 96 wallpaper rules/,
+  );
+  assert.throws(
+    () => parseVeilSettingsImport(JSON.stringify({ opacity: 10, opacityExclusions })),
+    /more than 96 opacity exclusions/,
+  );
+});
