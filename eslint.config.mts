@@ -28,11 +28,4 @@ export default defineConfig(
     },
   },
   ...obsidianmd.configs.recommended,
-  {
-    // Temporary prerelease diagnostic override; remove after the two reported
-    // assertions are cleaned up so CI can expose any deeper test/build errors.
-    rules: {
-      "@typescript-eslint/no-unnecessary-type-assertion": "off",
-    },
-  },
 );
