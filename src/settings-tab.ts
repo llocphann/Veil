@@ -7,6 +7,7 @@ import type {
   TFile,
 } from "obsidian";
 import type VeilPlugin from "./main";
+import { duplicateSceneProfile } from "./scene-profile-actions";
 import {
   COLOR_OVERLAY_BLEND_MODES,
   DEFAULT_SETTINGS,
@@ -29,6 +30,7 @@ import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-trans
 
 const FUNDING_URL = "https://www.buymeacoffee.com/llocphann";
 const MAX_IMPORT_BYTES = 1024 * 1024;
+const MAX_SCENES = 64;
 const SETTINGS_TABS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
   { id: "rules", label: "Rules", icon: "list-filter" },
@@ -401,6 +403,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       addItem: {
         name: "Add scene from current appearance",
         action: () => {
+          if (this.plugin.settings.profiles.length >= MAX_SCENES) {
+            new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
+            return;
+          }
           const profiles = [
             ...this.plugin.settings.profiles,
             createProfile(this.plugin.settings.profiles, this.plugin.settings),
@@ -464,6 +470,18 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           visible: () => profile.wallpaperPoolEnabled,
         },
         ...this.sceneAppearanceDefinitions(profile, key),
+        {
+          name: "Duplicate scene",
+          desc: "Create an independent copy of this scene with a new ID and the same wallpaper, pool, appearance, transition, and video settings.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Duplicate")
+                .setIcon("copy")
+                .onClick(() => this.duplicateScene(profile.id)),
+            );
+          },
+        },
         {
           name: "Copy current global appearance",
           desc: "Replace this scene's wallpaper, pool, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
@@ -1213,6 +1231,26 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (field === "wallpaperPath" && "wallpaperPath" in rule) {
       rule.wallpaperPath = typeof value === "string" ? value : "";
     }
+  }
+
+  private duplicateScene(id: string): void {
+    if (this.plugin.settings.profiles.length >= MAX_SCENES) {
+      new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
+      return;
+    }
+    const index = this.plugin.settings.profiles.findIndex((profile) => profile.id === id);
+    if (index < 0) return;
+    const source = this.plugin.settings.profiles[index];
+    if (!source) return;
+    const duplicate = duplicateSceneProfile(
+      this.plugin.settings.profiles,
+      source,
+      this.plugin.settings,
+    );
+    const profiles = [...this.plugin.settings.profiles];
+    profiles.splice(index + 1, 0, duplicate);
+    this.plugin.updateSettings({ profiles });
+    void this.plugin.flushSettings().then(() => this.update());
   }
 
   private copyGlobalAppearanceToProfile(id: string): void {
