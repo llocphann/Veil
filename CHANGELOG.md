@@ -38,6 +38,7 @@
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
 - Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
 - Harden release automation with immutable action SHAs, source/tag verification before dependency installation, production-bundle checks, and a read-only verification job that hands verified artifacts to a separate publish-only job with write/OIDC permissions.
+- Explicitly approve every locked dependency install script by package and version, and make npm fail closed before any newly introduced or unreviewed install script can execute.
 
 ## 1.3.0
 
