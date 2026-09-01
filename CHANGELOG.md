@@ -18,6 +18,7 @@
 - Expose all scene-specific effects and playback controls directly inside each Scene editor.
 - Add wallpaper pools for the default appearance and scenes, with optional descendant-folder discovery, stable per-context selection, and an explicit shuffle command that avoids the previous item when possible.
 - Keep pool selections stable across appearance-only edits, and invalidate only the default/Scene pool whose anchor or pool scope actually changed instead of rerolling unrelated Scenes.
+- Preserve a pool's currently selected media across vault file/folder renames by rewriting cached current/previous selections to the new path instead of rerolling the pool.
 - Add a lazy visual wallpaper library command with search, Favorites, Recently Selected, image thumbnails, lightweight video placeholders, and batched rendering for large vaults.
 - Add wallpaper-library folder/media filters, modification-time/name sorting, and a random pick constrained to the current visible result set.
 - Keep **Random visible** constrained to the cards currently rendered by the library's incremental 60-item view, rather than selecting an off-screen result that has not been revealed yet.
