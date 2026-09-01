@@ -35,7 +35,7 @@ const QUICK_ACTION_NAMES = new Set(["Reload wallpaper", "Shuffle wallpaper pool"
 const DATA_ACTION_NAMES = new Set(["Export settings", "Import settings", "Restore defaults"]);
 
 function mutable(definition: SettingDefinitionItem<string>): MutableDefinition {
-  return definition as MutableDefinition;
+  return definition;
 }
 
 function itemName(item: SettingDefinitionItem<string>): string {
@@ -160,10 +160,11 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
           const syncPanels = (): void => {
             for (const section of SETTINGS_SECTIONS) {
               const selected = section.id === this.activeSection;
-              for (const panel of this.containerEl.querySelectorAll<HTMLElement>(
+              const panels = this.containerEl.querySelectorAll(
                 `.veil-settings-panel-${section.id}`,
-              )) {
-                panel.hidden = !selected;
+              );
+              for (const panel of Array.from(panels)) {
+                if (panel instanceof HTMLElement) panel.hidden = !selected;
               }
             }
           };
