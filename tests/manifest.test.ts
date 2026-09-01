@@ -12,6 +12,13 @@ interface Manifest {
   isDesktopOnly: boolean;
 }
 
+function settingsSource(): string {
+  return [
+    fs.readFileSync("src/settings-tab.ts", "utf8"),
+    fs.readFileSync("src/settings-tab-base.ts", "utf8"),
+  ].join("\n");
+}
+
 void test("manifest is ready for a Community Plugins submission", () => {
   const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8")) as Manifest;
   const versions = JSON.parse(fs.readFileSync("versions.json", "utf8")) as Record<string, string>;
@@ -59,7 +66,7 @@ void test("release files and required repository documents exist", () => {
 });
 
 void test("support button is branded and independent from theme button classes", () => {
-  const source = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const source = settingsSource();
   const styles = fs.readFileSync("styles.css", "utf8");
 
   assert.match(source, /cls: "veil-support-link"/);
@@ -78,7 +85,7 @@ void test("stylesheet avoids Community CSS lint warnings", () => {
 
 void test("context routing and opacity exclusions are documented and exposed in settings", () => {
   const readme = fs.readFileSync("README.md", "utf8");
-  const settings = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const settings = settingsSource();
   const runtime = fs.readFileSync("src/main.ts", "utf8");
 
   assert.match(readme, /Wallpaper routes are evaluated from top to bottom/);
@@ -89,7 +96,7 @@ void test("context routing and opacity exclusions are documented and exposed in 
 });
 
 void test("rule pages expose visible destructive controls and runtime work is event driven", () => {
-  const settings = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const settings = settingsSource();
   const runtime = fs.readFileSync("src/main.ts", "utf8");
 
   assert.match(settings, /name: "Delete wallpaper rule"/);
