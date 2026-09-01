@@ -8,14 +8,15 @@ import {
 } from "obsidian";
 import {
   matchingOpacityExclusions,
-  matchingWallpaperRule,
   type NoteContext,
 } from "./context-rules";
+import { resolveWallpaper } from "./profile-resolver";
 import {
   DEFAULT_SETTINGS,
   mediaKind,
   normalizeSettings,
   type MediaKind,
+  type VeilAppearance,
   type VeilSettings,
 } from "./settings";
 import { WallpaperSettingsTab } from "./settings-tab";
@@ -33,6 +34,7 @@ interface WallpaperSource {
   kind: Exclude<MediaKind, "">;
   label: string;
   key: string;
+  contextLabel: string;
 }
 
 interface DocumentState {
@@ -162,6 +164,20 @@ export default class VeilPlugin extends Plugin {
     this.scheduleApplyToWorkspace();
   }
 
+  public activeContextSummary(): string {
+    const document = this.app.workspace.containerEl.ownerDocument;
+    const context = this.contextForDocument(document);
+    const resolved = resolveWallpaper(this.settings, context);
+    if (!context) return "No active note context in the main window.";
+    if (resolved.profile) {
+      return `${context.path} → ${resolved.profile.name} (${resolved.rule?.matchType || "rule"})`;
+    }
+    if (resolved.rule) {
+      return `${context.path} → inline wallpaper rule (${resolved.rule.matchType}: ${resolved.rule.matchValue})`;
+    }
+    return `${context.path} → default appearance`;
+  }
+
   private scheduleApplyToWorkspace(): void {
     if (this.refreshFrame !== null || this.unloaded) return;
     this.refreshFrame = window.requestAnimationFrame(() => {
@@ -198,6 +214,13 @@ export default class VeilPlugin extends Plugin {
           next.wallpaperPath = wallpaperPath;
           changed = true;
         }
+        for (const profile of next.profiles) {
+          const path = rename(profile.wallpaperPath);
+          if (path !== profile.wallpaperPath) {
+            profile.wallpaperPath = path;
+            changed = true;
+          }
+        }
         for (const rule of next.wallpaperRules) {
           const path = rename(rule.wallpaperPath);
           if (path !== rule.wallpaperPath) {
@@ -229,6 +252,7 @@ export default class VeilPlugin extends Plugin {
   private refreshIfWallpaper(path: string): void {
     const selectedPaths = [
       this.settings.wallpaperPath,
+      ...this.settings.profiles.map((profile) => profile.wallpaperPath),
       ...this.settings.wallpaperRules.map((rule) => rule.wallpaperPath),
     ];
     if (selectedPaths.includes(path)) this.refreshWallpaper(true);
@@ -247,40 +271,46 @@ export default class VeilPlugin extends Plugin {
     }
   }
 
+  private appearanceForContext(context: NoteContext | null): VeilAppearance {
+    return resolveWallpaper(this.settings, context).appearance;
+  }
+
   private applyOptions(
     document: Document,
     state: DocumentState,
     context: NoteContext | null,
   ): void {
+    const appearance = this.appearanceForContext(context);
+    const resolved = resolveWallpaper(this.settings, context);
     const filters: string[] = [];
-    if (this.settings.blurEnabled && this.settings.blurIntensity > 0) {
-      filters.push(`blur(${this.settings.blurIntensity}px)`);
+    if (appearance.blurEnabled && appearance.blurIntensity > 0) {
+      filters.push(`blur(${appearance.blurIntensity}px)`);
     }
-    if (this.settings.dimEnabled && this.settings.dimIntensity > 0) {
-      filters.push(`brightness(${1 - this.settings.dimIntensity / 100})`);
+    if (appearance.dimEnabled && appearance.dimIntensity > 0) {
+      filters.push(`brightness(${1 - appearance.dimIntensity / 100})`);
     }
-    const effectStrength = this.settings.effectIntensity / 100;
-    if (this.settings.effectPreset === "retro" && effectStrength > 0) {
+    const effectStrength = appearance.effectIntensity / 100;
+    if (appearance.effectPreset === "retro" && effectStrength > 0) {
       filters.push(
         `sepia(${(effectStrength * 0.72).toFixed(2)})`,
         `saturate(${(1 + effectStrength * 0.5).toFixed(2)})`,
         `contrast(${(1 + effectStrength * 0.14).toFixed(2)})`,
       );
     }
-    const effectBleed = this.settings.effectPreset === "glitch" ? 8 : 0;
+    const effectBleed = appearance.effectPreset === "glitch" ? 8 : 0;
     const variables: Record<string, string> = {
-      "--vdb-opacity": String(this.settings.opacity / 100),
-      "--vdb-fit": this.settings.displayMode,
+      "--vdb-opacity": String(appearance.opacity / 100),
+      "--vdb-fit": appearance.displayMode,
       "--vdb-filter": filters.length ? filters.join(" ") : "none",
       "--vdb-blur-bleed": `${
-        (this.settings.blurEnabled ? this.settings.blurIntensity * 2 : 0) + effectBleed
+        (appearance.blurEnabled ? appearance.blurIntensity * 2 : 0) + effectBleed
       }px`,
-      "--vdb-vignette-shape": this.settings.vignetteMode === "circle" ? "circle" : "ellipse",
-      "--vdb-vignette-intensity": String(this.settings.vignetteIntensity / 100),
-      "--vdb-vignette-radius": `${this.settings.vignetteRadius}%`,
-      "--vdb-overlay-color": this.settings.colorOverlayColor,
-      "--vdb-overlay-opacity": String(this.settings.colorOverlayOpacity / 100),
-      "--vdb-overlay-blend-mode": this.settings.colorOverlayBlendMode,
+      "--vdb-vignette-shape": appearance.vignetteMode === "circle" ? "circle" : "ellipse",
+      "--vdb-vignette-intensity": String(appearance.vignetteIntensity / 100),
+      "--vdb-vignette-radius": `${appearance.vignetteRadius}%`,
+      "--vdb-overlay-color": appearance.colorOverlayColor,
+      "--vdb-overlay-opacity": String(appearance.colorOverlayOpacity / 100),
+      "--vdb-overlay-blend-mode": appearance.colorOverlayBlendMode,
       "--vdb-effect-opacity": String(0.08 + effectStrength * 0.42),
       "--vdb-effect-shift": `${Math.max(1, Math.round(effectStrength * 7))}px`,
       "--vdb-effect-speed": `${Math.max(90, Math.round(420 - effectStrength * 300))}ms`,
@@ -292,18 +322,20 @@ export default class VeilPlugin extends Plugin {
     }
 
     state.layer.dataset.colorOverlay = String(
-      this.settings.colorOverlayEnabled && this.settings.colorOverlayOpacity > 0,
+      appearance.colorOverlayEnabled && appearance.colorOverlayOpacity > 0,
     );
-    state.layer.dataset.effect = this.settings.effectIntensity > 0
-      ? this.settings.effectPreset
+    state.layer.dataset.effect = appearance.effectIntensity > 0
+      ? appearance.effectPreset
       : "none";
-    state.layer.dataset.reduceMotion = String(this.settings.respectReducedMotion);
+    state.layer.dataset.reduceMotion = String(appearance.respectReducedMotion);
+    if (resolved.profile) state.layer.dataset.profileId = resolved.profile.id;
+    else delete state.layer.dataset.profileId;
 
     state.vignette.hidden =
-      this.settings.vignetteMode === "off" || this.settings.vignetteIntensity === 0;
+      appearance.vignetteMode === "off" || appearance.vignetteIntensity === 0;
     const exclusions = matchingOpacityExclusions(this.settings.opacityExclusions, context);
-    const paneOpacity = exclusions.paneSurface ? 100 : this.settings.paneOpacity;
-    const paneContentOpacity = exclusions.paneContent ? 100 : this.settings.paneContentOpacity;
+    const paneOpacity = exclusions.paneSurface ? 100 : appearance.paneOpacity;
+    const paneContentOpacity = exclusions.paneContent ? 100 : appearance.paneContentOpacity;
     if (!state.failed) document.body.style.setProperty(PANE_OPACITY_VARIABLE, `${paneOpacity}%`);
     const fadePaneContent = !state.failed && paneContentOpacity < 100;
     document.body.classList.toggle(PANE_CONTENT_CLASS, fadePaneContent);
@@ -339,6 +371,7 @@ export default class VeilPlugin extends Plugin {
     let state = this.documents.get(document);
     if (state?.key === source.key && state.layer.isConnected) {
       this.applyOptions(document, state, context);
+      this.setDocumentStatus(document, `${source.contextLabel} · ${source.label}: ${source.path}`, "success");
       return;
     }
     if (state) this.clearDocument(document);
@@ -399,7 +432,11 @@ export default class VeilPlugin extends Plugin {
       activeState.ready = true;
       layer.hidden = false;
       this.applyOptions(document, activeState, this.contextForDocument(document));
-      this.setDocumentStatus(document, `${source.label} loaded: ${source.path}`, "success");
+      this.setDocumentStatus(
+        document,
+        `${source.contextLabel} · ${source.label} loaded: ${source.path}`,
+        "success",
+      );
     };
     listen(media, source.kind === "video" ? "loadeddata" : "load", ready);
     listen(media, "error", () => {
@@ -441,16 +478,17 @@ export default class VeilPlugin extends Plugin {
   }
 
   private syncPlaybackAndMotion(document: Document, state: DocumentState): void {
+    const appearance = this.appearanceForContext(this.contextForDocument(document));
     const motionPaused =
-      this.settings.opacity === 0
-      || (this.settings.pauseWhenHidden && document.hidden)
-      || (this.settings.respectReducedMotion && Boolean(state.motionQuery?.matches));
+      appearance.opacity === 0
+      || (appearance.pauseWhenHidden && document.hidden)
+      || (appearance.respectReducedMotion && Boolean(state.motionQuery?.matches));
     state.layer.dataset.animationPaused = String(motionPaused);
     if (state.kind !== "video" || state.disposed || state.failed || this.unloaded) return;
     const video = state.media as HTMLVideoElement;
     const shouldPlay =
       this.settings.enabled &&
-      this.settings.opacity > 0 &&
+      appearance.opacity > 0 &&
       !motionPaused;
     if (!shouldPlay) {
       video.pause();
@@ -515,25 +553,32 @@ export default class VeilPlugin extends Plugin {
     document: Document,
     context: NoteContext | null,
   ): WallpaperSource | null {
-    const rule = matchingWallpaperRule(this.settings.wallpaperRules, context);
-    const path = rule ? rule.wallpaperPath : this.settings.wallpaperPath;
+    const resolved = resolveWallpaper(this.settings, context);
+    const path = resolved.path;
     const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
     const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
     const kind = file instanceof TFile ? mediaKind(file) : "";
+    const contextLabel = resolved.profile
+      ? `Scene “${resolved.profile.name}”`
+      : resolved.rule
+        ? `Rule ${resolved.rule.matchType}: ${resolved.rule.matchValue}`
+        : "Default appearance";
     if (!path || !(file instanceof TFile) || !kind) {
-      const rulePrefix = rule ? "Matched wallpaper rule: " : "";
+      const rulePrefix = resolved.rule ? `${contextLabel}: ` : "";
       this.setDocumentStatus(
         document,
         !path
-          ? rule
-            ? `${rulePrefix}choose a wallpaper file for ${rule.matchValue || "this rule"}.`
+          ? resolved.rule
+            ? resolved.profile
+              ? `${rulePrefix}choose a wallpaper file for this scene.`
+              : `${rulePrefix}choose a wallpaper file for this rule.`
             : "Choose a wallpaper file to begin."
           : invalidPath
             ? "Use a vault-relative path, not a URL or a path outside the vault."
             : !(file instanceof TFile)
               ? `${rulePrefix}file not found in this vault: ${path}`
               : `${rulePrefix}unsupported wallpaper format: ${file.extension}`,
-        path || rule ? "error" : "info",
+        path || resolved.rule ? "error" : "info",
       );
       return null;
     }
@@ -550,9 +595,13 @@ export default class VeilPlugin extends Plugin {
             ? "Animated GIF"
             : "Image",
       key: [file.path, url, file.stat.mtime, file.stat.size, this.sourceRevision].join("|"),
+      contextLabel,
     };
     if (this.documents.get(document)?.key !== source.key) {
-      this.setDocumentStatus(document, `Loading ${source.label.toLowerCase()}: ${file.path}`);
+      this.setDocumentStatus(
+        document,
+        `${contextLabel} · loading ${source.label.toLowerCase()}: ${file.path}`,
+      );
     }
     return source;
   }
