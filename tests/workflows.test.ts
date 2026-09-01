@@ -18,6 +18,11 @@ for (const path of WORKFLOWS) {
       document.errors.map((error) => error.message).join("\n"),
     );
   });
+
+  void test(`${path} does not persist checkout credentials`, () => {
+    const source = fs.readFileSync(path, "utf8");
+    assert.match(source, /persist-credentials: false/);
+  });
 }
 
 void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
