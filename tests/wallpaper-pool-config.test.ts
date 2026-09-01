@@ -3,6 +3,7 @@ import test from "node:test";
 import { normalizeSettings } from "../src/settings";
 import {
   rewriteWallpaperPoolSelectionPaths,
+  rewriteWallpaperPoolSelectionsForRename,
   wallpaperPoolConfiguration,
   wallpaperPoolConfigurationChanged,
   wallpaperPoolConfigurationChanges,
@@ -150,20 +151,68 @@ void test("renaming selected pool media preserves the current and previous selec
   );
 });
 
-void test("renaming a pool folder rewrites descendant selection paths", () => {
-  const selections = new Map([
-    ["profile:focus|Media/Focus|recursive", "Media/Focus/Sub/selected.webp"],
-  ]);
+void test("vault folder rename moves the pool selection key and selected path", () => {
+  const previous = fixture();
   const oldPath = "Media/Focus";
   const newPath = "Wallpapers/Focus";
   const rewrite = (path: string): string =>
     path === oldPath || path.startsWith(`${oldPath}/`)
       ? newPath + path.slice(oldPath.length)
       : path;
+  const next = normalizeSettings({
+    ...previous,
+    profiles: previous.profiles.map((profile) =>
+      profile.id === "focus"
+        ? { ...profile, wallpaperPath: rewrite(profile.wallpaperPath) }
+        : profile,
+    ),
+  });
+  const selections = new Map([
+    ["profile:focus|Media/Focus|recursive", "Media/Focus/Sub/selected.webp"],
+  ]);
 
-  assert.equal(rewriteWallpaperPoolSelectionPaths(selections, rewrite), true);
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), ["profile:focus"]);
+  assert.deepEqual(
+    rewriteWallpaperPoolSelectionsForRename(selections, previous, next, rewrite),
+    ["default", "profile:focus", "profile:reading"],
+  );
+  assert.equal(selections.has("profile:focus|Media/Focus|recursive"), false);
   assert.equal(
-    selections.get("profile:focus|Media/Focus|recursive"),
+    selections.get("profile:focus|Wallpapers/Focus|recursive"),
     "Wallpapers/Focus/Sub/selected.webp",
   );
+});
+
+void test("vault anchor-file rename preserves a pool selection without moving its folder key", () => {
+  const previous = fixture();
+  const oldPath = "Media/default.webp";
+  const newPath = "Media/default-renamed.webp";
+  const rewrite = (path: string): string => path === oldPath ? newPath : path;
+  const next = normalizeSettings({ ...previous, wallpaperPath: newPath });
+  const selections = new Map([
+    ["default|Media|direct", "Media/other-selected.webp"],
+  ]);
+
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), ["default"]);
+  assert.ok(
+    rewriteWallpaperPoolSelectionsForRename(selections, previous, next, rewrite).includes("default"),
+  );
+  assert.equal(selections.get("default|Media|direct"), "Media/other-selected.webp");
+});
+
+void test("manual anchor changes are not mistaken for vault renames", () => {
+  const previous = fixture();
+  const next = normalizeSettings({ ...previous, wallpaperPath: "Other/default.webp" });
+  const selections = new Map([
+    ["default|Media|direct", "Media/current.webp"],
+  ]);
+
+  const preserved = rewriteWallpaperPoolSelectionsForRename(
+    selections,
+    previous,
+    next,
+    (path) => path,
+  );
+  assert.equal(preserved.includes("default"), false);
+  assert.equal(selections.get("default|Media|direct"), "Media/current.webp");
 });
