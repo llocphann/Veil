@@ -535,8 +535,10 @@ export default class VeilPlugin extends Plugin {
       ...this.settings.profiles.map((profile) => profile.wallpaperPath),
       ...this.settings.wallpaperRules.map((rule) => rule.wallpaperPath),
     ];
-    const loadedPath = Array.from(this.documents.values()).some((state) => state.path === path);
-    if (selectedPaths.includes(path) || loadedPath) this.refreshWallpaper(true);
+    const touches = (candidate: string): boolean =>
+      candidate === path || candidate.startsWith(`${path}/`);
+    const loadedPath = Array.from(this.documents.values()).some((state) => touches(state.path));
+    if (selectedPaths.some(touches) || loadedPath) this.refreshWallpaper(true);
   }
 
   private applyToWorkspace(): void {
