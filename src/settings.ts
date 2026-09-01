@@ -53,6 +53,8 @@ export interface VeilProfile {
   id: string;
   name: string;
   wallpaperPath: string;
+  wallpaperPoolEnabled: boolean;
+  wallpaperPoolIncludeSubfolders: boolean;
   displayMode: DisplayMode;
   wallpaperPositionX: number;
   wallpaperPositionY: number;
@@ -96,6 +98,8 @@ export interface OpacityExclusionRule extends ContextRule {
 export interface VeilSettings {
   enabled: boolean;
   wallpaperPath: string;
+  wallpaperPoolEnabled: boolean;
+  wallpaperPoolIncludeSubfolders: boolean;
   displayMode: DisplayMode;
   wallpaperPositionX: number;
   wallpaperPositionY: number;
@@ -129,6 +133,8 @@ export type VeilAppearance = Omit<VeilProfile, "id" | "name">;
 export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   enabled: true,
   wallpaperPath: "",
+  wallpaperPoolEnabled: false,
+  wallpaperPoolIncludeSubfolders: false,
   displayMode: "cover",
   wallpaperPositionX: 50,
   wallpaperPositionY: 50,
@@ -159,6 +165,8 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
 
 const APPEARANCE_KEYS = [
   "wallpaperPath",
+  "wallpaperPoolEnabled",
+  "wallpaperPoolIncludeSubfolders",
   "displayMode",
   "wallpaperPositionX",
   "wallpaperPositionY",
@@ -295,6 +303,8 @@ function normalizeAppearance(
   );
 
   for (const key of [
+    "wallpaperPoolEnabled",
+    "wallpaperPoolIncludeSubfolders",
     "blurEnabled",
     "dimEnabled",
     "colorOverlayEnabled",
