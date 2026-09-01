@@ -18,6 +18,7 @@ const packageLock = JSON.parse(fs.readFileSync("package-lock.json", "utf8")) as 
   packages?: Record<string, { version?: string }>;
 };
 const versions = JSON.parse(fs.readFileSync("versions.json", "utf8")) as Record<string, string>;
+const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
 
 void test("package, lockfile, and manifest versions stay synchronized", () => {
   assert.equal(manifest.version, packageJson.version);
@@ -27,4 +28,8 @@ void test("package, lockfile, and manifest versions stay synchronized", () => {
 
 void test("versions.json contains the current release metadata", () => {
   assert.equal(versions[manifest.version], manifest.minAppVersion);
+});
+
+void test("changelog contains the current release version", () => {
+  assert.match(changelog, new RegExp(`^## ${manifest.version.replaceAll(".", "\\.")}$`, "m"));
 });
