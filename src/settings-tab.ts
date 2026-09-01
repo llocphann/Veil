@@ -8,18 +8,20 @@ import type {
 } from "obsidian";
 import type VeilPlugin from "./main";
 import {
-  DEFAULT_SETTINGS,
   COLOR_OVERLAY_BLEND_MODES,
+  DEFAULT_SETTINGS,
   DISPLAY_MODES,
   EFFECT_PRESETS,
   MATCH_TYPES,
   createOpacityExclusionRule,
+  createProfile,
   createWallpaperRule,
   mediaKind,
   normalizeSettings,
   type ContextRule,
   type MatchType,
   type OpacityExclusionRule,
+  type VeilProfile,
   type VeilSettings,
   type WallpaperRule,
 } from "./settings";
@@ -38,21 +40,12 @@ const SETTINGS_TABS = [
 
 type SettingKey = keyof VeilSettings;
 type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
-type NumericSettingKey =
-  | "opacity"
-  | "paneOpacity"
-  | "paneContentOpacity"
-  | "vignetteIntensity"
-  | "vignetteRadius"
-  | "blurIntensity"
-  | "dimIntensity"
-  | "colorOverlayOpacity"
-  | "effectIntensity";
 
 export class WallpaperSettingsTab extends PluginSettingTab {
   private readonly plugin: VeilPlugin;
   private statusEl: HTMLElement | null = null;
   private statusRowEl: HTMLElement | null = null;
+  private contextEl: HTMLElement | null = null;
   private activeTab: SettingsTabId = "wallpaper";
 
   constructor(app: App, plugin: VeilPlugin) {
@@ -61,16 +54,40 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   getControlValue(key: string): unknown {
+    const profileKey = this.parseProfileKey(key);
+    if (profileKey) {
+      const profile = this.findProfile(profileKey.id);
+      return profile
+        ? (profile as unknown as Record<string, unknown>)[profileKey.field]
+        : undefined;
+    }
+
     const ruleKey = this.parseRuleKey(key);
     if (ruleKey) {
       const rule = this.findRule(ruleKey.kind, ruleKey.id);
-      return rule?.[ruleKey.field as keyof typeof rule];
+      return rule
+        ? (rule as unknown as Record<string, unknown>)[ruleKey.field]
+        : undefined;
     }
+
     if (!(key in DEFAULT_SETTINGS)) return undefined;
     return this.plugin.settings[key as SettingKey];
   }
 
   setControlValue(key: string, value: unknown): void {
+    const profileKey = this.parseProfileKey(key);
+    if (profileKey) {
+      const profiles = this.plugin.settings.profiles.map((profile) =>
+        profile.id === profileKey.id
+          ? { ...profile, [profileKey.field]: value } as VeilProfile
+          : profile,
+      );
+      this.plugin.updateSettings({ profiles });
+      if (["name", "wallpaperPath"].includes(profileKey.field)) this.update();
+      else this.refreshDomState();
+      return;
+    }
+
     const ruleKey = this.parseRuleKey(key);
     if (ruleKey) {
       const rule = this.findRule(ruleKey.kind, ruleKey.id);
@@ -80,30 +97,34 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         wallpaperRules: this.plugin.settings.wallpaperRules,
         opacityExclusions: this.plugin.settings.opacityExclusions,
       });
-      if (["matchType", "enabled", "excludePaneSurface", "excludePaneContent"].includes(
-        ruleKey.field,
-      )) {
-        this.update();
-      }
+      if ([
+        "matchType",
+        "enabled",
+        "profileId",
+        "excludePaneSurface",
+        "excludePaneContent",
+      ].includes(ruleKey.field)) this.update();
+      else this.refreshDomState();
       return;
     }
+
     if (!(key in DEFAULT_SETTINGS)) return;
-    const settings = normalizeSettings(
-      { ...this.plugin.settings, [key]: value },
-      normalizePath,
-    );
-    this.plugin.updateSettings(settings);
+    this.plugin.updateSettings(normalizeSettings({ ...this.plugin.settings, [key]: value }, normalizePath));
     this.refreshDomState();
   }
 
   updateStatus(): void {
-    if (!this.statusEl?.isConnected || !this.statusRowEl?.isConnected) return;
-    this.statusEl.textContent = this.plugin.status.message;
-    this.statusRowEl.dataset.tone = this.plugin.status.tone;
+    if (this.statusEl?.isConnected && this.statusRowEl?.isConnected) {
+      this.statusEl.textContent = this.plugin.status.message;
+      this.statusRowEl.dataset.tone = this.plugin.status.tone;
+    }
+    if (this.contextEl?.isConnected) {
+      this.contextEl.textContent = this.plugin.activeContextSummary();
+    }
   }
 
-  private numberSetting(
-    key: NumericSettingKey,
+  private slider(
+    key: string,
     name: string,
     desc: string,
     maximum = 100,
@@ -125,374 +146,276 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private tabNavigationDefinitions(): SettingDefinitionItem<string> {
+  private tabs(): SettingDefinitionItem<string> {
     return {
       type: "group",
       cls: "veil-settings-tabs-group",
+      items: [{
+        name: "Settings sections",
+        searchable: false,
+        render: (setting) => {
+          this.containerEl.classList.add("veil-settings-root");
+          this.containerEl.dataset.veilSettingsTab = this.activeTab;
+          setting.settingEl.classList.add("veil-settings-tabs-setting");
+          const tabList = setting.controlEl.createDiv({ cls: "veil-settings-tabs" });
+          tabList.setAttribute("role", "tablist");
+          tabList.setAttribute("aria-label", "Veil settings sections");
+          const buttons: HTMLButtonElement[] = [];
+          const cleanups: Array<() => void> = [];
+
+          const activate = (tabId: SettingsTabId, focus = false): void => {
+            this.activeTab = tabId;
+            this.containerEl.dataset.veilSettingsTab = tabId;
+            for (const candidate of buttons) {
+              const selected = candidate.dataset.tabId === tabId;
+              candidate.setAttribute("aria-selected", String(selected));
+              candidate.tabIndex = selected ? 0 : -1;
+              if (selected && focus) candidate.focus();
+            }
+          };
+
+          for (const tab of SETTINGS_TABS) {
+            const button = tabList.createEl("button", {
+              cls: "veil-settings-tab",
+              attr: {
+                type: "button",
+                role: "tab",
+                "data-tab-id": tab.id,
+                "aria-selected": "false",
+              },
+            });
+            const icon = button.createSpan({ cls: "veil-settings-tab-icon" });
+            setIcon(icon, tab.icon);
+            button.createSpan({ text: tab.label });
+            const onClick = (): void => activate(tab.id);
+            button.addEventListener("click", onClick);
+            cleanups.push(() => button.removeEventListener("click", onClick));
+            buttons.push(button);
+          }
+
+          const onKeyDown = (event: KeyboardEvent): void => {
+            if (!new Set(["ArrowLeft", "ArrowRight", "Home", "End"]).has(event.key)) return;
+            const activeElement = this.containerEl.ownerDocument.activeElement;
+            const currentIndex = Math.max(0, buttons.findIndex((button) => button === activeElement));
+            let nextIndex = currentIndex;
+            if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+            if (event.key === "Home") nextIndex = 0;
+            if (event.key === "End") nextIndex = buttons.length - 1;
+            const nextTab = SETTINGS_TABS[nextIndex];
+            if (!nextTab) return;
+            event.preventDefault();
+            activate(nextTab.id, true);
+          };
+          tabList.addEventListener("keydown", onKeyDown);
+          cleanups.push(() => tabList.removeEventListener("keydown", onKeyDown));
+          activate(this.activeTab);
+          return () => cleanups.forEach((cleanup) => cleanup());
+        },
+      }],
+    };
+  }
+
+  getSettingDefinitions(): SettingDefinitionItem<string>[] {
+    return [
+      this.tabs(),
+      this.wallpaperDefinitions(),
+      this.sceneDefinitions(),
+      this.activeContextDefinition(),
+      this.wallpaperRuleDefinitions(),
+      this.opacityExclusionDefinitions(),
+      this.effectsDefinitions(),
+      this.videoDefinitions(),
+      this.actionsDefinitions(),
+      this.supportDefinitions(),
+    ];
+  }
+
+  private wallpaperDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "group",
+      heading: "Wallpaper",
+      cls: "veil-settings-panel-wallpaper",
       items: [
         {
-          name: "Settings sections",
+          name: "Live preview",
+          desc: "Changes preview immediately. Context rules can replace the default wallpaper or switch the complete appearance through a scene.",
+          searchable: false,
+        },
+        {
+          name: "Enable wallpaper",
+          desc: "Restore the theme's normal background when turned off.",
+          control: { type: "toggle", key: "enabled" },
+        },
+        {
+          name: "Wallpaper file",
+          desc: "Choose an image, GIF, or video from this vault, or enter its vault-relative path.",
+          control: {
+            type: "file",
+            key: "wallpaperPath",
+            placeholder: "Media/Wallpapers/example.webp",
+            filter: (file: TFile) => Boolean(mediaKind(file)),
+          },
+        },
+        {
+          name: "Wallpaper status",
+          desc: "Waiting for the workspace…",
           searchable: false,
           render: (setting) => {
-            this.containerEl.classList.add("veil-settings-root");
-            this.containerEl.dataset.veilSettingsTab = this.activeTab;
-            setting.settingEl.classList.add("veil-settings-tabs-setting");
-
-            const tabList = setting.controlEl.createDiv({ cls: "veil-settings-tabs" });
-            tabList.setAttribute("role", "tablist");
-            tabList.setAttribute("aria-label", "Veil settings sections");
-            const buttons: HTMLButtonElement[] = [];
-            const cleanups: Array<() => void> = [];
-
-            const activate = (tabId: SettingsTabId, focus = false): void => {
-              this.activeTab = tabId;
-              this.containerEl.dataset.veilSettingsTab = tabId;
-              for (const candidate of buttons) {
-                const selected = candidate.dataset.tabId === tabId;
-                candidate.setAttribute("aria-selected", String(selected));
-                candidate.tabIndex = selected ? 0 : -1;
-                if (selected && focus) candidate.focus();
-              }
+            setting.settingEl.classList.add("vault-dashboard-wallpaper-status");
+            setting.descEl.setAttribute("role", "status");
+            setting.descEl.setAttribute("aria-live", "polite");
+            this.statusEl = setting.descEl;
+            this.statusRowEl = setting.settingEl;
+            this.updateStatus();
+            return () => {
+              if (this.statusEl === setting.descEl) this.statusEl = null;
+              if (this.statusRowEl === setting.settingEl) this.statusRowEl = null;
             };
+          },
+        },
+        {
+          name: "Display mode",
+          desc: "The same sizing rules apply to every supported media type.",
+          control: { type: "dropdown", key: "displayMode", options: DISPLAY_MODES },
+        },
+        this.slider("opacity", "Wallpaper opacity", "0% hides the wallpaper; 100% shows its full opacity."),
+        this.slider("paneOpacity", "Pane background opacity", "Lower values reveal more wallpaper without fading pane content."),
+        this.slider("paneContentOpacity", "Pane & content opacity", "Fade each pane as one group, including nested backgrounds, text, icons, and images."),
+      ],
+    };
+  }
 
-            for (const tab of SETTINGS_TABS) {
-              const button = tabList.createEl("button", {
-                cls: "veil-settings-tab",
-                attr: {
-                  type: "button",
-                  role: "tab",
-                  "data-tab-id": tab.id,
-                  "aria-selected": "false",
-                },
-              });
-              const icon = button.createSpan({ cls: "veil-settings-tab-icon" });
-              setIcon(icon, tab.icon);
-              button.createSpan({ text: tab.label });
-              const onClick = (): void => activate(tab.id);
-              button.addEventListener("click", onClick);
-              cleanups.push(() => button.removeEventListener("click", onClick));
-              buttons.push(button);
-            }
+  private sceneDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "list",
+      heading: "Scenes",
+      cls: "veil-settings-panel-rules",
+      emptyState: "No scenes. Create one from the current appearance, then route notes to it below.",
+      items: this.plugin.settings.profiles.map((profile, index) => this.scenePage(profile, index)),
+      addItem: {
+        name: "Add scene from current appearance",
+        action: () => {
+          const profiles = [
+            ...this.plugin.settings.profiles,
+            createProfile(this.plugin.settings.profiles, this.plugin.settings),
+          ];
+          this.plugin.updateSettings({ profiles });
+          this.update();
+        },
+      },
+      onReorder: (oldIndex, newIndex) => {
+        const profiles = [...this.plugin.settings.profiles];
+        const [profile] = profiles.splice(oldIndex, 1);
+        if (!profile) return;
+        profiles.splice(newIndex, 0, profile);
+        this.plugin.updateSettings({ profiles });
+        this.update();
+      },
+      onDelete: (index) => {
+        const profile = this.plugin.settings.profiles[index];
+        if (profile) this.deleteProfile(profile.id);
+      },
+    };
+  }
 
-            const onKeyDown = (event: KeyboardEvent): void => {
-              if (!new Set(["ArrowLeft", "ArrowRight", "Home", "End"]).has(event.key)) {
-                return;
-              }
-              const currentIndex = this.documentActiveButtonIndex(buttons);
-              let nextIndex = currentIndex;
-              if (event.key === "ArrowLeft") {
-                nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
-              }
-              if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
-              if (event.key === "Home") nextIndex = 0;
-              if (event.key === "End") nextIndex = buttons.length - 1;
-              const nextTab = SETTINGS_TABS[nextIndex];
-              if (!nextTab) return;
-              event.preventDefault();
-              activate(nextTab.id, true);
-            };
-            tabList.addEventListener("keydown", onKeyDown);
-            cleanups.push(() => tabList.removeEventListener("keydown", onKeyDown));
-            activate(this.activeTab);
-            return () => cleanups.forEach((cleanup) => cleanup());
+  private scenePage(profile: VeilProfile, index: number): SettingDefinitionPage<string> {
+    const key = (field: string): string => `profile:${profile.id}:${field}`;
+    const file = profile.wallpaperPath
+      ? this.app.vault.getFileByPath(normalizePath(profile.wallpaperPath))
+      : null;
+    const ready = Boolean(file && mediaKind(file));
+    return {
+      type: "page",
+      name: profile.name || `Scene ${index + 1}`,
+      desc: profile.wallpaperPath || "No wallpaper selected",
+      displayValue: () => ready ? "Ready" : "Needs wallpaper",
+      status: () => ready ? null : "warning",
+      items: [
+        {
+          name: "Scene name",
+          desc: "A short label shown when selecting this scene in a rule.",
+          control: { type: "text", key: key("name"), placeholder: `Scene ${index + 1}` },
+        },
+        {
+          name: "Wallpaper file",
+          desc: "Media used whenever a context rule resolves to this scene.",
+          control: {
+            type: "file",
+            key: key("wallpaperPath"),
+            placeholder: "Media/Wallpapers/focus.webp",
+            filter: (candidate: TFile) => Boolean(mediaKind(candidate)),
+          },
+        },
+        {
+          name: "Display mode",
+          control: { type: "dropdown", key: key("displayMode"), options: DISPLAY_MODES },
+        },
+        this.slider(key("opacity"), "Wallpaper opacity", "Scene-specific wallpaper opacity."),
+        this.slider(key("paneOpacity"), "Pane background opacity", "Scene-specific pane surface opacity."),
+        this.slider(key("paneContentOpacity"), "Pane & content opacity", "Scene-specific whole-pane opacity."),
+        {
+          name: "Scene effects",
+          desc: this.sceneEffectsSummary(profile),
+          searchable: false,
+        },
+        {
+          name: "Copy current global appearance",
+          desc: "Copy the current wallpaper, opacity, effects, and video behavior into this scene while keeping its name.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button.setButtonText("Copy current").onClick(() => this.copyGlobalAppearanceToProfile(profile.id)),
+            );
+          },
+        },
+        {
+          name: "Delete scene",
+          desc: "Rules using it fall back to this scene's wallpaper as an inline rule.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Delete scene")
+                .setIcon("trash-2")
+                .setDestructive()
+                .onClick(() => this.deleteProfile(profile.id)),
+            );
           },
         },
       ],
     };
   }
 
-  getSettingDefinitions(): SettingDefinitionItem<string>[] {
-    return [
-      this.tabNavigationDefinitions(),
-      {
-        type: "group",
-        heading: "Wallpaper",
-        cls: "veil-settings-panel-wallpaper",
-        items: [
-          {
-            name: "Live preview",
-            desc: "Changes preview immediately. Wallpaper effects stay behind the interface. Pane and content opacity can also fade nested pane backgrounds and content.",
-            searchable: false,
-          },
-          {
-            name: "Enable wallpaper",
-            desc: "Restore the theme's normal background when turned off.",
-            control: { type: "toggle", key: "enabled" },
-          },
-          {
-            name: "Wallpaper file",
-            desc: "Choose an image, GIF, or video from this vault, or enter its vault-relative path.",
-            control: {
-              type: "file",
-              key: "wallpaperPath",
-              placeholder: "Media/Wallpapers/example.webp",
-              filter: (file: TFile) => Boolean(mediaKind(file)),
-            },
-          },
-          {
-            name: "Wallpaper status",
-            desc: "Waiting for the workspace…",
-            searchable: false,
-            render: (setting) => {
-              setting.settingEl.classList.add("vault-dashboard-wallpaper-status");
-              setting.descEl.setAttribute("role", "status");
-              setting.descEl.setAttribute("aria-live", "polite");
-              this.statusEl = setting.descEl;
-              this.statusRowEl = setting.settingEl;
-              this.updateStatus();
-              return () => {
-                if (this.statusEl === setting.descEl) this.statusEl = null;
-                if (this.statusRowEl === setting.settingEl) this.statusRowEl = null;
-              };
-            },
-          },
-          {
-            name: "Display mode",
-            desc: "The same sizing rules apply to every supported media type.",
-            control: {
-              type: "dropdown",
-              key: "displayMode",
-              options: DISPLAY_MODES,
-            },
-          },
-          this.numberSetting(
-            "opacity",
-            "Wallpaper opacity",
-            "0% hides the wallpaper; 100% shows its full opacity.",
-          ),
-          this.numberSetting(
-            "paneOpacity",
-            "Pane background opacity",
-            "Lower values reveal more wallpaper without fading pane content.",
-          ),
-          this.numberSetting(
-            "paneContentOpacity",
-            "Pane & content opacity",
-            "Fade each pane as one group, including nested backgrounds, text, icons, and images. Settings and menus outside panes remain visible.",
-          ),
-        ],
-      },
-      this.wallpaperRuleDefinitions(),
-      this.opacityExclusionDefinitions(),
-      {
-        type: "group",
-        heading: "Effects",
-        cls: "veil-settings-panel-effects",
-        items: [
-          {
-            name: "Vignette mode",
-            desc: "Shade the edges using the active theme's shadow palette.",
-            control: {
-              type: "dropdown",
-              key: "vignetteMode",
-              options: { off: "Off", ellipse: "Elliptical", circle: "Circular" },
-            },
-          },
-          this.numberSetting(
-            "vignetteIntensity",
-            "Vignette intensity",
-            "Strength of the edge shading.",
-            100,
-            "%",
-            () => this.plugin.settings.vignetteMode === "off",
-          ),
-          this.numberSetting(
-            "vignetteRadius",
-            "Vignette radius",
-            "Clear center before shading begins. A larger radius leaves more of the center untouched.",
-            100,
-            "%",
-            () => this.plugin.settings.vignetteMode === "off",
-          ),
-          {
-            name: "Blur",
-            desc: "Blur the wallpaper only. High values use more GPU resources.",
-            control: { type: "toggle", key: "blurEnabled" },
-          },
-          this.numberSetting(
-            "blurIntensity",
-            "Blur intensity",
-            "Blur radius in pixels.",
-            40,
-            " px",
-            () => !this.plugin.settings.blurEnabled,
-          ),
-          {
-            name: "Dim",
-            desc: "Reduce wallpaper brightness without dimming the interface.",
-            control: { type: "toggle", key: "dimEnabled" },
-          },
-          this.numberSetting(
-            "dimIntensity",
-            "Dim intensity",
-            "0% keeps the original brightness; 100% darkens the wallpaper completely.",
-            100,
-            "%",
-            () => !this.plugin.settings.dimEnabled,
-          ),
-          {
-            name: "Color overlay",
-            desc: "Place a color layer over the wallpaper without modifying the source file.",
-            control: { type: "toggle", key: "colorOverlayEnabled" },
-          },
-          {
-            name: "Overlay color",
-            control: { type: "color", key: "colorOverlayColor" },
-            visible: () => this.plugin.settings.colorOverlayEnabled,
-          },
-          {
-            ...this.numberSetting(
-              "colorOverlayOpacity",
-              "Overlay opacity",
-              "Strength of the selected color layer.",
-              100,
-              "%",
-              () => !this.plugin.settings.colorOverlayEnabled,
-            ),
-            visible: () => this.plugin.settings.colorOverlayEnabled,
-          },
-          {
-            name: "Overlay blend mode",
-            desc: "Color preserves image detail most closely; other modes change brightness and contrast.",
-            control: {
-              type: "dropdown",
-              key: "colorOverlayBlendMode",
-              options: COLOR_OVERLAY_BLEND_MODES,
-            },
-            visible: () => this.plugin.settings.colorOverlayEnabled,
-          },
-          {
-            name: "Effect preset",
-            desc: "Apply one optimized preset at a time. The original wallpaper file is never changed.",
-            control: {
-              type: "dropdown",
-              key: "effectPreset",
-              options: EFFECT_PRESETS,
-            },
-          },
-          this.numberSetting(
-            "effectIntensity",
-            "Effect intensity",
-            "Controls the strength and, for animated effects, the update speed.",
-            100,
-            "%",
-            () => this.plugin.settings.effectPreset === "none",
-          ),
-          {
-            name: "Performance guide",
-            desc: "Color overlay, dim, and vignette are low cost. Retro is low to moderate. Blur is GPU-heavy at high radius. Glitch and TV noise animate continuously and can use substantial GPU; combining video, blur, and an animated preset is the most demanding setup. Reduced motion freezes preset animation when enabled.",
-            searchable: false,
-          },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Video playback",
-        cls: "veil-settings-panel-video",
-        items: [
-          {
-            name: "Video compatibility",
-            desc: "Videos loop silently. Common web video formats work most broadly; other formats depend on codecs available in the local Obsidian installation. Animated images remain image elements.",
-            searchable: false,
-          },
-          {
-            name: "Pause video when the app is hidden",
-            desc: "Avoid decoding video when a window is not visible.",
-            control: { type: "toggle", key: "pauseWhenHidden" },
-          },
-          {
-            name: "Respect reduced motion",
-            desc: "Pause video on a still frame when the operating system requests reduced motion. This setting cannot pause GIF files.",
-            control: { type: "toggle", key: "respectReducedMotion" },
-          },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Actions",
-        cls: "veil-settings-panel-actions",
-        items: [
-          {
-            name: "Reload wallpaper",
-            desc: "Retry loading the current file or a video whose autoplay was blocked.",
-            render: (setting) => {
-              setting.addButton((button) =>
-                button
-                  .setButtonText("Reload")
-                  .onClick(() => this.plugin.refreshWallpaper(true)),
-              );
-            },
-          },
-          {
-            name: "Export settings",
-            desc: "Download a versioned JSON backup containing Veil settings and rules. Wallpaper media files are not included.",
-            render: (setting) => {
-              setting.addButton((button) =>
-                button
-                  .setButtonText("Export")
-                  .setIcon("download")
-                  .onClick(() => this.exportSettings()),
-              );
-            },
-          },
-          {
-            name: "Import settings",
-            desc: "Replace the current configuration with a validated Veil JSON backup. Invalid and unsupported files are rejected.",
-            render: (setting) => {
-              setting.addButton((button) =>
-                button
-                  .setButtonText("Import")
-                  .setIcon("upload")
-                  .onClick(() => this.chooseImportFile()),
-              );
-            },
-          },
-          {
-            name: "Restore defaults",
-            desc: "Clear the selected wallpaper, restore the default opacity values, and turn effects off. No media files are changed.",
-            render: (setting) => {
-              setting.addButton((button) =>
-                button.setButtonText("Restore").onClick(() => {
-                  this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
-                  void this.plugin.flushSettings().then(() => this.update());
-                }),
-              );
-            },
-          },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Support Veil",
-        cls: "veil-settings-panel-support",
-        items: [
-          {
-            name: "Buy me a coffee",
-            desc: "If Veil is useful to you, you can support its continued development.",
-            searchable: false,
-            render: (setting) => {
-              const link = setting.controlEl.createEl("a", {
-                cls: "veil-support-link",
-                attr: {
-                  href: FUNDING_URL,
-                  target: "_blank",
-                  rel: "noopener noreferrer",
-                  "aria-label": "Buy me a coffee",
-                },
-              });
-              const icon = link.createSpan({ cls: "veil-support-link-icon" });
-              setIcon(icon, "coffee");
-              link.createSpan({ cls: "veil-support-link-label", text: "Buy me a coffee" });
-            },
-          },
-        ],
-      },
-    ];
+  private sceneEffectsSummary(profile: VeilProfile): string {
+    const parts: string[] = [];
+    if (profile.vignetteMode !== "off") parts.push(`vignette ${profile.vignetteMode}`);
+    if (profile.blurEnabled) parts.push(`blur ${profile.blurIntensity}px`);
+    if (profile.dimEnabled) parts.push(`dim ${profile.dimIntensity}%`);
+    if (profile.colorOverlayEnabled) parts.push(`overlay ${profile.colorOverlayOpacity}%`);
+    if (profile.effectPreset !== "none") parts.push(`${profile.effectPreset} ${profile.effectIntensity}%`);
+    if (parts.length === 0) parts.push("no visual effects");
+    return `${parts.join(", ")}; video hidden-pause ${profile.pauseWhenHidden ? "on" : "off"}; reduced motion ${profile.respectReducedMotion ? "on" : "off"}.`;
   }
 
-  private documentActiveButtonIndex(buttons: HTMLButtonElement[]): number {
-    const activeElement = this.containerEl.ownerDocument.activeElement;
-    return Math.max(0, buttons.findIndex((button) => button === activeElement));
+  private activeContextDefinition(): SettingDefinitionItem<string> {
+    return {
+      type: "group",
+      heading: "Active context",
+      cls: "veil-settings-panel-rules",
+      items: [{
+        name: "Resolved appearance",
+        desc: this.plugin.activeContextSummary(),
+        searchable: false,
+        render: (setting) => {
+          this.contextEl = setting.descEl;
+          setting.descEl.setAttribute("role", "status");
+          setting.descEl.setAttribute("aria-live", "polite");
+          this.updateStatus();
+          return () => {
+            if (this.contextEl === setting.descEl) this.contextEl = null;
+          };
+        },
+      }],
+    };
   }
 
   private wallpaperRuleDefinitions(): SettingDefinitionItem<string> {
@@ -500,24 +423,25 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       type: "list",
       heading: "Wallpaper routing",
       cls: "veil-settings-panel-rules",
-      emptyState: "No wallpaper rules. The default wallpaper applies everywhere.",
-      items: this.plugin.settings.wallpaperRules.map((rule, index) =>
-        this.wallpaperRulePage(rule, index)),
+      emptyState: "No wallpaper rules. The default appearance applies everywhere.",
+      items: this.plugin.settings.wallpaperRules.map((rule, index) => this.wallpaperRulePage(rule, index)),
       addItem: {
         name: "Add wallpaper rule",
         action: () => {
-          this.plugin.settings.wallpaperRules.push(
+          const wallpaperRules = [
+            ...this.plugin.settings.wallpaperRules,
             createWallpaperRule(this.plugin.settings.wallpaperRules),
-          );
-          this.plugin.updateSettings({ wallpaperRules: this.plugin.settings.wallpaperRules });
+          ];
+          this.plugin.updateSettings({ wallpaperRules });
           this.update();
         },
       },
       onReorder: (oldIndex, newIndex) => {
-        const [rule] = this.plugin.settings.wallpaperRules.splice(oldIndex, 1);
+        const wallpaperRules = [...this.plugin.settings.wallpaperRules];
+        const [rule] = wallpaperRules.splice(oldIndex, 1);
         if (!rule) return;
-        this.plugin.settings.wallpaperRules.splice(newIndex, 0, rule);
-        this.plugin.updateSettings({ wallpaperRules: this.plugin.settings.wallpaperRules });
+        wallpaperRules.splice(newIndex, 0, rule);
+        this.plugin.updateSettings({ wallpaperRules });
         this.update();
       },
       onDelete: (index) => {
@@ -527,29 +451,71 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
+  private wallpaperRulePage(rule: WallpaperRule, index: number): SettingDefinitionPage<string> {
+    const key = (field: string): string => `wallpaper-rule:${rule.id}:${field}`;
+    const profile = rule.profileId ? this.findProfile(rule.profileId) : undefined;
+    return {
+      type: "page",
+      name: rule.matchValue || `Wallpaper rule ${index + 1}`,
+      desc: profile ? `Scene: ${profile.name}` : rule.wallpaperPath || "No appearance selected",
+      displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
+      status: () => !rule.enabled || this.wallpaperRuleReady(rule) ? null : "warning",
+      items: [
+        ...this.matchRuleSettings(rule, key),
+        {
+          name: "Appearance source",
+          desc: "A scene switches the complete appearance. Inline wallpaper preserves 1.3 behavior and changes only the media.",
+          control: { type: "dropdown", key: key("profileId"), options: this.profileOptions() },
+        },
+        {
+          name: "Wallpaper file",
+          desc: "Inline mode uses global opacity, effects, and video settings.",
+          control: {
+            type: "file",
+            key: key("wallpaperPath"),
+            placeholder: "Media/Wallpapers/context.webp",
+            filter: (file: TFile) => Boolean(mediaKind(file)),
+          },
+          visible: () => !rule.profileId,
+        },
+        {
+          name: "Delete wallpaper rule",
+          desc: "Remove this route from Veil.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button.setButtonText("Delete rule").setIcon("trash-2").setDestructive()
+                .onClick(() => this.deleteWallpaperRule(rule.id)),
+            );
+          },
+        },
+      ],
+    };
+  }
+
   private opacityExclusionDefinitions(): SettingDefinitionItem<string> {
     return {
       type: "list",
       heading: "Opacity exclusions",
       cls: "veil-settings-panel-rules",
-      emptyState: "No exclusions. Global pane opacity applies everywhere.",
-      items: this.plugin.settings.opacityExclusions.map((rule, index) =>
-        this.opacityExclusionPage(rule, index)),
+      emptyState: "No exclusions. The resolved scene or global pane opacity applies everywhere.",
+      items: this.plugin.settings.opacityExclusions.map((rule, index) => this.opacityExclusionPage(rule, index)),
       addItem: {
         name: "Add opacity exclusion",
         action: () => {
-          this.plugin.settings.opacityExclusions.push(
+          const opacityExclusions = [
+            ...this.plugin.settings.opacityExclusions,
             createOpacityExclusionRule(this.plugin.settings.opacityExclusions),
-          );
-          this.plugin.updateSettings({ opacityExclusions: this.plugin.settings.opacityExclusions });
+          ];
+          this.plugin.updateSettings({ opacityExclusions });
           this.update();
         },
       },
       onReorder: (oldIndex, newIndex) => {
-        const [rule] = this.plugin.settings.opacityExclusions.splice(oldIndex, 1);
+        const opacityExclusions = [...this.plugin.settings.opacityExclusions];
+        const [rule] = opacityExclusions.splice(oldIndex, 1);
         if (!rule) return;
-        this.plugin.settings.opacityExclusions.splice(newIndex, 0, rule);
-        this.plugin.updateSettings({ opacityExclusions: this.plugin.settings.opacityExclusions });
+        opacityExclusions.splice(newIndex, 0, rule);
+        this.plugin.updateSettings({ opacityExclusions });
         this.update();
       },
       onDelete: (index) => {
@@ -559,62 +525,19 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private wallpaperRulePage(rule: WallpaperRule, index: number): SettingDefinitionPage<string> {
-    const key = (field: string): string => `wallpaper-rule:${rule.id}:${field}`;
-    return {
-      type: "page",
-      name: rule.matchValue || `Wallpaper rule ${index + 1}`,
-      desc: rule.wallpaperPath || "No wallpaper selected",
-      displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
-      status: () => !rule.enabled || this.wallpaperRuleReady(rule) ? null : "warning",
-      items: [
-        ...this.matchRuleSettings(rule, key),
-        {
-          name: "Wallpaper file",
-          desc: "This wallpaper replaces the default when the rule is the first enabled match.",
-          control: {
-            type: "file",
-            key: key("wallpaperPath"),
-            placeholder: "Media/Wallpapers/context.webp",
-            filter: (file: TFile) => Boolean(mediaKind(file)),
-          },
-        },
-        {
-          name: "Delete wallpaper rule",
-          desc: "Remove this route from Veil.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Delete rule")
-                .setIcon("trash-2")
-                .setDestructive()
-                .onClick(() => this.deleteWallpaperRule(rule.id)),
-            );
-          },
-        },
-      ],
-    };
-  }
-
-  private opacityExclusionPage(
-    rule: OpacityExclusionRule,
-    index: number,
-  ): SettingDefinitionPage<string> {
+  private opacityExclusionPage(rule: OpacityExclusionRule, index: number): SettingDefinitionPage<string> {
     const key = (field: string): string => `opacity-rule:${rule.id}:${field}`;
     return {
       type: "page",
       name: rule.matchValue || `Opacity exclusion ${index + 1}`,
       desc: "Keep selected pane layers at full opacity in this context.",
       displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
-      status: () => !rule.enabled || (rule.matchValue
-        && (rule.excludePaneSurface || rule.excludePaneContent))
-        ? null
-        : "warning",
+      status: () => !rule.enabled || (rule.matchValue && (rule.excludePaneSurface || rule.excludePaneContent)) ? null : "warning",
       items: [
         ...this.matchRuleSettings(rule, key),
         {
           name: "Exclude pane background opacity",
-          desc: "Use a fully opaque pane surface instead of the global pane background opacity.",
+          desc: "Use a fully opaque pane surface instead of the resolved pane opacity.",
           control: { type: "toggle", key: key("excludePaneSurface") },
         },
         {
@@ -627,10 +550,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           desc: "Remove this exclusion from Veil.",
           render: (setting) => {
             setting.addButton((button) =>
-              button
-                .setButtonText("Delete rule")
-                .setIcon("trash-2")
-                .setDestructive()
+              button.setButtonText("Delete rule").setIcon("trash-2").setDestructive()
                 .onClick(() => this.deleteOpacityRule(rule.id)),
             );
           },
@@ -639,15 +559,9 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private matchRuleSettings(
-    rule: ContextRule,
-    key: (field: string) => string,
-  ): SettingDefinition<string>[] {
+  private matchRuleSettings(rule: ContextRule, key: (field: string) => string): SettingDefinition<string>[] {
     return [
-      {
-        name: "Enabled",
-        control: { type: "toggle", key: key("enabled") },
-      },
+      { name: "Enabled", control: { type: "toggle", key: key("enabled") } },
       {
         name: "Match by",
         desc: "Tag rules also match nested tags. Folder rules include every descendant file.",
@@ -656,98 +570,222 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       {
         name: "Exact file path",
         desc: "Choose one file in the vault.",
-        control: {
-          type: "file",
-          key: key("matchValue"),
-          placeholder: "Folder/Note.md",
-        },
+        control: { type: "file", key: key("matchValue"), placeholder: "Folder/Note.md" },
         visible: () => rule.matchType === "path",
       },
       {
-        name: rule.matchType === "note"
-          ? "Note name"
-          : rule.matchType === "folder"
-            ? "Folder path"
-            : "Tag",
+        name: rule.matchType === "note" ? "Note name" : rule.matchType === "folder" ? "Folder path" : "Tag",
         desc: rule.matchType === "note"
           ? "The note name is matched without requiring the .md extension."
-          : rule.matchType === "folder"
-            ? "Use a vault-relative folder path."
-            : "A leading # is optional.",
+          : rule.matchType === "folder" ? "Use a vault-relative folder path." : "A leading # is optional.",
         control: {
           type: "text",
           key: key("matchValue"),
-          placeholder: rule.matchType === "note"
-            ? "Homepage"
-            : rule.matchType === "folder"
-              ? "20_Personal_Life/25_Media_Tracker"
-              : "#media/movies",
+          placeholder: rule.matchType === "note" ? "Homepage" : rule.matchType === "folder" ? "Projects" : "#media/movies",
         },
         visible: () => rule.matchType !== "path",
       },
     ];
   }
 
-  private wallpaperRuleReady(rule: WallpaperRule): boolean {
-    if (!rule.matchValue || !rule.wallpaperPath) return false;
-    const file = this.app.vault.getFileByPath(normalizePath(rule.wallpaperPath));
-    return Boolean(file && mediaKind(file));
-  }
-
-  private parseRuleKey(
-    key: string,
-  ): { kind: "wallpaper" | "opacity"; id: string; field: string } | null {
-    const [prefix, id, ...fieldParts] = key.split(":");
-    if (!id || fieldParts.length === 0) return null;
-    if (prefix !== "wallpaper-rule" && prefix !== "opacity-rule") return null;
+  private effectsDefinitions(): SettingDefinitionItem<string> {
     return {
-      kind: prefix === "wallpaper-rule" ? "wallpaper" : "opacity",
-      id,
-      field: fieldParts.join(":"),
+      type: "group",
+      heading: "Effects",
+      cls: "veil-settings-panel-effects",
+      items: [
+        {
+          name: "Vignette mode",
+          desc: "Shade the edges using the active theme's shadow palette.",
+          control: { type: "dropdown", key: "vignetteMode", options: { off: "Off", ellipse: "Elliptical", circle: "Circular" } },
+        },
+        this.slider("vignetteIntensity", "Vignette intensity", "Strength of the edge shading.", 100, "%", () => this.plugin.settings.vignetteMode === "off"),
+        this.slider("vignetteRadius", "Vignette radius", "Clear center before shading begins.", 100, "%", () => this.plugin.settings.vignetteMode === "off"),
+        { name: "Blur", desc: "Blur the wallpaper only. High values use more GPU resources.", control: { type: "toggle", key: "blurEnabled" } },
+        this.slider("blurIntensity", "Blur intensity", "Blur radius in pixels.", 40, " px", () => !this.plugin.settings.blurEnabled),
+        { name: "Dim", desc: "Reduce wallpaper brightness without dimming the interface.", control: { type: "toggle", key: "dimEnabled" } },
+        this.slider("dimIntensity", "Dim intensity", "0% keeps original brightness; 100% darkens completely.", 100, "%", () => !this.plugin.settings.dimEnabled),
+        { name: "Color overlay", desc: "Place a color layer over the wallpaper.", control: { type: "toggle", key: "colorOverlayEnabled" } },
+        { name: "Overlay color", control: { type: "color", key: "colorOverlayColor" }, visible: () => this.plugin.settings.colorOverlayEnabled },
+        { ...this.slider("colorOverlayOpacity", "Overlay opacity", "Strength of the selected color layer.", 100, "%", () => !this.plugin.settings.colorOverlayEnabled), visible: () => this.plugin.settings.colorOverlayEnabled },
+        {
+          name: "Overlay blend mode",
+          desc: "Color preserves image detail most closely; other modes alter brightness and contrast.",
+          control: { type: "dropdown", key: "colorOverlayBlendMode", options: COLOR_OVERLAY_BLEND_MODES },
+          visible: () => this.plugin.settings.colorOverlayEnabled,
+        },
+        {
+          name: "Effect preset",
+          desc: "Apply one optimized preset at a time.",
+          control: { type: "dropdown", key: "effectPreset", options: EFFECT_PRESETS },
+        },
+        this.slider("effectIntensity", "Effect intensity", "Strength and animated update speed.", 100, "%", () => this.plugin.settings.effectPreset === "none"),
+        {
+          name: "Performance guide",
+          desc: "Overlay, dim, and vignette are low cost. Retro is low to moderate. Blur is GPU-heavy at high radius. Glitch and TV noise animate continuously.",
+          searchable: false,
+        },
+      ],
     };
   }
 
-  private findRule(
-    kind: "wallpaper" | "opacity",
-    id: string,
-  ): WallpaperRule | OpacityExclusionRule | undefined {
+  private videoDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "group",
+      heading: "Video playback",
+      cls: "veil-settings-panel-video",
+      items: [
+        {
+          name: "Video compatibility",
+          desc: "Videos loop silently. Web formats work most broadly; other formats depend on codecs in the local Obsidian runtime.",
+          searchable: false,
+        },
+        { name: "Pause video when the app is hidden", desc: "Avoid decoding video when a window is not visible.", control: { type: "toggle", key: "pauseWhenHidden" } },
+        { name: "Respect reduced motion", desc: "Pause video on a still frame when the operating system requests reduced motion. GIF files cannot be paused.", control: { type: "toggle", key: "respectReducedMotion" } },
+      ],
+    };
+  }
+
+  private actionsDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "group",
+      heading: "Actions",
+      cls: "veil-settings-panel-actions",
+      items: [
+        {
+          name: "Reload wallpaper",
+          desc: "Retry loading the current file or a video whose autoplay was blocked.",
+          render: (setting) => { setting.addButton((button) => button.setButtonText("Reload").onClick(() => this.plugin.refreshWallpaper(true))); },
+        },
+        {
+          name: "Export settings",
+          desc: "Download a schema-versioned JSON backup containing settings, scenes, and rules. Media files are not embedded.",
+          render: (setting) => { setting.addButton((button) => button.setButtonText("Export").setIcon("download").onClick(() => this.exportSettings())); },
+        },
+        {
+          name: "Import settings",
+          desc: "Replace the current configuration with a validated backup. Schema 1 exports migrate automatically.",
+          render: (setting) => { setting.addButton((button) => button.setButtonText("Import").setIcon("upload").onClick(() => this.chooseImportFile())); },
+        },
+        {
+          name: "Restore defaults",
+          desc: "Clear the wallpaper, scenes, and rules and restore default appearance values. No media files are changed.",
+          render: (setting) => {
+            setting.addButton((button) => button.setButtonText("Restore").onClick(() => {
+              this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
+              void this.plugin.flushSettings().then(() => this.update());
+            }));
+          },
+        },
+      ],
+    };
+  }
+
+  private supportDefinitions(): SettingDefinitionItem<string> {
+    return {
+      type: "group",
+      heading: "Support Veil",
+      cls: "veil-settings-panel-support",
+      items: [{
+        name: "Buy me a coffee",
+        desc: "If Veil is useful to you, you can support its continued development.",
+        searchable: false,
+        render: (setting) => {
+          const link = setting.controlEl.createEl("a", {
+            cls: "veil-support-link",
+            attr: { href: FUNDING_URL, target: "_blank", rel: "noopener noreferrer", "aria-label": "Buy me a coffee" },
+          });
+          const icon = link.createSpan({ cls: "veil-support-link-icon" });
+          setIcon(icon, "coffee");
+          link.createSpan({ cls: "veil-support-link-label", text: "Buy me a coffee" });
+        },
+      }],
+    };
+  }
+
+  private profileOptions(): Record<string, string> {
+    const options: Record<string, string> = { "": "Inline wallpaper — use global appearance" };
+    for (const profile of this.plugin.settings.profiles) options[profile.id] = profile.name || profile.id;
+    return options;
+  }
+
+  private wallpaperRuleReady(rule: WallpaperRule): boolean {
+    if (!rule.matchValue) return false;
+    const profile = rule.profileId ? this.findProfile(rule.profileId) : undefined;
+    const path = profile?.wallpaperPath || rule.wallpaperPath;
+    if (!path) return false;
+    const file = this.app.vault.getFileByPath(normalizePath(path));
+    return Boolean(file && mediaKind(file));
+  }
+
+  private parseRuleKey(key: string): { kind: "wallpaper" | "opacity"; id: string; field: string } | null {
+    const [prefix, id, ...fieldParts] = key.split(":");
+    if (!id || fieldParts.length === 0) return null;
+    if (prefix !== "wallpaper-rule" && prefix !== "opacity-rule") return null;
+    return { kind: prefix === "wallpaper-rule" ? "wallpaper" : "opacity", id, field: fieldParts.join(":") };
+  }
+
+  private parseProfileKey(key: string): { id: string; field: string } | null {
+    const [prefix, id, ...fieldParts] = key.split(":");
+    if (prefix !== "profile" || !id || fieldParts.length === 0) return null;
+    return { id, field: fieldParts.join(":") };
+  }
+
+  private findRule(kind: "wallpaper" | "opacity", id: string): WallpaperRule | OpacityExclusionRule | undefined {
     return kind === "wallpaper"
       ? this.plugin.settings.wallpaperRules.find((rule) => rule.id === id)
       : this.plugin.settings.opacityExclusions.find((rule) => rule.id === id);
   }
 
-  private setRuleValue(
-    rule: WallpaperRule | OpacityExclusionRule,
-    field: string,
-    value: unknown,
-  ): void {
-    if (["enabled", "excludePaneSurface", "excludePaneContent"].includes(field)) {
-      if (field in rule) rule[field as "enabled"] = value === true;
-      return;
-    }
+  private findProfile(id: string): VeilProfile | undefined {
+    return this.plugin.settings.profiles.find((profile) => profile.id === id);
+  }
+
+  private setRuleValue(rule: WallpaperRule | OpacityExclusionRule, field: string, value: unknown): void {
+    if (field === "enabled") { rule.enabled = value === true; return; }
+    if (field === "excludePaneSurface" && "excludePaneSurface" in rule) { rule.excludePaneSurface = value === true; return; }
+    if (field === "excludePaneContent" && "excludePaneContent" in rule) { rule.excludePaneContent = value === true; return; }
     if (field === "matchType") {
-      rule.matchType = Object.keys(MATCH_TYPES).includes(String(value))
-        ? value as MatchType
-        : "path";
+      rule.matchType = Object.keys(MATCH_TYPES).includes(String(value)) ? value as MatchType : "path";
       return;
     }
-    if (field === "matchValue") rule.matchValue = typeof value === "string" ? value : "";
-    if (field === "wallpaperPath" && "wallpaperPath" in rule) {
-      rule.wallpaperPath = typeof value === "string" ? value : "";
-    }
+    if (field === "matchValue") { rule.matchValue = typeof value === "string" ? value : ""; return; }
+    if (field === "profileId" && "profileId" in rule) { rule.profileId = typeof value === "string" ? value : ""; return; }
+    if (field === "wallpaperPath" && "wallpaperPath" in rule) rule.wallpaperPath = typeof value === "string" ? value : "";
+  }
+
+  private copyGlobalAppearanceToProfile(id: string): void {
+    const current = this.findProfile(id);
+    if (!current) return;
+    const copied = createProfile([], this.plugin.settings);
+    const profile: VeilProfile = { ...copied, id: current.id, name: current.name };
+    const profiles = this.plugin.settings.profiles.map((candidate) => candidate.id === id ? profile : candidate);
+    this.plugin.updateSettings({ profiles });
+    void this.plugin.flushSettings().then(() => this.update());
+  }
+
+  private deleteProfile(id: string): void {
+    const profile = this.findProfile(id);
+    if (!profile) return;
+    const profiles = this.plugin.settings.profiles.filter((candidate) => candidate.id !== id);
+    const wallpaperRules = this.plugin.settings.wallpaperRules.map((rule) =>
+      rule.profileId === id ? { ...rule, profileId: "", wallpaperPath: profile.wallpaperPath } : rule,
+    );
+    this.plugin.updateSettings({ profiles, wallpaperRules });
+    void this.plugin.flushSettings().then(() => this.update());
   }
 
   private deleteWallpaperRule(id: string): void {
-    const rules = this.plugin.settings.wallpaperRules.filter((rule) => rule.id !== id);
-    if (rules.length === this.plugin.settings.wallpaperRules.length) return;
-    this.plugin.updateSettings({ wallpaperRules: rules });
+    const wallpaperRules = this.plugin.settings.wallpaperRules.filter((rule) => rule.id !== id);
+    if (wallpaperRules.length === this.plugin.settings.wallpaperRules.length) return;
+    this.plugin.updateSettings({ wallpaperRules });
     void this.plugin.flushSettings().then(() => this.update());
   }
 
   private deleteOpacityRule(id: string): void {
-    const rules = this.plugin.settings.opacityExclusions.filter((rule) => rule.id !== id);
-    if (rules.length === this.plugin.settings.opacityExclusions.length) return;
-    this.plugin.updateSettings({ opacityExclusions: rules });
+    const opacityExclusions = this.plugin.settings.opacityExclusions.filter((rule) => rule.id !== id);
+    if (opacityExclusions.length === this.plugin.settings.opacityExclusions.length) return;
+    this.plugin.updateSettings({ opacityExclusions });
     void this.plugin.flushSettings().then(() => this.update());
   }
 
@@ -760,10 +798,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     link.download = `veil-settings-${new Date().toISOString().slice(0, 10)}.json`;
     link.hidden = true;
     link.click();
-    window.setTimeout(() => {
-      link.remove();
-      URL.revokeObjectURL(url);
-    }, 0);
+    window.setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 0);
     new Notice("Veil settings exported.");
   }
 
@@ -776,20 +811,14 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     input.addEventListener("cancel", cleanup, { once: true });
     input.addEventListener("change", () => {
       const file = input.files?.[0];
-      if (!file) {
-        cleanup();
-        return;
-      }
+      if (!file) { cleanup(); return; }
       void this.importSettings(file).finally(cleanup);
     }, { once: true });
     input.click();
   }
 
   private async importSettings(file: File): Promise<void> {
-    if (file.size > MAX_IMPORT_BYTES) {
-      new Notice("Veil settings import is limited to one megabyte.");
-      return;
-    }
+    if (file.size > MAX_IMPORT_BYTES) { new Notice("Veil settings import is limited to one megabyte."); return; }
     try {
       const imported = parseVeilSettingsImport(await file.text(), normalizePath);
       this.plugin.updateSettings(imported);
@@ -805,6 +834,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   hide(): void {
     this.statusEl = null;
     this.statusRowEl = null;
+    this.contextEl = null;
     void this.plugin.flushSettings();
   }
 }
