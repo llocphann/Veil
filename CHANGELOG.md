@@ -10,6 +10,8 @@
 - Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
 - Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
 - Keep the last successfully loaded wallpaper visible across rapid A → B → C navigation when B is still preloading, rather than disposing the fallback and flashing a blank workspace.
+- Keep the last working wallpaper when a configured default/Scene/rule source is temporarily missing, invalid, or unsupported; clearing the default wallpaper intentionally still restores the theme background.
+- Ignore duplicate ready callbacks from cached images/load events so a single incoming wallpaper cannot start its transition twice.
 - Respect reduced-motion preferences by disabling scene crossfades in addition to pausing motion-heavy effects and video.
 - Expose all scene-specific effects and playback controls directly inside each Scene editor.
 - Add wallpaper pools for the default appearance and scenes, with optional descendant-folder discovery, stable per-context selection, and an explicit shuffle command that avoids the previous item when possible.
