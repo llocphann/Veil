@@ -20,7 +20,14 @@ function wallpaperRule(
   matchValue: string,
   wallpaperPath = "Media/wallpaper.webp",
 ): WallpaperRule {
-  return { id: `${matchType}-${matchValue}`, enabled: true, matchType, matchValue, wallpaperPath };
+  return {
+    id: `${matchType}-${matchValue}`,
+    enabled: true,
+    matchType,
+    matchValue,
+    profileId: "",
+    wallpaperPath,
+  };
 }
 
 void test("context rules match note names, exact paths, folders, and nested tags", () => {
