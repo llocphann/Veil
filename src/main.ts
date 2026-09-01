@@ -10,9 +10,11 @@ import {
   matchingOpacityExclusions,
   type NoteContext,
 } from "./context-rules";
-import { resolveWallpaper } from "./profile-resolver";
+import { resolveWallpaper, type ResolvedWallpaper } from "./profile-resolver";
+import { SceneSwitcherModal } from "./scene-switcher-modal";
 import {
   DEFAULT_SETTINGS,
+  copyAppearance,
   mediaKind,
   normalizeSettings,
   type MediaKind,
@@ -79,6 +81,7 @@ export default class VeilPlugin extends Plugin {
   private readonly poolSelections = new Map<string, string>();
   private readonly previousPoolSelections = new Map<string, string>();
   private wallpaperLibrary: WallpaperLibraryState = { favorites: [], recent: [] };
+  private manualProfileId = "";
   private settingTab: WallpaperSettingsTab | null = null;
   private unloaded = false;
   private layoutReady = false;
@@ -118,6 +121,11 @@ export default class VeilPlugin extends Plugin {
       id: "open-wallpaper-library",
       name: "Open wallpaper library",
       callback: () => this.openWallpaperLibrary(),
+    });
+    this.addCommand({
+      id: "switch-scene",
+      name: "Switch scene",
+      callback: () => this.openSceneSwitcher(),
     });
 
     this.app.workspace.onLayoutReady(() => {
@@ -164,6 +172,9 @@ export default class VeilPlugin extends Plugin {
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
     if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
     this.settings = next;
+    if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
+      this.manualProfileId = "";
+    }
     this.poolCandidates.clear();
     this.poolSelections.clear();
     this.previousPoolSelections.clear();
@@ -211,7 +222,7 @@ export default class VeilPlugin extends Plugin {
   public shuffleWallpaperPool(): void {
     const document = this.app.workspace.containerEl.ownerDocument;
     const context = this.contextForDocument(document);
-    const resolved = resolveWallpaper(this.settings, context);
+    const resolved = this.resolveForContext(context);
     const poolAllowed = !resolved.rule || Boolean(resolved.profile);
     if (!poolAllowed || !resolved.appearance.wallpaperPoolEnabled) {
       new Notice("The current appearance is not using a wallpaper pool.");
@@ -239,10 +250,22 @@ export default class VeilPlugin extends Plugin {
     }).open();
   }
 
+  public openSceneSwitcher(): void {
+    new SceneSwitcherModal(this.app, {
+      getProfiles: () => this.settings.profiles,
+      getActiveOverrideId: () => this.manualProfileId,
+      choose: (profileId) => this.setManualScene(profileId),
+    }).open();
+  }
+
   public activeContextSummary(): string {
     const document = this.app.workspace.containerEl.ownerDocument;
     const context = this.contextForDocument(document);
-    const resolved = resolveWallpaper(this.settings, context);
+    const resolved = this.resolveForContext(context);
+    if (this.manualProfileId && resolved.profile) {
+      const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
+      return `${context?.path || "Workspace"} → manual scene: ${resolved.profile.name}${pool}`;
+    }
     if (!context) return "No active note context in the main window.";
     if (resolved.profile) {
       const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
@@ -253,6 +276,40 @@ export default class VeilPlugin extends Plugin {
     }
     const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
     return `${context.path} → default appearance${pool}`;
+  }
+
+  private setManualScene(profileId: string): void {
+    if (profileId && !this.settings.profiles.some((profile) => profile.id === profileId)) {
+      new Notice("That Veil scene no longer exists.");
+      return;
+    }
+    if (this.manualProfileId === profileId) return;
+    this.manualProfileId = profileId;
+    this.sourceRevision += 1;
+    this.scheduleApplyToWorkspace();
+    this.settingTab?.updateStatus();
+    if (!profileId) {
+      new Notice("Veil is following context rules again.");
+      return;
+    }
+    const profile = this.settings.profiles.find((candidate) => candidate.id === profileId);
+    new Notice(`Veil scene: ${profile?.name || profileId}`);
+  }
+
+  private resolveForContext(context: NoteContext | null): ResolvedWallpaper {
+    const automatic = resolveWallpaper(this.settings, context);
+    if (!this.manualProfileId) return automatic;
+    const profile = this.settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
+    if (!profile) {
+      this.manualProfileId = "";
+      return automatic;
+    }
+    return {
+      rule: null,
+      profile,
+      path: profile.wallpaperPath,
+      appearance: copyAppearance(profile),
+    };
   }
 
   private scheduleSave(): void {
@@ -432,7 +489,7 @@ export default class VeilPlugin extends Plugin {
     context: NoteContext | null,
     appearanceOverride?: VeilAppearance,
   ): void {
-    const resolved = appearanceOverride ? null : resolveWallpaper(this.settings, context);
+    const resolved = appearanceOverride ? null : this.resolveForContext(context);
     const appearance = appearanceOverride || resolved?.appearance || state.appearance;
     state.appearance = appearance;
     const filters: string[] = [];
@@ -806,7 +863,7 @@ export default class VeilPlugin extends Plugin {
     document: Document,
     context: NoteContext | null,
   ): WallpaperSource | null {
-    const resolved = resolveWallpaper(this.settings, context);
+    const resolved = this.resolveForContext(context);
     const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
     const poolActive = (!resolved.rule || Boolean(resolved.profile))
       && resolved.appearance.wallpaperPoolEnabled;
@@ -816,11 +873,13 @@ export default class VeilPlugin extends Plugin {
     const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
     const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
     const kind = file instanceof TFile ? mediaKind(file) : "";
-    const contextLabel = resolved.profile
-      ? `Scene “${resolved.profile.name}”${poolActive ? " · pool" : ""}`
-      : resolved.rule
-        ? `Rule ${resolved.rule.matchType}: ${resolved.rule.matchValue}`
-        : `Default appearance${poolActive ? " · pool" : ""}`;
+    const contextLabel = this.manualProfileId && resolved.profile
+      ? `Manual scene “${resolved.profile.name}”${poolActive ? " · pool" : ""}`
+      : resolved.profile
+        ? `Scene “${resolved.profile.name}”${poolActive ? " · pool" : ""}`
+        : resolved.rule
+          ? `Rule ${resolved.rule.matchType}: ${resolved.rule.matchValue}`
+          : `Default appearance${poolActive ? " · pool" : ""}`;
     if (!path || !(file instanceof TFile) || !kind) {
       const rulePrefix = resolved.rule ? `${contextLabel}: ` : "";
       this.setDocumentStatus(
@@ -830,7 +889,9 @@ export default class VeilPlugin extends Plugin {
             ? resolved.profile
               ? `${rulePrefix}choose a wallpaper file for this scene.`
               : `${rulePrefix}choose a wallpaper file for this rule.`
-            : "Choose a wallpaper file to begin."
+            : this.manualProfileId && resolved.profile
+              ? `Manual scene “${resolved.profile.name}”: choose a wallpaper file for this scene.`
+              : "Choose a wallpaper file to begin."
           : invalidPath
             ? "Use a vault-relative path, not a URL or a path outside the vault."
             : !(file instanceof TFile)
@@ -858,6 +919,7 @@ export default class VeilPlugin extends Plugin {
         file.stat.mtime,
         file.stat.size,
         contextKey,
+        this.manualProfileId ? `manual:${this.manualProfileId}` : "automatic",
         this.sourceRevision,
       ].join("|"),
       contextLabel,
