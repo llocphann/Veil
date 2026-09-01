@@ -33,6 +33,9 @@ void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
 void test("release workflow verifies and publishes the required artifacts", () => {
   const source = fs.readFileSync(".github/workflows/release.yml", "utf8");
   assert.match(source, /Verify release tag/);
+  assert.match(source, /fetch-depth: 0/);
+  assert.match(source, /Verify release source/);
+  assert.match(source, /merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/);
   assert.match(source, /actions\/attest@v4/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
     assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
