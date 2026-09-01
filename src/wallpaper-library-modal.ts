@@ -1,6 +1,7 @@
 import { Modal, TFile, setIcon, type App } from "obsidian";
 import { mediaKind, type MediaKind } from "./settings";
 import type { WallpaperLibraryState } from "./wallpaper-library-state";
+import type { WallpaperLibraryTarget } from "./wallpaper-library-targets";
 
 type LibraryView = "all" | "favorites" | "recent";
 type LibraryKind = "all" | Exclude<MediaKind, "">;
@@ -10,12 +11,6 @@ const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_STEP = 60;
 const ALL_FOLDERS = "__all__";
 const ROOT_FOLDER = "__root__";
-
-export interface WallpaperLibraryTarget {
-  id: string;
-  label: string;
-  selectedPath: string;
-}
 
 interface WallpaperLibraryController {
   getTargets: () => WallpaperLibraryTarget[];
@@ -187,6 +182,7 @@ export class WallpaperLibraryModal extends Modal {
     this.moreEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-more" });
     this.updateFilterButtons();
     this.renderGrid();
+    search.focus();
   }
 
   onClose(): void {
@@ -211,7 +207,7 @@ export class WallpaperLibraryModal extends Modal {
   private activeTarget(): WallpaperLibraryTarget {
     const targets = this.controller.getTargets();
     const target = targets.find((candidate) => candidate.id === this.targetId) || targets[0];
-    return target || { id: "", label: "Default appearance", selectedPath: "" };
+    return target || { id: "default", label: "Default appearance", selectedPath: "" };
   }
 
   private ensureActiveTarget(): void {
