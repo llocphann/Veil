@@ -11,10 +11,16 @@ const VISIBLE_ITEMS_STEP = 60;
 const ALL_FOLDERS = "__all__";
 const ROOT_FOLDER = "__root__";
 
+export interface WallpaperLibraryTarget {
+  id: string;
+  label: string;
+  selectedPath: string;
+}
+
 interface WallpaperLibraryController {
-  getSelectedPath: () => string;
+  getTargets: () => WallpaperLibraryTarget[];
   getState: () => WallpaperLibraryState;
-  selectWallpaper: (path: string) => void;
+  selectWallpaper: (targetId: string, path: string) => void;
   toggleFavorite: (path: string) => void;
 }
 
@@ -31,6 +37,7 @@ export class WallpaperLibraryModal extends Modal {
   private kind: LibraryKind = "all";
   private sort: LibrarySort = "default";
   private folderScope = ALL_FOLDERS;
+  private targetId = "";
   private visibleLimit = INITIAL_VISIBLE_ITEMS;
   private gridEl: HTMLElement | null = null;
   private summaryEl: HTMLElement | null = null;
@@ -54,6 +61,23 @@ export class WallpaperLibraryModal extends Modal {
     this.files = this.app.vault.getFiles()
       .filter((file) => Boolean(mediaKind(file)))
       .sort((left, right) => left.path.localeCompare(right.path));
+
+    const targets = this.controller.getTargets();
+    this.targetId = targets[0]?.id || "";
+
+    const targetRow = this.contentEl.createDiv({ cls: "veil-wallpaper-library-target-row" });
+    targetRow.createSpan({ cls: "veil-wallpaper-library-target-label", text: "Apply to" });
+    const targetSelect = targetRow.createEl("select", {
+      cls: "veil-wallpaper-library-target",
+      attr: { "aria-label": "Apply wallpaper to" },
+    });
+    this.populateTargetSelect(targetSelect);
+    targetSelect.addEventListener("change", () => {
+      this.targetId = targetSelect.value;
+      this.ensureActiveTarget();
+      targetSelect.value = this.targetId;
+      this.renderGrid();
+    });
 
     const toolbar = this.contentEl.createDiv({ cls: "veil-wallpaper-library-toolbar" });
     const search = toolbar.createEl("input", {
@@ -174,6 +198,27 @@ export class WallpaperLibraryModal extends Modal {
     this.contentEl.empty();
   }
 
+  private populateTargetSelect(select: HTMLSelectElement): void {
+    select.empty();
+    const targets = this.controller.getTargets();
+    for (const target of targets) {
+      select.createEl("option", { value: target.id, text: target.label });
+    }
+    this.ensureActiveTarget();
+    select.value = this.targetId;
+  }
+
+  private activeTarget(): WallpaperLibraryTarget {
+    const targets = this.controller.getTargets();
+    const target = targets.find((candidate) => candidate.id === this.targetId) || targets[0];
+    return target || { id: "", label: "Default appearance", selectedPath: "" };
+  }
+
+  private ensureActiveTarget(): void {
+    const target = this.activeTarget();
+    this.targetId = target.id;
+  }
+
   private resetVisibleLimit(): void {
     this.visibleLimit = INITIAL_VISIBLE_ITEMS;
     this.renderGrid();
@@ -229,13 +274,13 @@ export class WallpaperLibraryModal extends Modal {
   private selectRandomVisible(): void {
     const files = this.visibleFiles();
     if (files.length === 0) return;
-    const selectedPath = this.controller.getSelectedPath();
+    const target = this.activeTarget();
     const choices = files.length > 1
-      ? files.filter((file) => file.path !== selectedPath)
+      ? files.filter((file) => file.path !== target.selectedPath)
       : files;
     const selected = choices[Math.floor(Math.random() * choices.length)];
     if (!selected) return;
-    this.controller.selectWallpaper(selected.path);
+    this.controller.selectWallpaper(target.id, selected.path);
     this.renderGrid();
   }
 
@@ -247,13 +292,15 @@ export class WallpaperLibraryModal extends Modal {
 
     grid.empty();
     more.empty();
+    const target = this.activeTarget();
     const files = this.visibleFiles();
     const visible = files.slice(0, this.visibleLimit);
     const imageCount = files.reduce((count, file) => count + Number(mediaKind(file) === "image"), 0);
     const videoCount = files.length - imageCount;
-    summary.textContent = files.length === 1
+    const countText = files.length === 1
       ? `1 wallpaper · ${imageCount} image · ${videoCount} videos`
       : `${files.length} wallpapers · ${imageCount} images · ${videoCount} videos`;
+    summary.textContent = `${countText} · Apply to: ${target.label}`;
 
     if (visible.length === 0) {
       grid.createDiv({
@@ -269,9 +316,8 @@ export class WallpaperLibraryModal extends Modal {
 
     const state = this.controller.getState();
     const favorites = new Set(state.favorites);
-    const selectedPath = this.controller.getSelectedPath();
     for (const file of visible) {
-      this.renderCard(grid, file, favorites.has(file.path), file.path === selectedPath);
+      this.renderCard(grid, file, favorites.has(file.path), file.path === target.selectedPath, target);
     }
 
     if (visible.length < files.length) {
@@ -292,6 +338,7 @@ export class WallpaperLibraryModal extends Modal {
     file: TFile,
     favorite: boolean,
     selected: boolean,
+    target: WallpaperLibraryTarget,
   ): void {
     const kind = mediaKind(file);
     if (!kind) return;
@@ -302,7 +349,7 @@ export class WallpaperLibraryModal extends Modal {
       cls: "veil-wallpaper-library-select",
       attr: {
         type: "button",
-        "aria-label": `Use ${file.path} as the default wallpaper`,
+        "aria-label": `Use ${file.path} for ${target.label}`,
       },
     });
     const preview = select.createDiv({ cls: "veil-wallpaper-library-preview" });
@@ -328,7 +375,7 @@ export class WallpaperLibraryModal extends Modal {
     select.createSpan({ cls: "veil-wallpaper-library-name", text: file.name });
     select.createSpan({ cls: "veil-wallpaper-library-path", text: file.path });
     select.addEventListener("click", () => {
-      this.controller.selectWallpaper(file.path);
+      this.controller.selectWallpaper(target.id, file.path);
       this.renderGrid();
     });
 
