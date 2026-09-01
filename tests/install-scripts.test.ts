@@ -44,3 +44,8 @@ void test("every dependency install script is explicitly approved at its locked 
     "package.json allowScripts must exactly match dependencies with install scripts in package-lock.json",
   );
 });
+
+void test("npm fails closed when an install script is not explicitly approved", () => {
+  const npmrc = fs.readFileSync(".npmrc", "utf8");
+  assert.match(npmrc, /^strict-allow-scripts=true$/m);
+});
