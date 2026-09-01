@@ -6,6 +6,7 @@
 - Allow wallpaper routing rules to switch to a complete scene while preserving the 1.3 inline-wallpaper behavior.
 - Duplicate an existing Scene from Settings with a fresh ID while preserving its complete wallpaper, pool, appearance, transition, effect, and video configuration.
 - Surface the 64-Scene limit in Settings instead of silently dropping additions beyond the normalized data cap.
+- Surface the 96-item limits for wallpaper rules and opacity exclusions, and reject oversized imported collections instead of silently truncating portable settings.
 - Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
 - Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
 - Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
@@ -27,6 +28,7 @@
 - Fix overnight scheduled fallbacks so an early-morning carryover such as `mon-fri 22:00-06:00` still schedules the current day's 06:00 end boundary instead of waiting for the next evening.
 - Preserve per-window system context even when a desktop window has no active note, so adaptive theme/time/day fallbacks still resolve correctly there.
 - Track the most recently active root leaf independently for each desktop/pop-out document so split windows resolve note, tag, property, and Scene rules from the correct local context.
+- Keep theme fallbacks strictly scoped to the theme reported by each document context rather than consulting a global document fallback.
 - Add a command-palette Scene switcher for temporary session-only manual overrides, with a `Follow context rules` option to resume automatic routing.
 - Refactor declarative Settings definitions so dynamic Scene and rule controls share smaller helpers, and expose the visual wallpaper library directly from Wallpaper and Actions settings.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
