@@ -90,6 +90,7 @@ export default class VeilPlugin extends Plugin {
   };
 
   private readonly documents = new Map<Document, DocumentState>();
+  private readonly activeRootLeaves = new Map<Document, WorkspaceLeaf>();
   private readonly poolCandidates = new Map<string, string[]>();
   private readonly poolSelections = new Map<string, string>();
   private readonly previousPoolSelections = new Map<string, string>();
@@ -145,11 +146,15 @@ export default class VeilPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       if (this.unloaded) return;
       this.layoutReady = true;
+      this.rememberActiveRootLeaf(this.app.workspace.getMostRecentLeaf());
       this.registerVaultEvents();
       this.rescheduleSystemRouting();
       this.refreshWallpaper();
     });
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshWallpaper()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
+      this.rememberActiveRootLeaf(leaf);
+      this.refreshWallpaper();
+    }));
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshWallpaper()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshWallpaper()));
     this.registerEvent(
@@ -164,6 +169,7 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.workspace.on("window-close", (_workspaceWindow, window) => {
+        this.activeRootLeaves.delete(window.document);
         this.clearDocument(window.document);
       }),
     );
@@ -178,6 +184,7 @@ export default class VeilPlugin extends Plugin {
     this.systemRoutingTimer = null;
     void this.flushSettings();
     this.clearAllDocuments();
+    this.activeRootLeaves.clear();
     this.poolCandidates.clear();
     this.poolSelections.clear();
     this.previousPoolSelections.clear();
@@ -535,8 +542,12 @@ export default class VeilPlugin extends Plugin {
       documents.add(leaf.view.containerEl.ownerDocument);
     });
     for (const document of documents) {
-      if (document.defaultView?.closed) this.clearDocument(document);
-      else this.applyToDocument(document);
+      if (document.defaultView?.closed) {
+        this.activeRootLeaves.delete(document);
+        this.clearDocument(document);
+      } else {
+        this.applyToDocument(document);
+      }
     }
   }
 
@@ -1088,19 +1099,34 @@ export default class VeilPlugin extends Plugin {
     };
   }
 
+  private rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): void {
+    const document = leaf?.view?.containerEl?.ownerDocument;
+    if (!document || !this.isRootLeafForDocument(leaf, document)) return;
+    this.activeRootLeaves.set(document, leaf);
+  }
+
   private leafForDocument(document: Document): WorkspaceLeaf | null {
+    const remembered = this.activeRootLeaves.get(document) || null;
+    if (this.isRootLeafForDocument(remembered, document)) return remembered;
+    if (remembered) this.activeRootLeaves.delete(document);
+
     const recent = this.app.workspace.getMostRecentLeaf();
-    if (this.isRootLeafForDocument(recent, document)) return recent;
+    if (this.isRootLeafForDocument(recent, document)) {
+      this.activeRootLeaves.set(document, recent);
+      return recent;
+    }
     let result: WorkspaceLeaf | null = null;
     this.app.workspace.iterateAllLeaves((leaf) => {
       if (!result && this.isRootLeafForDocument(leaf, document)) result = leaf;
     });
+    if (result) this.activeRootLeaves.set(document, result);
     return result;
   }
 
   private isRootLeafForDocument(leaf: WorkspaceLeaf | null, document: Document): boolean {
     const container = leaf?.view?.containerEl;
     return container?.ownerDocument === document
+      && container.isConnected
       && Boolean(container.closest(".workspace-split.mod-root"));
   }
 
