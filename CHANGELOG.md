@@ -8,7 +8,7 @@
 - Keep the ` copy` suffix visible when duplicating Scene names at the 80-character limit so the duplicate cannot appear to have the same name as its source.
 - Surface the 64-Scene limit in Settings instead of silently dropping additions beyond the normalized data cap.
 - Surface the 96-item limits for wallpaper rules and opacity exclusions, and reject oversized imported collections instead of silently truncating portable settings.
-- Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
+- Add an active-context inspector so routing settings show whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
 - Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
 - Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
 - Keep the last successfully loaded wallpaper visible across rapid A → B → C navigation when B is still preloading, rather than disposing the fallback and flashing a blank workspace.
@@ -34,7 +34,8 @@
 - Track the most recently active root leaf independently for each desktop/pop-out document so split windows resolve note, tag, property, and Scene rules from the correct local context.
 - Keep theme fallbacks strictly scoped to the theme reported by each document context rather than consulting a global document fallback.
 - Add a command-palette Scene switcher for temporary session-only manual overrides, with a `Follow context rules` option to resume automatic routing.
-- Refactor declarative Settings definitions so dynamic Scene and rule controls share smaller helpers, and expose the visual wallpaper library directly from Wallpaper and Actions settings.
+- Reorganize Settings using the same task-oriented navigation model as Ledge, adapted for Veil: **Wallpaper, Behavior, Routing, Appearance, Scenes, Data, About**. Runtime actions, transfer/recovery controls, effects, playback, and routing are grouped by user intent instead of implementation category.
+- Preserve the complete declarative Settings implementation behind a small presentation adapter so the new organization does not fork Scene/rule validation, import/export, or control behavior.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
 - Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
 - Harden release automation with immutable action SHAs, source/tag verification before dependency installation, production-bundle checks, and a read-only verification job that hands verified artifacts to a separate publish-only job with write/OIDC permissions.
