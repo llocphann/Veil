@@ -1,0 +1,232 @@
+import { Modal, TFile, setIcon, type App } from "obsidian";
+import { mediaKind } from "./settings";
+import type { WallpaperLibraryState } from "./wallpaper-library-state";
+
+type LibraryView = "all" | "favorites" | "recent";
+
+const INITIAL_VISIBLE_ITEMS = 60;
+const VISIBLE_ITEMS_STEP = 60;
+
+interface WallpaperLibraryController {
+  getSelectedPath: () => string;
+  getState: () => WallpaperLibraryState;
+  selectWallpaper: (path: string) => void;
+  toggleFavorite: (path: string) => void;
+}
+
+export class WallpaperLibraryModal extends Modal {
+  private readonly controller: WallpaperLibraryController;
+  private files: TFile[] = [];
+  private query = "";
+  private view: LibraryView = "all";
+  private visibleLimit = INITIAL_VISIBLE_ITEMS;
+  private gridEl: HTMLElement | null = null;
+  private summaryEl: HTMLElement | null = null;
+  private moreEl: HTMLElement | null = null;
+  private filterButtons = new Map<LibraryView, HTMLButtonElement>();
+
+  constructor(app: App, controller: WallpaperLibraryController) {
+    super(app);
+    this.controller = controller;
+  }
+
+  onOpen(): void {
+    this.modalEl.classList.add("veil-wallpaper-library-modal");
+    this.contentEl.empty();
+    this.contentEl.createEl("h2", { text: "Wallpaper library" });
+    this.contentEl.createEl("p", {
+      cls: "veil-wallpaper-library-description",
+      text: "Browse vault-local wallpaper media. Images load lazily; videos stay as lightweight placeholders until selected as the wallpaper.",
+    });
+
+    this.files = this.app.vault.getFiles()
+      .filter((file) => Boolean(mediaKind(file)))
+      .sort((left, right) => left.path.localeCompare(right.path));
+
+    const toolbar = this.contentEl.createDiv({ cls: "veil-wallpaper-library-toolbar" });
+    const search = toolbar.createEl("input", {
+      cls: "veil-wallpaper-library-search",
+      attr: {
+        type: "search",
+        placeholder: "Search wallpaper paths…",
+        "aria-label": "Search wallpaper library",
+      },
+    });
+    search.addEventListener("input", () => {
+      this.query = search.value.trim().toLowerCase();
+      this.visibleLimit = INITIAL_VISIBLE_ITEMS;
+      this.renderGrid();
+    });
+
+    const filters = toolbar.createDiv({ cls: "veil-wallpaper-library-filters" });
+    for (const [view, label] of [
+      ["all", "All"],
+      ["favorites", "Favorites"],
+      ["recent", "Recent"],
+    ] as const) {
+      const button = filters.createEl("button", {
+        cls: "veil-wallpaper-library-filter",
+        text: label,
+        attr: { type: "button", "aria-pressed": "false" },
+      });
+      button.addEventListener("click", () => {
+        this.view = view;
+        this.visibleLimit = INITIAL_VISIBLE_ITEMS;
+        this.updateFilterButtons();
+        this.renderGrid();
+      });
+      this.filterButtons.set(view, button);
+    }
+
+    this.summaryEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-summary" });
+    this.gridEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-grid" });
+    this.moreEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-more" });
+    this.updateFilterButtons();
+    this.renderGrid();
+  }
+
+  onClose(): void {
+    this.files = [];
+    this.filterButtons.clear();
+    this.gridEl = null;
+    this.summaryEl = null;
+    this.moreEl = null;
+    this.contentEl.empty();
+  }
+
+  private updateFilterButtons(): void {
+    for (const [view, button] of this.filterButtons) {
+      const active = view === this.view;
+      button.setAttribute("aria-pressed", String(active));
+      button.classList.toggle("is-active", active);
+    }
+  }
+
+  private visibleFiles(): TFile[] {
+    const state = this.controller.getState();
+    const favorites = new Set(state.favorites);
+    const recentOrder = new Map(state.recent.map((path, index) => [path, index]));
+    let files = this.files;
+
+    if (this.view === "favorites") {
+      files = files.filter((file) => favorites.has(file.path));
+    } else if (this.view === "recent") {
+      files = files
+        .filter((file) => recentOrder.has(file.path))
+        .sort((left, right) =>
+          (recentOrder.get(left.path) ?? Number.MAX_SAFE_INTEGER)
+          - (recentOrder.get(right.path) ?? Number.MAX_SAFE_INTEGER));
+    }
+
+    if (this.query) {
+      files = files.filter((file) => file.path.toLowerCase().includes(this.query));
+    }
+    return files;
+  }
+
+  private renderGrid(): void {
+    const grid = this.gridEl;
+    const summary = this.summaryEl;
+    const more = this.moreEl;
+    if (!grid || !summary || !more) return;
+
+    grid.empty();
+    more.empty();
+    const files = this.visibleFiles();
+    const visible = files.slice(0, this.visibleLimit);
+    summary.textContent = files.length === 1
+      ? "1 wallpaper"
+      : `${files.length} wallpapers`;
+
+    if (visible.length === 0) {
+      grid.createDiv({
+        cls: "veil-wallpaper-library-empty",
+        text: this.view === "favorites"
+          ? "No favorite wallpapers match this view."
+          : this.view === "recent"
+            ? "No recently selected wallpapers match this view."
+            : "No supported wallpaper media match this search.",
+      });
+      return;
+    }
+
+    const state = this.controller.getState();
+    const favorites = new Set(state.favorites);
+    const selectedPath = this.controller.getSelectedPath();
+    for (const file of visible) this.renderCard(grid, file, favorites.has(file.path), file.path === selectedPath);
+
+    if (visible.length < files.length) {
+      const button = more.createEl("button", {
+        cls: "veil-wallpaper-library-show-more",
+        text: `Show ${Math.min(VISIBLE_ITEMS_STEP, files.length - visible.length)} more`,
+        attr: { type: "button" },
+      });
+      button.addEventListener("click", () => {
+        this.visibleLimit += VISIBLE_ITEMS_STEP;
+        this.renderGrid();
+      });
+    }
+  }
+
+  private renderCard(
+    grid: HTMLElement,
+    file: TFile,
+    favorite: boolean,
+    selected: boolean,
+  ): void {
+    const kind = mediaKind(file);
+    if (!kind) return;
+    const card = grid.createDiv({ cls: "veil-wallpaper-library-card" });
+    card.dataset.selected = String(selected);
+
+    const select = card.createEl("button", {
+      cls: "veil-wallpaper-library-select",
+      attr: {
+        type: "button",
+        "aria-label": `Use ${file.path} as the default wallpaper`,
+      },
+    });
+    const preview = select.createDiv({ cls: "veil-wallpaper-library-preview" });
+    if (kind === "image") {
+      const image = preview.createEl("img", {
+        attr: {
+          src: this.app.vault.getResourcePath(file),
+          alt: "",
+          loading: "lazy",
+          decoding: "async",
+          draggable: "false",
+        },
+      });
+      image.addEventListener("error", () => preview.classList.add("is-error"), { once: true });
+    } else {
+      const icon = preview.createSpan({ cls: "veil-wallpaper-library-video-icon" });
+      setIcon(icon, "video");
+    }
+    preview.createSpan({
+      cls: "veil-wallpaper-library-type",
+      text: file.extension.toUpperCase(),
+    });
+    select.createSpan({ cls: "veil-wallpaper-library-name", text: file.name });
+    select.createSpan({ cls: "veil-wallpaper-library-path", text: file.path });
+    select.addEventListener("click", () => {
+      this.controller.selectWallpaper(file.path);
+      this.renderGrid();
+    });
+
+    const favoriteButton = card.createEl("button", {
+      cls: "veil-wallpaper-library-favorite",
+      attr: {
+        type: "button",
+        title: favorite ? "Remove from favorites" : "Add to favorites",
+        "aria-label": favorite ? `Remove ${file.name} from favorites` : `Add ${file.name} to favorites`,
+        "aria-pressed": String(favorite),
+      },
+    });
+    favoriteButton.dataset.favorite = String(favorite);
+    setIcon(favoriteButton, "star");
+    favoriteButton.addEventListener("click", () => {
+      this.controller.toggleFavorite(file.path);
+      this.renderGrid();
+    });
+  }
+}
