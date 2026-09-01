@@ -164,7 +164,7 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
                 `.veil-settings-panel-${section.id}`,
               );
               for (const panel of Array.from(panels)) {
-                if (panel instanceof HTMLElement) panel.hidden = !selected;
+                if (panel.instanceOf(HTMLElement)) panel.hidden = !selected;
               }
             }
           };
