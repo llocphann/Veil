@@ -5,6 +5,7 @@
 - Add reusable **Scenes** that capture wallpaper, pool behavior, framing, opacity, vignette, blur/dim, color overlay, effect, transition, and video playback settings as one profile.
 - Allow wallpaper routing rules to switch to a complete scene while preserving the 1.3 inline-wallpaper behavior.
 - Duplicate an existing Scene from Settings with a fresh ID while preserving its complete wallpaper, pool, appearance, transition, effect, and video configuration.
+- Keep the ` copy` suffix visible when duplicating Scene names at the 80-character limit so the duplicate cannot appear to have the same name as its source.
 - Surface the 64-Scene limit in Settings instead of silently dropping additions beyond the normalized data cap.
 - Surface the 96-item limits for wallpaper rules and opacity exclusions, and reject oversized imported collections instead of silently truncating portable settings.
 - Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
@@ -19,6 +20,7 @@
 - Keep pool selections stable across appearance-only edits, and invalidate only the default/Scene pool whose anchor or pool scope actually changed instead of rerolling unrelated Scenes.
 - Add a lazy visual wallpaper library command with search, Favorites, Recently Selected, image thumbnails, lightweight video placeholders, and batched rendering for large vaults.
 - Add wallpaper-library folder/media filters, modification-time/name sorting, and a random pick constrained to the current visible result set.
+- Keep **Random visible** constrained to the cards currently rendered by the library's incremental 60-item view, rather than selecting an off-screen result that has not been revealed yet.
 - Let the Wallpaper Library apply a selected or random wallpaper directly to the default appearance, any Scene, or any legacy inline wallpaper rule without changing the other targets.
 - Keep Favorites and Recently Selected as local vault metadata in `data.json`; rename/delete events keep that metadata synchronized without polluting portable Scene settings exports.
 - Add frontmatter property routing. Property rules accept `key=value` for case-insensitive scalar/array matching, or `key` to match property existence.
