@@ -26,6 +26,7 @@
 - Keep Favorites and Recently Selected as local vault metadata in `data.json`; rename/delete events keep that metadata synchronized without polluting portable Scene settings exports.
 - Add frontmatter property routing. Property rules accept `key=value` for case-insensitive scalar/array matching, or `key` to match property existence.
 - Add adaptive system-context fallback routing through Property rules: `@theme=light|dark`, `@time=HH:MM-HH:MM`, `@day=...`, and `@schedule=<days> HH:MM-HH:MM`, including overnight ranges.
+- Warn in Settings when enabled frontmatter/system routing syntax is malformed, using the same parser as runtime matching for both wallpaper routes and opacity exclusions.
 - Keep note/path/folder/tag/frontmatter wallpaper rules above adaptive system fallbacks regardless of list position; a session-only manual Scene override remains the highest-priority appearance source.
 - Schedule time/day routing with a single one-shot timeout at the next meaningful boundary instead of interval polling; theme changes remain event-driven through Obsidian's CSS-change event.
 - Fix overnight scheduled fallbacks so an early-morning carryover such as `mon-fri 22:00-06:00` still schedules the current day's 06:00 end boundary instead of waiting for the next evening.
