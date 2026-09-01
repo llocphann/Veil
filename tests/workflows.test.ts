@@ -25,6 +25,13 @@ for (const path of WORKFLOWS) {
   });
 }
 
+void test("verification and release jobs have bounded runtimes", () => {
+  const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+  const release = fs.readFileSync(".github/workflows/release.yml", "utf8");
+  assert.equal(ci.split("timeout-minutes: 10").length - 1, 1);
+  assert.equal(release.split("timeout-minutes: 10").length - 1, 2);
+});
+
 void test("prerelease CI cancels superseded verification runs", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(source, /concurrency:/);
