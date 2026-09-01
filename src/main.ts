@@ -8,6 +8,7 @@ import {
 } from "obsidian";
 import {
   matchingOpacityExclusions,
+  nextSystemContextBoundary,
   type NoteContext,
 } from "./context-rules";
 import { resolveWallpaper, type ResolvedWallpaper } from "./profile-resolver";
@@ -38,6 +39,8 @@ const PANE_CONTENT_OPACITY_VARIABLE = "--vault-dashboard-pane-content-opacity";
 const LEGACY_IMAGE_VARIABLE = "--vault-dashboard-banner-image";
 const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
 const TRANSITION_CLEANUP_BUFFER = 80;
+const SYSTEM_ROUTING_BOUNDARY_BUFFER = 50;
+const MAX_TIMEOUT_DELAY = 2_147_483_647;
 
 interface WallpaperSource {
   path: string;
@@ -87,6 +90,7 @@ export default class VeilPlugin extends Plugin {
   private layoutReady = false;
   private sourceRevision = 0;
   private saveTimer: number | null = null;
+  private systemRoutingTimer: number | null = null;
   private pendingSave = false;
   private saveQueue: Promise<void> = Promise.resolve();
   private refreshFrame: number | null = null;
@@ -132,6 +136,7 @@ export default class VeilPlugin extends Plugin {
       if (this.unloaded) return;
       this.layoutReady = true;
       this.registerVaultEvents();
+      this.rescheduleSystemRouting();
       this.refreshWallpaper();
     });
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshWallpaper()));
@@ -152,13 +157,15 @@ export default class VeilPlugin extends Plugin {
         this.clearDocument(window.document);
       }),
     );
-    this.registerEvent(this.app.workspace.on("css-change", () => this.applyToWorkspace()));
+    this.registerEvent(this.app.workspace.on("css-change", () => this.refreshWallpaper()));
   }
 
   onunload(): void {
     this.unloaded = true;
     if (this.refreshFrame !== null) window.cancelAnimationFrame(this.refreshFrame);
     this.refreshFrame = null;
+    if (this.systemRoutingTimer !== null) window.clearTimeout(this.systemRoutingTimer);
+    this.systemRoutingTimer = null;
     void this.flushSettings();
     this.clearAllDocuments();
     this.poolCandidates.clear();
@@ -178,6 +185,7 @@ export default class VeilPlugin extends Plugin {
     this.poolCandidates.clear();
     this.poolSelections.clear();
     this.previousPoolSelections.clear();
+    this.rescheduleSystemRouting();
     this.refreshWallpaper();
     this.scheduleSave();
   }
@@ -345,6 +353,31 @@ export default class VeilPlugin extends Plugin {
     for (const path of paths) {
       this.wallpaperLibrary = rememberRecentWallpaper(this.wallpaperLibrary, path, normalizePath);
     }
+  }
+
+  private rescheduleSystemRouting(): void {
+    if (this.systemRoutingTimer !== null) {
+      window.clearTimeout(this.systemRoutingTimer);
+      this.systemRoutingTimer = null;
+    }
+    if (this.unloaded || !this.layoutReady || !this.settings.enabled) return;
+
+    const boundary = nextSystemContextBoundary([
+      ...this.settings.wallpaperRules,
+      ...this.settings.opacityExclusions,
+    ]);
+    if (boundary === null) return;
+
+    const delay = Math.max(
+      1,
+      Math.min(MAX_TIMEOUT_DELAY, boundary - Date.now() + SYSTEM_ROUTING_BOUNDARY_BUFFER),
+    );
+    this.systemRoutingTimer = window.setTimeout(() => {
+      this.systemRoutingTimer = null;
+      if (this.unloaded) return;
+      this.refreshWallpaper();
+      this.rescheduleSystemRouting();
+    }, delay);
   }
 
   private scheduleApplyToWorkspace(): void {
@@ -988,12 +1021,18 @@ export default class VeilPlugin extends Plugin {
     const candidate: unknown = (leaf?.view as { file?: unknown } | undefined)?.file;
     if (!(candidate instanceof TFile)) return null;
     const cache = this.app.metadataCache.getFileCache(candidate);
+    const theme = document.body.classList.contains("theme-dark")
+      ? "dark"
+      : document.body.classList.contains("theme-light")
+        ? "light"
+        : undefined;
     return {
       path: candidate.path,
       name: candidate.name,
       basename: candidate.basename,
       tags: cache ? getAllTags(cache) || [] : [],
       properties: cache?.frontmatter || {},
+      theme,
     };
   }
 
