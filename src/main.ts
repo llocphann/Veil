@@ -1115,12 +1115,13 @@ export default class VeilPlugin extends Plugin {
       this.activeRootLeaves.set(document, recent);
       return recent;
     }
-    let result: WorkspaceLeaf | null = null;
+    const fallback: { leaf: WorkspaceLeaf | null } = { leaf: null };
     this.app.workspace.iterateAllLeaves((leaf) => {
-      if (!result && this.isRootLeafForDocument(leaf, document)) result = leaf;
+      if (!fallback.leaf && this.isRootLeafForDocument(leaf, document)) fallback.leaf = leaf;
     });
-    if (result) this.activeRootLeaves.set(document, result);
-    return result;
+    const leaf = fallback.leaf;
+    if (leaf) this.activeRootLeaves.set(document, leaf);
+    return leaf;
   }
 
   private isRootLeafForDocument(leaf: WorkspaceLeaf | null, document: Document): boolean {
