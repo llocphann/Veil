@@ -41,3 +41,9 @@ void test("folder rename refreshes loaded descendant wallpaper paths", () => {
     /state\.path === oldPath \|\| state\.path\.startsWith\(`\$\{oldPath\}\/`\)/,
   );
 });
+
+void test("folder changes refresh configured and loaded descendant wallpaper paths", () => {
+  assert.ok(source.includes("candidate === path || candidate.startsWith(`${path}/`)"));
+  assert.ok(source.includes("some((state) => touches(state.path))"));
+  assert.ok(source.includes("selectedPaths.some(touches) || loadedPath"));
+});
