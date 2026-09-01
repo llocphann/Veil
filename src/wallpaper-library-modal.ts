@@ -1,8 +1,10 @@
 import { Modal, TFile, setIcon, type App } from "obsidian";
-import { mediaKind } from "./settings";
+import { mediaKind, type MediaKind } from "./settings";
 import type { WallpaperLibraryState } from "./wallpaper-library-state";
 
 type LibraryView = "all" | "favorites" | "recent";
+type LibraryKind = "all" | Exclude<MediaKind, "">;
+type LibrarySort = "default" | "name" | "newest" | "oldest";
 
 const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_STEP = 60;
@@ -19,6 +21,8 @@ export class WallpaperLibraryModal extends Modal {
   private files: TFile[] = [];
   private query = "";
   private view: LibraryView = "all";
+  private kind: LibraryKind = "all";
+  private sort: LibrarySort = "default";
   private visibleLimit = INITIAL_VISIBLE_ITEMS;
   private gridEl: HTMLElement | null = null;
   private summaryEl: HTMLElement | null = null;
@@ -54,8 +58,7 @@ export class WallpaperLibraryModal extends Modal {
     });
     search.addEventListener("input", () => {
       this.query = search.value.trim().toLowerCase();
-      this.visibleLimit = INITIAL_VISIBLE_ITEMS;
-      this.renderGrid();
+      this.resetVisibleLimit();
     });
 
     const filters = toolbar.createDiv({ cls: "veil-wallpaper-library-filters" });
@@ -78,6 +81,52 @@ export class WallpaperLibraryModal extends Modal {
       this.filterButtons.set(view, button);
     }
 
+    const kindSelect = toolbar.createEl("select", {
+      cls: "veil-wallpaper-library-kind",
+      attr: { "aria-label": "Filter wallpaper media type" },
+    });
+    for (const [value, label] of [
+      ["all", "All media"],
+      ["image", "Images"],
+      ["video", "Videos"],
+    ] as const) {
+      kindSelect.createEl("option", { value, text: label });
+    }
+    kindSelect.value = this.kind;
+    kindSelect.addEventListener("change", () => {
+      const value = kindSelect.value;
+      this.kind = value === "image" || value === "video" ? value : "all";
+      this.resetVisibleLimit();
+    });
+
+    const sortSelect = toolbar.createEl("select", {
+      cls: "veil-wallpaper-library-sort",
+      attr: { "aria-label": "Sort wallpaper library" },
+    });
+    for (const [value, label] of [
+      ["default", "Default order"],
+      ["name", "Name"],
+      ["newest", "Newest modified"],
+      ["oldest", "Oldest modified"],
+    ] as const) {
+      sortSelect.createEl("option", { value, text: label });
+    }
+    sortSelect.value = this.sort;
+    sortSelect.addEventListener("change", () => {
+      const value = sortSelect.value;
+      this.sort = value === "name" || value === "newest" || value === "oldest"
+        ? value
+        : "default";
+      this.resetVisibleLimit();
+    });
+
+    const randomButton = toolbar.createEl("button", {
+      cls: "veil-wallpaper-library-random",
+      text: "Random visible",
+      attr: { type: "button" },
+    });
+    randomButton.addEventListener("click", () => this.selectRandomVisible());
+
     this.summaryEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-summary" });
     this.gridEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-grid" });
     this.moreEl = this.contentEl.createDiv({ cls: "veil-wallpaper-library-more" });
@@ -92,6 +141,11 @@ export class WallpaperLibraryModal extends Modal {
     this.summaryEl = null;
     this.moreEl = null;
     this.contentEl.empty();
+  }
+
+  private resetVisibleLimit(): void {
+    this.visibleLimit = INITIAL_VISIBLE_ITEMS;
+    this.renderGrid();
   }
 
   private updateFilterButtons(): void {
@@ -118,10 +172,37 @@ export class WallpaperLibraryModal extends Modal {
           - (recentOrder.get(right.path) ?? Number.MAX_SAFE_INTEGER));
     }
 
+    if (this.kind !== "all") {
+      files = files.filter((file) => mediaKind(file) === this.kind);
+    }
     if (this.query) {
       files = files.filter((file) => file.path.toLowerCase().includes(this.query));
     }
+
+    if (this.sort === "name") {
+      files = [...files].sort((left, right) =>
+        left.name.localeCompare(right.name) || left.path.localeCompare(right.path));
+    } else if (this.sort === "newest") {
+      files = [...files].sort((left, right) =>
+        right.stat.mtime - left.stat.mtime || left.path.localeCompare(right.path));
+    } else if (this.sort === "oldest") {
+      files = [...files].sort((left, right) =>
+        left.stat.mtime - right.stat.mtime || left.path.localeCompare(right.path));
+    }
     return files;
+  }
+
+  private selectRandomVisible(): void {
+    const files = this.visibleFiles();
+    if (files.length === 0) return;
+    const selectedPath = this.controller.getSelectedPath();
+    const choices = files.length > 1
+      ? files.filter((file) => file.path !== selectedPath)
+      : files;
+    const selected = choices[Math.floor(Math.random() * choices.length)];
+    if (!selected) return;
+    this.controller.selectWallpaper(selected.path);
+    this.renderGrid();
   }
 
   private renderGrid(): void {
@@ -134,9 +215,11 @@ export class WallpaperLibraryModal extends Modal {
     more.empty();
     const files = this.visibleFiles();
     const visible = files.slice(0, this.visibleLimit);
+    const imageCount = files.reduce((count, file) => count + Number(mediaKind(file) === "image"), 0);
+    const videoCount = files.length - imageCount;
     summary.textContent = files.length === 1
-      ? "1 wallpaper"
-      : `${files.length} wallpapers`;
+      ? `1 wallpaper · ${imageCount} image · ${videoCount} videos`
+      : `${files.length} wallpapers · ${imageCount} images · ${videoCount} videos`;
 
     if (visible.length === 0) {
       grid.createDiv({
@@ -145,7 +228,7 @@ export class WallpaperLibraryModal extends Modal {
           ? "No favorite wallpapers match this view."
           : this.view === "recent"
             ? "No recently selected wallpapers match this view."
-            : "No supported wallpaper media match this search.",
+            : "No supported wallpaper media match these filters.",
       });
       return;
     }
@@ -153,7 +236,9 @@ export class WallpaperLibraryModal extends Modal {
     const state = this.controller.getState();
     const favorites = new Set(state.favorites);
     const selectedPath = this.controller.getSelectedPath();
-    for (const file of visible) this.renderCard(grid, file, favorites.has(file.path), file.path === selectedPath);
+    for (const file of visible) {
+      this.renderCard(grid, file, favorites.has(file.path), file.path === selectedPath);
+    }
 
     if (visible.length < files.length) {
       const button = more.createEl("button", {
