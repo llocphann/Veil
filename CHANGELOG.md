@@ -7,9 +7,11 @@
 - Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
 - Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
 - Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
+- Keep the last successfully loaded wallpaper visible across rapid A → B → C navigation when B is still preloading, rather than disposing the fallback and flashing a blank workspace.
 - Respect reduced-motion preferences by disabling scene crossfades in addition to pausing motion-heavy effects and video.
 - Expose all scene-specific effects and playback controls directly inside each Scene editor.
 - Add wallpaper pools for the default appearance and scenes, with optional descendant-folder discovery, stable per-context selection, and an explicit shuffle command that avoids the previous item when possible.
+- Keep pool selections stable across appearance-only edits, and invalidate only the default/Scene pool whose anchor or pool scope actually changed instead of rerolling unrelated Scenes.
 - Add a lazy visual wallpaper library command with search, Favorites, Recently Selected, image thumbnails, lightweight video placeholders, and batched rendering for large vaults.
 - Add wallpaper-library folder/media filters, modification-time/name sorting, and a random pick constrained to the current visible result set.
 - Let the Wallpaper Library apply a selected or random wallpaper directly to the default appearance, any Scene, or any legacy inline wallpaper rule without changing the other targets.
