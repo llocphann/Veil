@@ -4,6 +4,7 @@ import { normalizeSettings } from "../src/settings";
 import {
   wallpaperPoolConfiguration,
   wallpaperPoolConfigurationChanged,
+  wallpaperPoolConfigurationChanges,
 } from "../src/wallpaper-pool-config";
 
 function fixture() {
@@ -43,19 +44,20 @@ void test("pool configuration ignores appearance-only changes", () => {
     ),
   });
   assert.equal(wallpaperPoolConfigurationChanged(previous, next), false);
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), []);
 });
 
-void test("pool configuration changes when an anchor or pool scope changes", () => {
+void test("pool configuration reports only the appearance whose pool topology changed", () => {
   const previous = fixture();
-  assert.equal(
-    wallpaperPoolConfigurationChanged(previous, normalizeSettings({
+  assert.deepEqual(
+    wallpaperPoolConfigurationChanges(previous, normalizeSettings({
       ...previous,
       wallpaperPath: "Media/other.webp",
     })),
-    true,
+    ["default"],
   );
-  assert.equal(
-    wallpaperPoolConfigurationChanged(previous, normalizeSettings({
+  assert.deepEqual(
+    wallpaperPoolConfigurationChanges(previous, normalizeSettings({
       ...previous,
       profiles: previous.profiles.map((profile) =>
         profile.id === "focus"
@@ -63,8 +65,24 @@ void test("pool configuration changes when an anchor or pool scope changes", () 
           : profile,
       ),
     })),
-    true,
+    ["profile:focus"],
   );
+});
+
+void test("changing one scene pool does not invalidate unrelated scene selections", () => {
+  const previous = fixture();
+  const next = normalizeSettings({
+    ...previous,
+    profiles: previous.profiles.map((profile) =>
+      profile.id === "focus"
+        ? { ...profile, wallpaperPath: "Media/Focus/alternate.webp" }
+        : profile,
+    ),
+  });
+  const changes = wallpaperPoolConfigurationChanges(previous, next);
+  assert.deepEqual(changes, ["profile:focus"]);
+  assert.equal(changes.includes("profile:reading"), false);
+  assert.equal(changes.includes("default"), false);
 });
 
 void test("scene reordering does not invalidate stable pool selections", () => {
@@ -74,17 +92,38 @@ void test("scene reordering does not invalidate stable pool selections", () => {
     profiles: [...previous.profiles].reverse(),
   });
   assert.equal(wallpaperPoolConfigurationChanged(previous, next), false);
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), []);
   assert.deepEqual(
     wallpaperPoolConfiguration(previous).map((entry) => entry.id),
-    ["default", "focus", "reading"],
+    ["default", "profile:focus", "profile:reading"],
   );
 });
 
-void test("adding or removing a scene invalidates pool state", () => {
+void test("adding or removing a scene invalidates only that scene pool state", () => {
   const previous = fixture();
-  const next = normalizeSettings({
+  const removed = normalizeSettings({
     ...previous,
     profiles: previous.profiles.slice(0, 1),
   });
-  assert.equal(wallpaperPoolConfigurationChanged(previous, next), true);
+  assert.deepEqual(
+    wallpaperPoolConfigurationChanges(previous, removed),
+    ["profile:reading"],
+  );
+
+  const added = normalizeSettings({
+    ...previous,
+    profiles: [
+      ...previous.profiles,
+      {
+        id: "cinema",
+        name: "Cinema",
+        wallpaperPath: "Media/Cinema/cinema.webp",
+        wallpaperPoolEnabled: true,
+      },
+    ],
+  });
+  assert.deepEqual(
+    wallpaperPoolConfigurationChanges(previous, added),
+    ["profile:cinema"],
+  );
 });
