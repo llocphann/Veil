@@ -13,6 +13,9 @@
 - Add a lazy visual wallpaper library command with search, Favorites, Recently Selected, image thumbnails, lightweight video placeholders, and batched rendering for large vaults.
 - Keep Favorites and Recently Selected as local vault metadata in `data.json`; rename/delete events keep that metadata synchronized without polluting portable Scene settings exports.
 - Add frontmatter property routing. Property rules accept `key=value` for case-insensitive scalar/array matching, or `key` to match property existence.
+- Add adaptive system-context fallback routing through Property rules: `@theme=light|dark`, `@time=HH:MM-HH:MM`, `@day=...`, and `@schedule=<days> HH:MM-HH:MM`, including overnight ranges.
+- Keep note/path/folder/tag/frontmatter wallpaper rules above adaptive system fallbacks regardless of list position; a session-only manual Scene override remains the highest-priority appearance source.
+- Schedule time/day routing with one one-shot timeout at the next meaningful boundary instead of interval polling; theme changes remain event-driven through Obsidian's CSS-change event.
 - Add a command-palette Scene switcher for temporary session-only manual overrides, with a `Follow context rules` option to resume automatic routing.
 - Refactor declarative Settings definitions so dynamic Scene and rule controls share smaller helpers, and expose the visual wallpaper library directly from Wallpaper and Actions settings.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
