@@ -27,6 +27,7 @@ const PANE_OPACITY_VARIABLE = "--vault-dashboard-pane-opacity";
 const PANE_CONTENT_CLASS = "vault-dashboard-fade-pane-content";
 const PANE_CONTENT_OPACITY_VARIABLE = "--vault-dashboard-pane-content-opacity";
 const LEGACY_IMAGE_VARIABLE = "--vault-dashboard-banner-image";
+const TRANSITION_CLEANUP_BUFFER = 80;
 
 interface WallpaperSource {
   path: string;
@@ -35,6 +36,7 @@ interface WallpaperSource {
   label: string;
   key: string;
   contextLabel: string;
+  appearance: VeilAppearance;
 }
 
 interface DocumentState {
@@ -43,10 +45,13 @@ interface DocumentState {
   layer: HTMLDivElement;
   media: HTMLImageElement | HTMLVideoElement;
   vignette: HTMLDivElement;
+  appearance: VeilAppearance;
   ready: boolean;
   failed: boolean;
   disposed: boolean;
   playPromise: Promise<void> | null;
+  transitionTimer: number | null;
+  outgoing: DocumentState | null;
   cleanups: Array<() => void>;
   motionQuery?: MediaQueryList;
 }
@@ -271,17 +276,15 @@ export default class VeilPlugin extends Plugin {
     }
   }
 
-  private appearanceForContext(context: NoteContext | null): VeilAppearance {
-    return resolveWallpaper(this.settings, context).appearance;
-  }
-
   private applyOptions(
     document: Document,
     state: DocumentState,
     context: NoteContext | null,
+    appearanceOverride?: VeilAppearance,
   ): void {
-    const appearance = this.appearanceForContext(context);
-    const resolved = resolveWallpaper(this.settings, context);
+    const resolved = appearanceOverride ? null : resolveWallpaper(this.settings, context);
+    const appearance = appearanceOverride || resolved?.appearance || state.appearance;
+    state.appearance = appearance;
     const filters: string[] = [];
     if (appearance.blurEnabled && appearance.blurIntensity > 0) {
       filters.push(`blur(${appearance.blurIntensity}px)`);
@@ -298,9 +301,15 @@ export default class VeilPlugin extends Plugin {
       );
     }
     const effectBleed = appearance.effectPreset === "glitch" ? 8 : 0;
+    const mediaScale = appearance.wallpaperZoom / 100;
     const variables: Record<string, string> = {
       "--vdb-opacity": String(appearance.opacity / 100),
       "--vdb-fit": appearance.displayMode,
+      "--vdb-position-x": `${appearance.wallpaperPositionX}%`,
+      "--vdb-position-y": `${appearance.wallpaperPositionY}%`,
+      "--vdb-media-scale": String(mediaScale),
+      "--vdb-glitch-scale": String(mediaScale * 1.01),
+      "--vdb-transition-duration": `${appearance.transitionDuration}ms`,
       "--vdb-filter": filters.length ? filters.join(" ") : "none",
       "--vdb-blur-bleed": `${
         (appearance.blurEnabled ? appearance.blurIntensity * 2 : 0) + effectBleed
@@ -328,8 +337,9 @@ export default class VeilPlugin extends Plugin {
       ? appearance.effectPreset
       : "none";
     state.layer.dataset.reduceMotion = String(appearance.respectReducedMotion);
-    if (resolved.profile) state.layer.dataset.profileId = resolved.profile.id;
-    else delete state.layer.dataset.profileId;
+    const profile = resolved?.profile || null;
+    if (profile) state.layer.dataset.profileId = profile.id;
+    else if (!appearanceOverride) delete state.layer.dataset.profileId;
 
     state.vignette.hidden =
       appearance.vignetteMode === "off" || appearance.vignetteIntensity === 0;
@@ -368,13 +378,20 @@ export default class VeilPlugin extends Plugin {
       this.clearDocument(document);
       return;
     }
-    let state = this.documents.get(document);
-    if (state?.key === source.key && state.layer.isConnected) {
-      this.applyOptions(document, state, context);
+    let previous = this.documents.get(document) || null;
+    if (previous?.key === source.key && previous.layer.isConnected) {
+      this.applyOptions(document, previous, context, source.appearance);
       this.setDocumentStatus(document, `${source.contextLabel} · ${source.label}: ${source.path}`, "success");
       return;
     }
-    if (state) this.clearDocument(document);
+
+    if (previous && (!previous.ready || previous.failed || !previous.layer.isConnected)) {
+      this.documents.delete(document);
+      this.disposeState(previous);
+      previous = null;
+    } else if (previous) {
+      this.settleState(previous);
+    }
 
     const layer = document.body.createDiv();
     layer.className = LAYER_CLASS;
@@ -405,16 +422,19 @@ export default class VeilPlugin extends Plugin {
     const vignette = layer.createDiv();
     vignette.className = "vault-dashboard-wallpaper-vignette";
 
-    state = {
+    const state: DocumentState = {
       key: source.key,
       kind: source.kind,
       layer,
       media,
       vignette,
+      appearance: source.appearance,
       ready: false,
       failed: false,
       disposed: false,
       playPromise: null,
+      transitionTimer: null,
+      outgoing: previous,
       cleanups: [],
       motionQuery: document.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)"),
     };
@@ -432,6 +452,7 @@ export default class VeilPlugin extends Plugin {
       activeState.ready = true;
       layer.hidden = false;
       this.applyOptions(document, activeState, this.contextForDocument(document));
+      this.startCrossfade(document, activeState);
       this.setDocumentStatus(
         document,
         `${source.contextLabel} · ${source.label} loaded: ${source.path}`,
@@ -446,7 +467,17 @@ export default class VeilPlugin extends Plugin {
       if (activeState.kind === "video") {
         (media as HTMLVideoElement).pause();
       }
-      this.restoreDocumentStyles(document);
+      const fallback = activeState.outgoing;
+      activeState.outgoing = null;
+      this.documents.delete(document);
+      this.disposeState(activeState);
+      if (fallback && !fallback.disposed && fallback.layer.isConnected) {
+        this.settleState(fallback);
+        this.documents.set(document, fallback);
+        this.applyOptions(document, fallback, this.contextForDocument(document), fallback.appearance);
+      } else {
+        this.restoreDocumentStyles(document);
+      }
       this.setDocumentStatus(
         document,
         `Could not load ${source.path}${
@@ -466,7 +497,7 @@ export default class VeilPlugin extends Plugin {
 
     this.documents.set(document, activeState);
     document.body.prepend(layer);
-    this.applyOptions(document, activeState, context);
+    this.applyOptions(document, activeState, context, source.appearance);
     media.src = source.url;
     if (activeState.kind === "video") {
       (media as HTMLVideoElement).load();
@@ -477,8 +508,66 @@ export default class VeilPlugin extends Plugin {
     }
   }
 
+  private startCrossfade(document: Document, state: DocumentState): void {
+    const outgoing = state.outgoing;
+    if (!outgoing || outgoing.disposed || !outgoing.ready || outgoing.failed) {
+      if (outgoing) this.disposeState(outgoing);
+      state.outgoing = null;
+      state.layer.style.removeProperty("opacity");
+      delete state.layer.dataset.transitionState;
+      return;
+    }
+
+    const reducedMotion =
+      state.appearance.respectReducedMotion && Boolean(state.motionQuery?.matches);
+    const duration = reducedMotion ? 0 : state.appearance.transitionDuration;
+    if (duration <= 0) {
+      this.disposeState(outgoing);
+      state.outgoing = null;
+      state.layer.style.removeProperty("opacity");
+      delete state.layer.dataset.transitionState;
+      return;
+    }
+
+    const durationValue = `${duration}ms`;
+    state.layer.style.setProperty("--vdb-transition-duration", durationValue);
+    outgoing.layer.style.setProperty("--vdb-transition-duration", durationValue);
+    state.layer.dataset.transitionState = "incoming";
+    outgoing.layer.dataset.transitionState = "outgoing";
+    state.layer.style.opacity = "0";
+    outgoing.layer.style.removeProperty("opacity");
+    void state.layer.offsetWidth;
+
+    window.requestAnimationFrame(() => {
+      if (state.disposed || outgoing.disposed || this.documents.get(document) !== state) return;
+      state.layer.style.removeProperty("opacity");
+      outgoing.layer.style.opacity = "0";
+    });
+
+    state.transitionTimer = window.setTimeout(() => {
+      state.transitionTimer = null;
+      if (state.outgoing !== outgoing) return;
+      this.disposeState(outgoing);
+      state.outgoing = null;
+      delete state.layer.dataset.transitionState;
+    }, duration + TRANSITION_CLEANUP_BUFFER);
+  }
+
+  private settleState(state: DocumentState): void {
+    if (state.transitionTimer !== null) {
+      window.clearTimeout(state.transitionTimer);
+      state.transitionTimer = null;
+    }
+    if (state.outgoing) {
+      this.disposeState(state.outgoing);
+      state.outgoing = null;
+    }
+    state.layer.style.removeProperty("opacity");
+    delete state.layer.dataset.transitionState;
+  }
+
   private syncPlaybackAndMotion(document: Document, state: DocumentState): void {
-    const appearance = this.appearanceForContext(this.contextForDocument(document));
+    const appearance = state.appearance;
     const motionPaused =
       appearance.opacity === 0
       || (appearance.pauseWhenHidden && document.hidden)
@@ -519,21 +608,34 @@ export default class VeilPlugin extends Plugin {
     }
   }
 
+  private disposeState(state: DocumentState): void {
+    if (state.disposed) return;
+    state.disposed = true;
+    if (state.transitionTimer !== null) {
+      window.clearTimeout(state.transitionTimer);
+      state.transitionTimer = null;
+    }
+    if (state.outgoing) {
+      this.disposeState(state.outgoing);
+      state.outgoing = null;
+    }
+    for (const cleanup of state.cleanups) cleanup();
+    if (state.kind === "video") {
+      const video = state.media as HTMLVideoElement;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    } else {
+      state.media.removeAttribute("src");
+    }
+    state.layer.remove();
+  }
+
   private clearDocument(document: Document): void {
     const state = this.documents.get(document);
     if (state) {
-      state.disposed = true;
-      for (const cleanup of state.cleanups) cleanup();
-      if (state.kind === "video") {
-        const video = state.media as HTMLVideoElement;
-        video.pause();
-        video.removeAttribute("src");
-        video.load();
-      } else {
-        state.media.removeAttribute("src");
-      }
-      state.layer.remove();
       this.documents.delete(document);
+      this.disposeState(state);
     }
     this.restoreDocumentStyles(document);
   }
@@ -584,6 +686,11 @@ export default class VeilPlugin extends Plugin {
     }
 
     const url = this.app.vault.getResourcePath(file);
+    const contextKey = resolved.profile
+      ? `profile:${resolved.profile.id}`
+      : resolved.rule
+        ? `rule:${resolved.rule.id}`
+        : "default";
     const source: WallpaperSource = {
       path: file.path,
       url,
@@ -594,8 +701,16 @@ export default class VeilPlugin extends Plugin {
           : file.extension.toLowerCase() === "gif"
             ? "Animated GIF"
             : "Image",
-      key: [file.path, url, file.stat.mtime, file.stat.size, this.sourceRevision].join("|"),
+      key: [
+        file.path,
+        url,
+        file.stat.mtime,
+        file.stat.size,
+        contextKey,
+        this.sourceRevision,
+      ].join("|"),
       contextLabel,
+      appearance: resolved.appearance,
     };
     if (this.documents.get(document)?.key !== source.key) {
       this.setDocumentStatus(
