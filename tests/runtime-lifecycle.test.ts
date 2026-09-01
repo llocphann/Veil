@@ -5,7 +5,7 @@ import test from "node:test";
 const source = fs.readFileSync("src/main.ts", "utf8");
 
 void test("plugin unload cancels scheduled work and removes document state", () => {
-  const unload = source.match(/onunload\(\): void \{([\s\S]*?)\n  \}/)?.[1] || "";
+  const unload = source.match(/onunload\(\): void \{([\s\S]*?)\n {2}\}/)?.[1] || "";
 
   assert.match(unload, /cancelAnimationFrame\(this\.refreshFrame\)/);
   assert.match(unload, /clearTimeout\(this\.systemRoutingTimer\)/);
@@ -18,7 +18,7 @@ void test("plugin unload cancels scheduled work and removes document state", () 
 });
 
 void test("document disposal releases timers, listeners, media resources, and DOM", () => {
-  const dispose = source.match(/private disposeState\(state: DocumentState\): void \{([\s\S]*?)\n  \}/)?.[1] || "";
+  const dispose = source.match(/private disposeState\(state: DocumentState\): void \{([\s\S]*?)\n {2}\}/)?.[1] || "";
 
   assert.match(dispose, /clearTimeout\(state\.transitionTimer\)/);
   assert.match(dispose, /for \(const cleanup of state\.cleanups\) cleanup\(\)/);
