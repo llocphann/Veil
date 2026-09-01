@@ -250,31 +250,49 @@ export default class VeilPlugin extends Plugin {
     new WallpaperLibraryModal(this.app, {
       getTargets: () => [
         {
-          id: "",
+          id: "default",
           label: "Default appearance",
           selectedPath: this.settings.wallpaperPath,
         },
         ...this.settings.profiles.map((profile) => ({
-          id: profile.id,
+          id: `profile:${profile.id}`,
           label: `Scene: ${profile.name || profile.id}`,
           selectedPath: profile.wallpaperPath,
         })),
+        ...this.settings.wallpaperRules
+          .filter((rule) => !rule.profileId)
+          .map((rule) => ({
+            id: `rule:${rule.id}`,
+            label: `Inline rule: ${rule.matchValue || rule.id}`,
+            selectedPath: rule.wallpaperPath,
+          })),
       ],
       getState: () => this.wallpaperLibrary,
       selectWallpaper: (targetId, path) => {
-        if (!targetId) {
+        if (targetId === "default") {
           this.updateSettings({ wallpaperPath: path });
           return;
         }
-        const profileExists = this.settings.profiles.some((profile) => profile.id === targetId);
-        if (!profileExists) {
-          this.updateSettings({ wallpaperPath: path });
+        if (targetId.startsWith("profile:")) {
+          const profileId = targetId.slice("profile:".length);
+          if (!this.settings.profiles.some((profile) => profile.id === profileId)) return;
+          const profiles = this.settings.profiles.map((profile) =>
+            profile.id === profileId ? { ...profile, wallpaperPath: path } : profile,
+          );
+          this.updateSettings({ profiles });
           return;
         }
-        const profiles = this.settings.profiles.map((profile) =>
-          profile.id === targetId ? { ...profile, wallpaperPath: path } : profile,
-        );
-        this.updateSettings({ profiles });
+        if (targetId.startsWith("rule:")) {
+          const ruleId = targetId.slice("rule:".length);
+          const ruleExists = this.settings.wallpaperRules.some(
+            (rule) => rule.id === ruleId && !rule.profileId,
+          );
+          if (!ruleExists) return;
+          const wallpaperRules = this.settings.wallpaperRules.map((rule) =>
+            rule.id === ruleId && !rule.profileId ? { ...rule, wallpaperPath: path } : rule,
+          );
+          this.updateSettings({ wallpaperRules });
+        }
       },
       toggleFavorite: (path) => {
         this.wallpaperLibrary = toggleFavoriteWallpaper(this.wallpaperLibrary, path, normalizePath);
@@ -295,18 +313,19 @@ export default class VeilPlugin extends Plugin {
     const document = this.app.workspace.containerEl.ownerDocument;
     const context = this.contextForDocument(document);
     const resolved = this.resolveForContext(context);
+    const subject = context?.path || "Workspace";
     if (this.manualProfileId && resolved.profile) {
       const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
-      return `${context?.path || "Workspace"} → manual scene: ${resolved.profile.name}${pool}`;
+      return `${subject} → manual scene: ${resolved.profile.name}${pool}`;
     }
-    if (!context) return "No active note context in the main window.";
     if (resolved.profile) {
       const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
-      return `${context.path} → ${resolved.profile.name}${pool} (${resolved.rule?.matchType || "rule"})`;
+      return `${subject} → ${resolved.profile.name}${pool} (${resolved.rule?.matchType || "rule"})`;
     }
     if (resolved.rule) {
-      return `${context.path} → inline wallpaper rule (${resolved.rule.matchType}: ${resolved.rule.matchValue})`;
+      return `${subject} → inline wallpaper rule (${resolved.rule.matchType}: ${resolved.rule.matchValue})`;
     }
+    if (!context?.path) return "Workspace → default appearance";
     const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
     return `${context.path} → default appearance${pool}`;
   }
@@ -1044,13 +1063,22 @@ export default class VeilPlugin extends Plugin {
   private contextForDocument(document: Document): NoteContext | null {
     const leaf = this.leafForDocument(document);
     const candidate: unknown = (leaf?.view as { file?: unknown } | undefined)?.file;
-    if (!(candidate instanceof TFile)) return null;
-    const cache = this.app.metadataCache.getFileCache(candidate);
     const theme = document.body.classList.contains("theme-dark")
       ? "dark"
       : document.body.classList.contains("theme-light")
         ? "light"
         : undefined;
+    if (!(candidate instanceof TFile)) {
+      return {
+        path: "",
+        name: "",
+        basename: "",
+        tags: [],
+        properties: {},
+        theme,
+      };
+    }
+    const cache = this.app.metadataCache.getFileCache(candidate);
     return {
       path: candidate.path,
       name: candidate.name,
