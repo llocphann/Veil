@@ -5,6 +5,7 @@ export interface NoteContext {
   name: string;
   basename: string;
   tags: string[];
+  properties: Record<string, unknown>;
 }
 
 function comparable(value: string): string {
@@ -19,6 +20,27 @@ function normalizedRulePath(value: string): string {
 
 function normalizedTag(value: string): string {
   return comparable(value).replace(/^#+/, "");
+}
+
+function comparablePropertyValue(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap((candidate) => comparablePropertyValue(candidate));
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return [comparable(String(value))];
+  }
+  return [];
+}
+
+function propertyMatches(ruleValue: string, properties: Record<string, unknown>): boolean {
+  const separator = ruleValue.indexOf("=");
+  const key = comparable(separator >= 0 ? ruleValue.slice(0, separator) : ruleValue);
+  if (!key) return false;
+
+  const propertyKey = Object.keys(properties).find((candidate) => comparable(candidate) === key);
+  if (!propertyKey) return false;
+  if (separator < 0) return true;
+
+  const expected = comparable(ruleValue.slice(separator + 1));
+  return comparablePropertyValue(properties[propertyKey]).includes(expected);
 }
 
 export function contextMatches(rule: ContextRule, context: NoteContext | null): boolean {
@@ -38,6 +60,10 @@ export function contextMatches(rule: ContextRule, context: NoteContext | null): 
     const folder = normalizedRulePath(rule.matchValue);
     const path = normalizedRulePath(context.path);
     return Boolean(folder) && path.startsWith(`${folder}/`);
+  }
+
+  if (rule.matchType === "property") {
+    return propertyMatches(rule.matchValue, context.properties);
   }
 
   const targetTag = normalizedTag(rule.matchValue);
