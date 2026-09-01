@@ -26,9 +26,6 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Verify release tag
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -41,6 +38,9 @@ jobs:
             echo "Release tag commit must be reachable from main." >&2
             exit 1
           }
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Lint, test, and build
         run: npm run check
