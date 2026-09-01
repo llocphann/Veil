@@ -1,4 +1,5 @@
 import { Modal, TFile, setIcon, type App } from "obsidian";
+import { randomVisibleWallpaper } from "./wallpaper-library-random";
 import { mediaKind, type MediaKind } from "./settings";
 import type { WallpaperLibraryState } from "./wallpaper-library-state";
 import type { WallpaperLibraryTarget } from "./wallpaper-library-targets";
@@ -268,13 +269,12 @@ export class WallpaperLibraryModal extends Modal {
   }
 
   private selectRandomVisible(): void {
-    const files = this.visibleFiles();
-    if (files.length === 0) return;
     const target = this.activeTarget();
-    const choices = files.length > 1
-      ? files.filter((file) => file.path !== target.selectedPath)
-      : files;
-    const selected = choices[Math.floor(Math.random() * choices.length)];
+    const selected = randomVisibleWallpaper(
+      this.visibleFiles(),
+      this.visibleLimit,
+      target.selectedPath,
+    );
     if (!selected) return;
     this.controller.selectWallpaper(target.id, selected.path);
     this.renderGrid();
