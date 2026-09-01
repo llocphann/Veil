@@ -9,6 +9,10 @@ import { normalizeSettings } from "../src/settings";
 void test("Veil settings export and import round-trip through schema 2", () => {
   const settings = normalizeSettings({
     wallpaperPath: "Media/wallpaper.webp",
+    wallpaperPositionX: 31,
+    wallpaperPositionY: 68,
+    wallpaperZoom: 128,
+    transitionDuration: 460,
     colorOverlayEnabled: true,
     colorOverlayColor: "#123456",
     colorOverlayOpacity: 42,
@@ -16,6 +20,10 @@ void test("Veil settings export and import round-trip through schema 2", () => {
       id: "cinema",
       name: "Cinema",
       wallpaperPath: "Media/cinema.webp",
+      wallpaperPositionX: 72,
+      wallpaperPositionY: 42,
+      wallpaperZoom: 145,
+      transitionDuration: 620,
       effectPreset: "tv-noise",
       effectIntensity: 21,
       paneOpacity: 44,
@@ -58,6 +66,10 @@ void test("schema 1 exports migrate without changing inline wallpaper behavior",
   }));
 
   assert.equal(imported.opacity, 63);
+  assert.equal(imported.wallpaperPositionX, 50);
+  assert.equal(imported.wallpaperPositionY, 50);
+  assert.equal(imported.wallpaperZoom, 100);
+  assert.equal(imported.transitionDuration, 320);
   assert.deepEqual(imported.profiles, []);
   assert.equal(imported.wallpaperRules[0]?.profileId, "");
   assert.equal(imported.wallpaperRules[0]?.wallpaperPath, "Media/project.webp");
