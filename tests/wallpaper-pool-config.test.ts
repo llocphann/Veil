@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeSettings } from "../src/settings";
 import {
+  rewriteWallpaperPoolSelectionPaths,
   wallpaperPoolConfiguration,
   wallpaperPoolConfigurationChanged,
   wallpaperPoolConfigurationChanges,
@@ -125,5 +126,44 @@ void test("adding or removing a scene invalidates only that scene pool state", (
   assert.deepEqual(
     wallpaperPoolConfigurationChanges(previous, added),
     ["profile:cinema"],
+  );
+});
+
+void test("renaming selected pool media preserves the current and previous selections", () => {
+  const selections = new Map([
+    ["default|Media|direct", "Media/current.webp"],
+    ["profile:focus|Media/Focus|recursive", "Media/Focus/old.webp"],
+    ["profile:reading|Media/Reading|direct", "Media/Reading/read.webp"],
+  ]);
+  const rewrite = (path: string): string =>
+    path === "Media/Focus/old.webp" ? "Media/Focus/renamed.webp" : path;
+
+  assert.equal(rewriteWallpaperPoolSelectionPaths(selections, rewrite), true);
+  assert.equal(
+    selections.get("profile:focus|Media/Focus|recursive"),
+    "Media/Focus/renamed.webp",
+  );
+  assert.equal(selections.get("default|Media|direct"), "Media/current.webp");
+  assert.equal(
+    rewriteWallpaperPoolSelectionPaths(selections, rewrite),
+    false,
+  );
+});
+
+void test("renaming a pool folder rewrites descendant selection paths", () => {
+  const selections = new Map([
+    ["profile:focus|Media/Focus|recursive", "Media/Focus/Sub/selected.webp"],
+  ]);
+  const oldPath = "Media/Focus";
+  const newPath = "Wallpapers/Focus";
+  const rewrite = (path: string): string =>
+    path === oldPath || path.startsWith(`${oldPath}/`)
+      ? newPath + path.slice(oldPath.length)
+      : path;
+
+  assert.equal(rewriteWallpaperPoolSelectionPaths(selections, rewrite), true);
+  assert.equal(
+    selections.get("profile:focus|Media/Focus|recursive"),
+    "Wallpapers/Focus/Sub/selected.webp",
   );
 });
