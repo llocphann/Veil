@@ -19,6 +19,7 @@ const context: NoteContext = {
     published: true,
     mood: ["Focus", "Dark"],
   },
+  theme: "dark",
 };
 
 function wallpaperRule(
@@ -54,7 +55,41 @@ void test("property rules support existence, scalar, boolean, numeric, and array
   assert.equal(contextMatches(wallpaperRule("property", "missing"), context), false);
 });
 
-void test("the first matching wallpaper rule wins", () => {
+void test("system theme rules match light or dark mode without requiring a note", () => {
+  assert.equal(contextMatches(wallpaperRule("property", "@theme=dark"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "@theme=light"), context), false);
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@theme=light"), {
+      ...context,
+      theme: "light",
+    }),
+    true,
+  );
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@theme=dark"), {
+      ...context,
+      properties: { "@theme": "light" },
+    }),
+    true,
+  );
+});
+
+void test("normal note context wins before theme fallback regardless of rule order", () => {
+  const rules = [
+    wallpaperRule("property", "@theme=dark", "Media/dark.webp"),
+    wallpaperRule("tag", "media", "Media/media.webp"),
+  ];
+  assert.equal(matchingWallpaperRule(rules, context)?.wallpaperPath, "Media/media.webp");
+
+  const unmatched: NoteContext = {
+    ...context,
+    tags: [],
+    properties: {},
+  };
+  assert.equal(matchingWallpaperRule(rules, unmatched)?.wallpaperPath, "Media/dark.webp");
+});
+
+void test("the first matching wallpaper rule wins within the same priority tier", () => {
   const rules = [
     wallpaperRule("tag", "media", "Media/first.webp"),
     wallpaperRule("note", "World War Z", "Media/second.webp"),
