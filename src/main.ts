@@ -29,6 +29,10 @@ import {
   toggleFavoriteWallpaper,
   type WallpaperLibraryState,
 } from "./wallpaper-library-state";
+import {
+  wallpaperLibraryTargetPatch,
+  wallpaperLibraryTargets,
+} from "./wallpaper-library-targets";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -248,51 +252,11 @@ export default class VeilPlugin extends Plugin {
 
   public openWallpaperLibrary(): void {
     new WallpaperLibraryModal(this.app, {
-      getTargets: () => [
-        {
-          id: "default",
-          label: "Default appearance",
-          selectedPath: this.settings.wallpaperPath,
-        },
-        ...this.settings.profiles.map((profile) => ({
-          id: `profile:${profile.id}`,
-          label: `Scene: ${profile.name || profile.id}`,
-          selectedPath: profile.wallpaperPath,
-        })),
-        ...this.settings.wallpaperRules
-          .filter((rule) => !rule.profileId)
-          .map((rule) => ({
-            id: `rule:${rule.id}`,
-            label: `Inline rule: ${rule.matchValue || rule.id}`,
-            selectedPath: rule.wallpaperPath,
-          })),
-      ],
+      getTargets: () => wallpaperLibraryTargets(this.settings),
       getState: () => this.wallpaperLibrary,
       selectWallpaper: (targetId, path) => {
-        if (targetId === "default") {
-          this.updateSettings({ wallpaperPath: path });
-          return;
-        }
-        if (targetId.startsWith("profile:")) {
-          const profileId = targetId.slice("profile:".length);
-          if (!this.settings.profiles.some((profile) => profile.id === profileId)) return;
-          const profiles = this.settings.profiles.map((profile) =>
-            profile.id === profileId ? { ...profile, wallpaperPath: path } : profile,
-          );
-          this.updateSettings({ profiles });
-          return;
-        }
-        if (targetId.startsWith("rule:")) {
-          const ruleId = targetId.slice("rule:".length);
-          const ruleExists = this.settings.wallpaperRules.some(
-            (rule) => rule.id === ruleId && !rule.profileId,
-          );
-          if (!ruleExists) return;
-          const wallpaperRules = this.settings.wallpaperRules.map((rule) =>
-            rule.id === ruleId && !rule.profileId ? { ...rule, wallpaperPath: path } : rule,
-          );
-          this.updateSettings({ wallpaperRules });
-        }
+        const patch = wallpaperLibraryTargetPatch(this.settings, targetId, path);
+        if (patch) this.updateSettings(patch);
       },
       toggleFavorite: (path) => {
         this.wallpaperLibrary = toggleFavoriteWallpaper(this.wallpaperLibrary, path, normalizePath);
