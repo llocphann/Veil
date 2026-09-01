@@ -37,6 +37,7 @@
 - Refactor declarative Settings definitions so dynamic Scene and rule controls share smaller helpers, and expose the visual wallpaper library directly from Wallpaper and Actions settings.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
 - Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
+- Harden release automation with immutable action SHAs, source/tag verification before dependency installation, production-bundle checks, and a read-only verification job that hands verified artifacts to a separate publish-only job with write/OIDC permissions.
 
 ## 1.3.0
 
