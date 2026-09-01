@@ -19,6 +19,13 @@ import {
   type VeilAppearance,
   type VeilSettings,
 } from "./settings";
+import { WallpaperLibraryModal } from "./wallpaper-library-modal";
+import {
+  normalizeWallpaperLibraryState,
+  rememberRecentWallpaper,
+  toggleFavoriteWallpaper,
+  type WallpaperLibraryState,
+} from "./wallpaper-library-state";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -71,6 +78,7 @@ export default class VeilPlugin extends Plugin {
   private readonly poolCandidates = new Map<string, string[]>();
   private readonly poolSelections = new Map<string, string>();
   private readonly previousPoolSelections = new Map<string, string>();
+  private wallpaperLibrary: WallpaperLibraryState = { favorites: [], recent: [] };
   private settingTab: WallpaperSettingsTab | null = null;
   private unloaded = false;
   private layoutReady = false;
@@ -82,7 +90,12 @@ export default class VeilPlugin extends Plugin {
 
   async onload(): Promise<void> {
     try {
-      this.settings = normalizeSettings(await this.loadData(), normalizePath);
+      const storedData: unknown = await this.loadData();
+      this.settings = normalizeSettings(storedData, normalizePath);
+      const libraryData = typeof storedData === "object" && storedData !== null
+        ? (storedData as Record<string, unknown>).wallpaperLibrary
+        : null;
+      this.wallpaperLibrary = normalizeWallpaperLibraryState(libraryData, normalizePath);
     } catch (error) {
       console.error("[veil] Could not load settings", error);
       new Notice("Veil settings could not be loaded. Using defaults.");
@@ -100,6 +113,11 @@ export default class VeilPlugin extends Plugin {
       id: "shuffle-wallpaper-pool",
       name: "Shuffle wallpaper pool",
       callback: () => this.shuffleWallpaperPool(),
+    });
+    this.addCommand({
+      id: "open-wallpaper-library",
+      name: "Open wallpaper library",
+      callback: () => this.openWallpaperLibrary(),
     });
 
     this.app.workspace.onLayoutReady(() => {
@@ -140,19 +158,17 @@ export default class VeilPlugin extends Plugin {
     this.previousPoolSelections.clear();
   }
 
-  public updateSettings(patch: Partial<VeilSettings>): void {
+  public updateSettings(patch: Partial<VeilSettings>, rememberRecent = true): void {
     if (this.unloaded) return;
-    this.settings = normalizeSettings({ ...this.settings, ...patch }, normalizePath);
+    const previous = this.settings;
+    const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
+    if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
+    this.settings = next;
     this.poolCandidates.clear();
     this.poolSelections.clear();
     this.previousPoolSelections.clear();
     this.refreshWallpaper();
-    this.pendingSave = true;
-    if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
-    this.saveTimer = window.setTimeout(() => {
-      this.saveTimer = null;
-      void this.flushSettings();
-    }, 200);
+    this.scheduleSave();
   }
 
   public flushSettings(): Promise<void> {
@@ -164,7 +180,14 @@ export default class VeilPlugin extends Plugin {
 
     this.pendingSave = false;
     const snapshot = normalizeSettings(this.settings, normalizePath);
-    const task = this.saveQueue.then(() => this.saveData(snapshot));
+    const librarySnapshot: WallpaperLibraryState = {
+      favorites: [...this.wallpaperLibrary.favorites],
+      recent: [...this.wallpaperLibrary.recent],
+    };
+    const task = this.saveQueue.then(() => this.saveData({
+      ...snapshot,
+      wallpaperLibrary: librarySnapshot,
+    }));
     this.saveQueue = task.catch((error: unknown) => {
       console.error("[veil] Could not save settings", error);
       new Notice("Veil changes could not be saved. Check vault permissions.");
@@ -204,6 +227,18 @@ export default class VeilPlugin extends Plugin {
     this.scheduleApplyToWorkspace();
   }
 
+  public openWallpaperLibrary(): void {
+    new WallpaperLibraryModal(this.app, {
+      getSelectedPath: () => this.settings.wallpaperPath,
+      getState: () => this.wallpaperLibrary,
+      selectWallpaper: (path) => this.updateSettings({ wallpaperPath: path }),
+      toggleFavorite: (path) => {
+        this.wallpaperLibrary = toggleFavoriteWallpaper(this.wallpaperLibrary, path, normalizePath);
+        this.scheduleSave();
+      },
+    }).open();
+  }
+
   public activeContextSummary(): string {
     const document = this.app.workspace.containerEl.ownerDocument;
     const context = this.contextForDocument(document);
@@ -218,6 +253,41 @@ export default class VeilPlugin extends Plugin {
     }
     const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
     return `${context.path} → default appearance${pool}`;
+  }
+
+  private scheduleSave(): void {
+    if (this.unloaded) return;
+    this.pendingSave = true;
+    if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
+      this.saveTimer = null;
+      void this.flushSettings();
+    }, 200);
+  }
+
+  private rememberChangedWallpaperPaths(previous: VeilSettings, next: VeilSettings): void {
+    const paths: string[] = [];
+    if (next.wallpaperPath && next.wallpaperPath !== previous.wallpaperPath) {
+      paths.push(next.wallpaperPath);
+    }
+
+    const previousProfiles = new Map(previous.profiles.map((profile) => [profile.id, profile.wallpaperPath]));
+    for (const profile of next.profiles) {
+      if (profile.wallpaperPath && previousProfiles.get(profile.id) !== profile.wallpaperPath) {
+        paths.push(profile.wallpaperPath);
+      }
+    }
+
+    const previousRules = new Map(previous.wallpaperRules.map((rule) => [rule.id, rule.wallpaperPath]));
+    for (const rule of next.wallpaperRules) {
+      if (rule.wallpaperPath && previousRules.get(rule.id) !== rule.wallpaperPath) {
+        paths.push(rule.wallpaperPath);
+      }
+    }
+
+    for (const path of paths) {
+      this.wallpaperLibrary = rememberRecentWallpaper(this.wallpaperLibrary, path, normalizePath);
+    }
   }
 
   private scheduleApplyToWorkspace(): void {
@@ -246,6 +316,7 @@ export default class VeilPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
         this.poolCandidates.clear();
+        this.pruneWallpaperLibrary(file.path);
         this.refreshIfWallpaper(file.path);
       }),
     );
@@ -295,10 +366,41 @@ export default class VeilPlugin extends Plugin {
             changed = true;
           }
         }
-        if (changed) this.updateSettings(next);
-        else this.refreshWallpaper(selectedPoolPathRenamed);
+
+        const renamedLibrary = normalizeWallpaperLibraryState({
+          favorites: this.wallpaperLibrary.favorites.map(rename),
+          recent: this.wallpaperLibrary.recent.map(rename),
+        }, normalizePath);
+        const libraryChanged =
+          renamedLibrary.favorites.join("\n") !== this.wallpaperLibrary.favorites.join("\n")
+          || renamedLibrary.recent.join("\n") !== this.wallpaperLibrary.recent.join("\n");
+        if (libraryChanged) this.wallpaperLibrary = renamedLibrary;
+
+        if (changed) this.updateSettings(next, false);
+        else {
+          if (libraryChanged) this.scheduleSave();
+          this.refreshWallpaper(selectedPoolPathRenamed);
+        }
       }),
     );
+  }
+
+  private pruneWallpaperLibrary(path: string): void {
+    const prefix = `${path}/`;
+    const next = normalizeWallpaperLibraryState({
+      favorites: this.wallpaperLibrary.favorites.filter(
+        (candidate) => candidate !== path && !candidate.startsWith(prefix),
+      ),
+      recent: this.wallpaperLibrary.recent.filter(
+        (candidate) => candidate !== path && !candidate.startsWith(prefix),
+      ),
+    }, normalizePath);
+    if (
+      next.favorites.length === this.wallpaperLibrary.favorites.length
+      && next.recent.length === this.wallpaperLibrary.recent.length
+    ) return;
+    this.wallpaperLibrary = next;
+    this.scheduleSave();
   }
 
   private refreshIfWallpaper(path: string): void {
