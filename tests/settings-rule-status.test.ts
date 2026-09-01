@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-const source = fs.readFileSync("src/settings-tab.ts", "utf8");
+const source = [
+  fs.readFileSync("src/settings-tab.ts", "utf8"),
+  fs.readFileSync("src/settings-tab-base.ts", "utf8"),
+].join("\n");
 
 void test("wallpaper rule readiness uses shared context syntax validation", () => {
   assert.match(source, /import \{ contextRuleSyntaxValid \} from "\.\/context-rules"/);
