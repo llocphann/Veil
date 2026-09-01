@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add reusable **Scenes** that capture wallpaper, opacity, vignette, blur/dim, color overlay, effect, and video playback settings as one profile.
+- Allow wallpaper routing rules to switch to a complete scene while preserving the 1.3 inline-wallpaper behavior.
+- Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
+- Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
+- Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
+
 ## 1.3.0
 
 - Add permanently visible delete buttons to wallpaper routes and opacity exclusions.
