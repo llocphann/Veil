@@ -58,11 +58,7 @@ function comparablePropertyValue(value: unknown): string[] {
 }
 
 function currentTheme(context: NoteContext | null): "light" | "dark" | "" {
-  if (context?.theme === "light" || context?.theme === "dark") return context.theme;
-  if (typeof document === "undefined") return "";
-  if (document.body?.classList.contains("theme-dark")) return "dark";
-  if (document.body?.classList.contains("theme-light")) return "light";
-  return "";
+  return context?.theme === "light" || context?.theme === "dark" ? context.theme : "";
 }
 
 function currentDate(context: NoteContext | null): Date {
