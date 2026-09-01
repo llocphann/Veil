@@ -1112,7 +1112,7 @@ export default class VeilPlugin extends Plugin {
     if (remembered) this.activeRootLeaves.delete(document);
 
     const recent = this.app.workspace.getMostRecentLeaf();
-    if (this.isRootLeafForDocument(recent, document)) {
+    if (recent && this.isRootLeafForDocument(recent, document)) {
       this.activeRootLeaves.set(document, recent);
       return recent;
     }
@@ -1120,9 +1120,7 @@ export default class VeilPlugin extends Plugin {
     this.app.workspace.iterateAllLeaves((leaf) => {
       if (!fallback.leaf && this.isRootLeafForDocument(leaf, document)) fallback.leaf = leaf;
     });
-    const leaf = fallback.leaf;
-    if (leaf) this.activeRootLeaves.set(document, leaf);
-    return leaf;
+    return fallback.leaf;
   }
 
   private isRootLeafForDocument(leaf: WorkspaceLeaf | null, document: Document): boolean {
