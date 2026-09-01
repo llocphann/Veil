@@ -25,7 +25,8 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 ## Pools and library
 
 - Enable a wallpaper pool, navigate away/back, and change only opacity/effects. The selected pool item should remain stable until Shuffle or a pool anchor/scope change.
-- Rename/delete media inside the pool and confirm Veil recovers without a blank wallpaper.
+- Rename the currently selected pool media (and separately a parent folder containing it). Veil should keep that same media selected at its new path rather than rerolling the pool.
+- Delete the currently selected pool media and confirm Veil selects another valid candidate without a blank wallpaper.
 - Open Wallpaper Library with a large media folder. Search/filter/sort, Favorites, Recent, **Random visible**, and **Show more** should remain responsive.
 - Apply Library selections separately to Default appearance, a Scene, and an inline wallpaper rule; unrelated targets must stay unchanged.
 
