@@ -24,7 +24,9 @@
 - Add adaptive system-context fallback routing through Property rules: `@theme=light|dark`, `@time=HH:MM-HH:MM`, `@day=...`, and `@schedule=<days> HH:MM-HH:MM`, including overnight ranges.
 - Keep note/path/folder/tag/frontmatter wallpaper rules above adaptive system fallbacks regardless of list position; a session-only manual Scene override remains the highest-priority appearance source.
 - Schedule time/day routing with a single one-shot timeout at the next meaningful boundary instead of interval polling; theme changes remain event-driven through Obsidian's CSS-change event.
+- Fix overnight scheduled fallbacks so an early-morning carryover such as `mon-fri 22:00-06:00` still schedules the current day's 06:00 end boundary instead of waiting for the next evening.
 - Preserve per-window system context even when a desktop window has no active note, so adaptive theme/time/day fallbacks still resolve correctly there.
+- Track the most recently active root leaf independently for each desktop/pop-out document so split windows resolve note, tag, property, and Scene rules from the correct local context.
 - Add a command-palette Scene switcher for temporary session-only manual overrides, with a `Follow context rules` option to resume automatic routing.
 - Refactor declarative Settings definitions so dynamic Scene and rule controls share smaller helpers, and expose the visual wallpaper library directly from Wallpaper and Actions settings.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
