@@ -53,3 +53,15 @@ void test("release workflow verifies and publishes the required artifacts", () =
     assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
   }
 });
+
+void test("release source and tag are verified before repository dependencies execute", () => {
+  const source = fs.readFileSync(".github/workflows/release.yml", "utf8");
+  const verifyTag = source.indexOf("- name: Verify release tag");
+  const verifySource = source.indexOf("- name: Verify release source");
+  const install = source.indexOf("- name: Install dependencies");
+  assert.ok(verifyTag >= 0, "release tag verification step is missing");
+  assert.ok(verifySource >= 0, "release source verification step is missing");
+  assert.ok(install >= 0, "dependency install step is missing");
+  assert.ok(verifyTag < install, "release tag must be verified before npm ci");
+  assert.ok(verifySource < install, "release source must be verified before npm ci");
+});
