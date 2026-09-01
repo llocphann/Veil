@@ -2,9 +2,13 @@
 
 ## Unreleased
 
-- Add reusable **Scenes** that capture wallpaper, opacity, vignette, blur/dim, color overlay, effect, and video playback settings as one profile.
+- Add reusable **Scenes** that capture wallpaper, framing, opacity, vignette, blur/dim, color overlay, effect, transition, and video playback settings as one profile.
 - Allow wallpaper routing rules to switch to a complete scene while preserving the 1.3 inline-wallpaper behavior.
 - Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
+- Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
+- Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
+- Respect reduced-motion preferences by disabling scene crossfades in addition to pausing motion-heavy effects and video.
+- Expose all scene-specific effects and playback controls directly inside each Scene editor.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
 - Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
 
