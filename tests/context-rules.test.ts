@@ -4,6 +4,7 @@ import {
   contextMatches,
   matchingOpacityExclusions,
   matchingWallpaperRule,
+  nextSystemContextBoundary,
   type NoteContext,
 } from "../src/context-rules";
 import type { OpacityExclusionRule, WallpaperRule } from "../src/settings";
@@ -20,6 +21,7 @@ const context: NoteContext = {
     mood: ["Focus", "Dark"],
   },
   theme: "dark",
+  now: new Date(2026, 8, 1, 23, 30),
 };
 
 function wallpaperRule(
@@ -55,7 +57,7 @@ void test("property rules support existence, scalar, boolean, numeric, and array
   assert.equal(contextMatches(wallpaperRule("property", "missing"), context), false);
 });
 
-void test("system theme rules match light or dark mode without requiring a note", () => {
+void test("system theme rules match light or dark mode without requiring frontmatter", () => {
   assert.equal(contextMatches(wallpaperRule("property", "@theme=dark"), context), true);
   assert.equal(contextMatches(wallpaperRule("property", "@theme=light"), context), false);
   assert.equal(
@@ -74,9 +76,58 @@ void test("system theme rules match light or dark mode without requiring a note"
   );
 });
 
-void test("normal note context wins before theme fallback regardless of rule order", () => {
+void test("time, day, and schedule fallbacks use local time and support overnight ranges", () => {
+  assert.equal(contextMatches(wallpaperRule("property", "@time=22:00-06:00"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "@time=06:00-22:00"), context), false);
+  assert.equal(contextMatches(wallpaperRule("property", "@day=tue"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "@day=weekday"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "@day=weekend"), context), false);
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@schedule=mon-fri 22:00-06:00"), context),
+    true,
+  );
+
+  const saturdayMorning: NoteContext = {
+    ...context,
+    now: new Date(2026, 8, 5, 5, 30),
+  };
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@schedule=mon-fri 22:00-06:00"), saturdayMorning),
+    true,
+  );
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@schedule=mon-fri 08:00-18:00"), saturdayMorning),
+    false,
+  );
+});
+
+void test("scheduled rules expose only their next meaningful boundary", () => {
+  const timeRule = wallpaperRule("property", "@time=22:00-06:00");
+  const timeNow = new Date(2026, 8, 1, 21, 30);
+  assert.equal(
+    nextSystemContextBoundary([timeRule], timeNow),
+    new Date(2026, 8, 1, 22, 0).getTime(),
+  );
+
+  const scheduleRule = wallpaperRule("property", "@schedule=mon-fri 22:00-06:00");
+  const scheduleNow = new Date(2026, 8, 1, 23, 30);
+  assert.equal(
+    nextSystemContextBoundary([scheduleRule], scheduleNow),
+    new Date(2026, 8, 2, 6, 0).getTime(),
+  );
+
+  const dayRule = wallpaperRule("property", "@day=weekday");
+  const fridayNight = new Date(2026, 8, 4, 23, 30);
+  assert.equal(
+    nextSystemContextBoundary([dayRule], fridayNight),
+    new Date(2026, 8, 5, 0, 0).getTime(),
+  );
+});
+
+void test("normal note context wins before system fallbacks regardless of rule order", () => {
   const rules = [
     wallpaperRule("property", "@theme=dark", "Media/dark.webp"),
+    wallpaperRule("property", "@time=22:00-06:00", "Media/night.webp"),
     wallpaperRule("tag", "media", "Media/media.webp"),
   ];
   assert.equal(matchingWallpaperRule(rules, context)?.wallpaperPath, "Media/media.webp");
