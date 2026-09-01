@@ -1,7 +1,8 @@
 import { DEFAULT_SETTINGS, normalizeSettings, type VeilSettings } from "./settings";
 
 export const VEIL_SETTINGS_FORMAT = "veil-settings";
-export const VEIL_SETTINGS_SCHEMA_VERSION = 1;
+export const VEIL_SETTINGS_SCHEMA_VERSION = 2;
+const OLDEST_SUPPORTED_SCHEMA_VERSION = 1;
 
 interface VeilSettingsEnvelope {
   format: typeof VEIL_SETTINGS_FORMAT;
@@ -15,6 +16,16 @@ type PathNormalizer = (path: string) => string;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function migrateSettingsEnvelope(schemaVersion: number, settings: unknown): unknown {
+  if (schemaVersion === 1) {
+    // Schema 1 predates reusable scenes. normalizeSettings supplies profiles=[]
+    // and profileId="" so every 1.3 wallpaper rule keeps its inline behavior.
+    return settings;
+  }
+  if (schemaVersion === VEIL_SETTINGS_SCHEMA_VERSION) return settings;
+  throw new Error(`Unsupported Veil settings schema: ${String(schemaVersion)}.`);
 }
 
 export function serializeVeilSettings(
@@ -49,10 +60,15 @@ export function parseVeilSettingsImport(
     if (parsed.format !== VEIL_SETTINGS_FORMAT) {
       throw new Error("This settings file was not exported by Veil.");
     }
-    if (parsed.schemaVersion !== VEIL_SETTINGS_SCHEMA_VERSION) {
+    if (
+      typeof parsed.schemaVersion !== "number" ||
+      !Number.isInteger(parsed.schemaVersion) ||
+      parsed.schemaVersion < OLDEST_SUPPORTED_SCHEMA_VERSION ||
+      parsed.schemaVersion > VEIL_SETTINGS_SCHEMA_VERSION
+    ) {
       throw new Error(`Unsupported Veil settings schema: ${String(parsed.schemaVersion)}.`);
     }
-    settings = parsed.settings;
+    settings = migrateSettingsEnvelope(parsed.schemaVersion, parsed.settings);
   } else if (!Object.keys(DEFAULT_SETTINGS).some((key) => key in parsed)) {
     throw new Error("This JSON object does not contain Veil settings.");
   }
