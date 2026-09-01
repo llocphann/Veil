@@ -241,7 +241,8 @@ function nextSystemRuleBoundary(rule: ContextRule, now: Date): number | null {
       const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
       pushFutureBoundary(boundaries, midnight, nowMs);
     } else {
-      for (let offset = 0; offset <= 7; offset += 1) {
+      const firstOffset = schedule.range.start > schedule.range.end ? -1 : 0;
+      for (let offset = firstOffset; offset <= 7; offset += 1) {
         const start = dateAtMinutes(now, offset, schedule.range.start);
         if (!schedule.days.has(start.getDay())) continue;
         pushFutureBoundary(boundaries, start, nowMs);
