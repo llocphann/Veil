@@ -166,14 +166,15 @@ The production build writes `main.js` at the repository root. `main.js` is inten
 
 ## Releasing
 
-1. On the release-candidate branch, decide the target semantic version and promote `## Unreleased` in `CHANGELOG.md` to that exact `## x.y.z` heading. Commit that documentation change, but keep `package.json`, `manifest.json`, and `versions.json` on the previous released version.
-2. Complete review and smoke testing, then merge the approved release-candidate PR into `main`. Do not create or push the release tag from the prerelease branch; a squash merge would make that prerelease commit unreachable from `main` and the release workflow would reject it.
-3. On an up-to-date local `main`, run exactly one of `npm version patch --no-git-tag-version`, `npm version minor --no-git-tag-version`, or `npm version major --no-git-tag-version`. The npm lifecycle updates `package.json` and `package-lock.json`, and Veil's version script synchronizes `manifest.json` and `versions.json` without creating a tag yet.
-4. Run `npm run check`. Only after it passes, commit the synchronized version files as the release commit and create a tag whose name exactly matches `manifest.json`.
-5. Push the release commit to `main`, then push its tag. The release workflow re-verifies the tag and `main` ancestry before dependency installation, builds in a read-only job, hands only the verified release files to the publish job, attests them, and creates a draft GitHub release containing `main.js`, `manifest.json`, and `styles.css`.
-6. Review and publish the draft release.
+1. After the release candidate passes review and desktop smoke testing, decide the target semantic version and promote `## Unreleased` in `CHANGELOG.md` to that exact `## x.y.z` heading on the release-candidate branch.
+2. Still on the release-candidate branch, run exactly one of `npm version patch --no-git-tag-version`, `npm version minor --no-git-tag-version`, or `npm version major --no-git-tag-version`. The npm lifecycle updates `package.json` and `package-lock.json`, and Veil's version script synchronizes `manifest.json` and `versions.json` without creating a tag.
+3. Run `npm run check`, commit the changelog and synchronized version files to the release-candidate branch, and require both branch CI and the PR merge-ref CI to pass. **Do not create or push a release tag from the release-candidate branch.**
+4. Merge the approved PR into `main`. Squash, merge-commit, and rebase strategies are all safe because no prerelease commit has been tagged.
+5. Update local `main` to the exact merged commit and confirm `manifest.json` contains the intended version. Create the version tag on that `main` commit, then push the tag. No direct release commit to protected `main` is required after the PR merge.
+6. The release workflow re-verifies that the tag matches `manifest.json` and points to a commit reachable from `main` before dependency installation, builds in a read-only job, hands only the verified release files to the publish job, attests them, and creates a draft GitHub release containing `main.js`, `manifest.json`, and `styles.css`.
+7. Review and publish the draft release.
 
-The release tag must point to a commit reachable from `main` and exactly match the version in `manifest.json`. Never push a release tag from `prerelease`.
+The release tag must point to the exact reviewed code now present on `main` and exactly match the version in `manifest.json`. Never tag a prerelease-only commit.
 
 ## License
 
