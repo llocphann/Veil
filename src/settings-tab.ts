@@ -31,6 +31,7 @@ import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-trans
 const FUNDING_URL = "https://www.buymeacoffee.com/llocphann";
 const MAX_IMPORT_BYTES = 1024 * 1024;
 const MAX_SCENES = 64;
+const MAX_CONTEXT_RULES = 96;
 const SETTINGS_TABS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
   { id: "rules", label: "Rules", icon: "list-filter" },
@@ -697,6 +698,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       addItem: {
         name: "Add wallpaper rule",
         action: () => {
+          if (this.plugin.settings.wallpaperRules.length >= MAX_CONTEXT_RULES) {
+            new Notice(`Veil supports up to ${MAX_CONTEXT_RULES} wallpaper rules.`);
+            return;
+          }
           const wallpaperRules = [
             ...this.plugin.settings.wallpaperRules,
             createWallpaperRule(this.plugin.settings.wallpaperRules),
@@ -775,6 +780,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       addItem: {
         name: "Add opacity exclusion",
         action: () => {
+          if (this.plugin.settings.opacityExclusions.length >= MAX_CONTEXT_RULES) {
+            new Notice(`Veil supports up to ${MAX_CONTEXT_RULES} opacity exclusions.`);
+            return;
+          }
           const opacityExclusions = [
             ...this.plugin.settings.opacityExclusions,
             createOpacityExclusionRule(this.plugin.settings.opacityExclusions),
