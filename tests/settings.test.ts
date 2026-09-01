@@ -11,6 +11,8 @@ import {
 void test("fresh installs start without vault-specific appearance state", () => {
   assert.deepEqual(normalizeSettings(null), DEFAULT_SETTINGS);
   assert.equal(DEFAULT_SETTINGS.wallpaperPath, "");
+  assert.equal(DEFAULT_SETTINGS.wallpaperPoolEnabled, false);
+  assert.equal(DEFAULT_SETTINGS.wallpaperPoolIncludeSubfolders, false);
   assert.equal(DEFAULT_SETTINGS.wallpaperPositionX, 50);
   assert.equal(DEFAULT_SETTINGS.wallpaperPositionY, 50);
   assert.equal(DEFAULT_SETTINGS.wallpaperZoom, 100);
@@ -26,6 +28,8 @@ void test("fresh installs start without vault-specific appearance state", () => 
 
 void test("settings use bounded numbers and allowed enum values", () => {
   const settings = normalizeSettings({
+    wallpaperPoolEnabled: "true",
+    wallpaperPoolIncludeSubfolders: true,
     wallpaperPositionX: -20,
     wallpaperPositionY: 180,
     wallpaperZoom: 999,
@@ -46,6 +50,8 @@ void test("settings use bounded numbers and allowed enum values", () => {
     vignetteMode: "bad",
     enabled: "false",
   });
+  assert.equal(settings.wallpaperPoolEnabled, false);
+  assert.equal(settings.wallpaperPoolIncludeSubfolders, true);
   assert.equal(settings.wallpaperPositionX, 0);
   assert.equal(settings.wallpaperPositionY, 100);
   assert.equal(settings.wallpaperZoom, 200);
@@ -69,6 +75,8 @@ void test("settings use bounded numbers and allowed enum values", () => {
 
 void test("zero values and disabled toggles survive loading", () => {
   const settings = normalizeSettings({
+    wallpaperPoolEnabled: false,
+    wallpaperPoolIncludeSubfolders: false,
     wallpaperPositionX: 0,
     wallpaperPositionY: 0,
     transitionDuration: 0,
@@ -98,12 +106,14 @@ void test("zero values and disabled toggles survive loading", () => {
     assert.equal(settings[key], 0);
   }
   assert.equal(settings.wallpaperZoom, 100);
+  assert.equal(settings.wallpaperPoolEnabled, false);
+  assert.equal(settings.wallpaperPoolIncludeSubfolders, false);
   assert.equal(settings.enabled, false);
   assert.equal(settings.pauseWhenHidden, false);
   assert.equal(settings.respectReducedMotion, false);
 });
 
-void test("older data keeps its values and receives neutral framing defaults", () => {
+void test("older data keeps its values and receives neutral framing and pool defaults", () => {
   const settings = normalizeSettings({
     opacity: 65,
     paneOpacity: 35,
@@ -112,6 +122,8 @@ void test("older data keeps its values and receives neutral framing defaults", (
   assert.equal(settings.opacity, 65);
   assert.equal(settings.paneOpacity, 35);
   assert.equal(settings.wallpaperPath, "Media/scene.gif");
+  assert.equal(settings.wallpaperPoolEnabled, false);
+  assert.equal(settings.wallpaperPoolIncludeSubfolders, false);
   assert.equal(settings.wallpaperPositionX, 50);
   assert.equal(settings.wallpaperPositionY, 50);
   assert.equal(settings.wallpaperZoom, 100);
@@ -153,6 +165,8 @@ void test("profiles and context rules normalize without losing order or compatib
         id: "focus",
         name: "Focus",
         wallpaperPath: ".\\Media\\focus.webp",
+        wallpaperPoolEnabled: true,
+        wallpaperPoolIncludeSubfolders: true,
         wallpaperPositionX: -50,
         wallpaperPositionY: 140,
         wallpaperZoom: 240,
@@ -193,6 +207,8 @@ void test("profiles and context rules normalize without losing order or compatib
   });
 
   assert.equal(settings.profiles[0]?.wallpaperPath, "Media/focus.webp");
+  assert.equal(settings.profiles[0]?.wallpaperPoolEnabled, true);
+  assert.equal(settings.profiles[0]?.wallpaperPoolIncludeSubfolders, true);
   assert.equal(settings.profiles[0]?.wallpaperPositionX, 0);
   assert.equal(settings.profiles[0]?.wallpaperPositionY, 100);
   assert.equal(settings.profiles[0]?.wallpaperZoom, 200);
@@ -213,6 +229,8 @@ void test("profiles and context rules normalize without losing order or compatib
 void test("new scenes copy the complete current global appearance", () => {
   const settings = normalizeSettings({
     wallpaperPath: "Media/default.webp",
+    wallpaperPoolEnabled: true,
+    wallpaperPoolIncludeSubfolders: true,
     wallpaperPositionX: 28,
     wallpaperPositionY: 73,
     wallpaperZoom: 135,
@@ -229,6 +247,8 @@ void test("new scenes copy the complete current global appearance", () => {
 
   assert.equal(profile.name, "Scene 1");
   assert.equal(profile.wallpaperPath, "Media/default.webp");
+  assert.equal(profile.wallpaperPoolEnabled, true);
+  assert.equal(profile.wallpaperPoolIncludeSubfolders, true);
   assert.equal(profile.wallpaperPositionX, 28);
   assert.equal(profile.wallpaperPositionY, 73);
   assert.equal(profile.wallpaperZoom, 135);
