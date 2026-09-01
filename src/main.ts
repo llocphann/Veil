@@ -33,6 +33,7 @@ import {
   wallpaperLibraryTargetPatch,
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
+import { wallpaperPoolConfigurationChanged } from "./wallpaper-pool-config";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -181,14 +182,17 @@ export default class VeilPlugin extends Plugin {
     if (this.unloaded) return;
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
+    const poolConfigurationChanged = wallpaperPoolConfigurationChanged(previous, next);
     if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
     this.settings = next;
     if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
       this.manualProfileId = "";
     }
-    this.poolCandidates.clear();
-    this.poolSelections.clear();
-    this.previousPoolSelections.clear();
+    if (poolConfigurationChanged) {
+      this.poolCandidates.clear();
+      this.poolSelections.clear();
+      this.previousPoolSelections.clear();
+    }
     this.rescheduleSystemRouting();
     this.refreshWallpaper();
     this.scheduleSave();
