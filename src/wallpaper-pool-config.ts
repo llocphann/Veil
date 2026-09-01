@@ -16,6 +16,12 @@ function configurationFor(
   return { id, wallpaperPath, enabled, includeSubfolders };
 }
 
+function configurationEqual(left: PoolConfiguration, right: PoolConfiguration): boolean {
+  return left.wallpaperPath === right.wallpaperPath
+    && left.enabled === right.enabled
+    && left.includeSubfolders === right.includeSubfolders;
+}
+
 export function wallpaperPoolConfiguration(settings: VeilSettings): PoolConfiguration[] {
   return [
     configurationFor(
@@ -26,7 +32,7 @@ export function wallpaperPoolConfiguration(settings: VeilSettings): PoolConfigur
     ),
     ...settings.profiles
       .map((profile) => configurationFor(
-        profile.id,
+        `profile:${profile.id}`,
         profile.wallpaperPath,
         profile.wallpaperPoolEnabled,
         profile.wallpaperPoolIncludeSubfolders,
@@ -35,19 +41,31 @@ export function wallpaperPoolConfiguration(settings: VeilSettings): PoolConfigur
   ];
 }
 
+export function wallpaperPoolConfigurationChanges(
+  previous: VeilSettings,
+  next: VeilSettings,
+): string[] {
+  const before = new Map(
+    wallpaperPoolConfiguration(previous).map((configuration) => [configuration.id, configuration]),
+  );
+  const after = new Map(
+    wallpaperPoolConfiguration(next).map((configuration) => [configuration.id, configuration]),
+  );
+  const ids = new Set([...before.keys(), ...after.keys()]);
+  return Array.from(ids)
+    .filter((id) => {
+      const previousConfiguration = before.get(id);
+      const nextConfiguration = after.get(id);
+      return !previousConfiguration
+        || !nextConfiguration
+        || !configurationEqual(previousConfiguration, nextConfiguration);
+    })
+    .sort((left, right) => left.localeCompare(right));
+}
+
 export function wallpaperPoolConfigurationChanged(
   previous: VeilSettings,
   next: VeilSettings,
 ): boolean {
-  const before = wallpaperPoolConfiguration(previous);
-  const after = wallpaperPoolConfiguration(next);
-  if (before.length !== after.length) return true;
-  return before.some((entry, index) => {
-    const candidate = after[index];
-    return !candidate
-      || entry.id !== candidate.id
-      || entry.wallpaperPath !== candidate.wallpaperPath
-      || entry.enabled !== candidate.enabled
-      || entry.includeSubfolders !== candidate.includeSubfolders;
-  });
+  return wallpaperPoolConfigurationChanges(previous, next).length > 0;
 }
