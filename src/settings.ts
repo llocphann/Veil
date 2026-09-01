@@ -54,6 +54,10 @@ export interface VeilProfile {
   name: string;
   wallpaperPath: string;
   displayMode: DisplayMode;
+  wallpaperPositionX: number;
+  wallpaperPositionY: number;
+  wallpaperZoom: number;
+  transitionDuration: number;
   opacity: number;
   paneOpacity: number;
   paneContentOpacity: number;
@@ -93,6 +97,10 @@ export interface VeilSettings {
   enabled: boolean;
   wallpaperPath: string;
   displayMode: DisplayMode;
+  wallpaperPositionX: number;
+  wallpaperPositionY: number;
+  wallpaperZoom: number;
+  transitionDuration: number;
   opacity: number;
   paneOpacity: number;
   paneContentOpacity: number;
@@ -122,6 +130,10 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   enabled: true,
   wallpaperPath: "",
   displayMode: "cover",
+  wallpaperPositionX: 50,
+  wallpaperPositionY: 50,
+  wallpaperZoom: 100,
+  transitionDuration: 320,
   opacity: 15,
   paneOpacity: 70,
   paneContentOpacity: 100,
@@ -148,6 +160,10 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
 const APPEARANCE_KEYS = [
   "wallpaperPath",
   "displayMode",
+  "wallpaperPositionX",
+  "wallpaperPositionY",
+  "wallpaperZoom",
+  "transitionDuration",
   "opacity",
   "paneOpacity",
   "paneContentOpacity",
@@ -289,6 +305,8 @@ function normalizeAppearance(
   }
 
   for (const key of [
+    "wallpaperPositionX",
+    "wallpaperPositionY",
     "opacity",
     "paneOpacity",
     "paneContentOpacity",
@@ -300,6 +318,13 @@ function normalizeAppearance(
   ] as const) {
     appearance[key] = boundedNumber(value[key], fallback[key], 0, 100);
   }
+  appearance.wallpaperZoom = boundedNumber(value.wallpaperZoom, fallback.wallpaperZoom, 100, 200);
+  appearance.transitionDuration = boundedNumber(
+    value.transitionDuration,
+    fallback.transitionDuration,
+    0,
+    2000,
+  );
   appearance.blurIntensity = boundedNumber(value.blurIntensity, fallback.blurIntensity, 0, 40);
   return appearance;
 }
