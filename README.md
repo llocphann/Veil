@@ -1,9 +1,9 @@
 # Veil
 
-Veil places a vault-local image, animated GIF, or video behind the Obsidian workspace. It keeps the wallpaper separate from interface content, while offering an optional control that fades an entire pane—including nested backgrounds—as one group.
+Veil places a vault-local image, animated GIF, or video behind the Obsidian workspace. It keeps wallpaper media separate from interface content and can switch complete visual **Scenes** automatically from note context, frontmatter, theme, day, or time.
 
 <p align="center">
-  <img src="assets/homepage.png" alt="Ledge Dock in my Obsidian theme" width="82%">
+  <img src="assets/homepage.png" alt="Veil wallpaper behind an Obsidian workspace" width="82%">
 </p>
 
 <p align="center">
@@ -12,25 +12,28 @@ Veil places a vault-local image, animated GIF, or video behind the Obsidian work
 
 ## Features
 
-- Pick media directly from the current vault or enter a vault-relative path.
-- Route different wallpapers to a note name, exact path, folder, or tag; the first matching rule wins.
-- Exclude selected notes, paths, folders, or tags from pane-surface and whole-pane opacity.
-- Use static images, animated GIFs, MP4, WebM, OGV, M4V, or MOV files.
-- Choose fill, fit, center, stretch, or scale-down sizing.
-- Adjust wallpaper opacity independently from pane surfaces.
-- Optionally fade each pane and all of its descendants as one visual group.
-- Recolor the active wallpaper with an adjustable color overlay and blend mode.
-- Add elliptical or circular vignette, blur, dim, retro film, glitch, or TV-noise effects.
-- Export and import a validated, versioned JSON backup of every Veil setting and rule.
-- Navigate compact tabbed settings for wallpaper, rules, effects, video, actions, and support.
-- Apply the wallpaper to the main window and desktop pop-out windows.
+- Pick an image, animated GIF, or video directly from the current vault.
+- Create reusable **Scenes** that bundle wallpaper, pool behavior, framing, opacity, effects, transition, and video behavior.
+- Route an inline wallpaper or a complete Scene by note name, exact path, folder, tag, or frontmatter property.
+- Add adaptive fallback routes for light/dark theme, local time, day of week, or combined schedules.
+- Temporarily override all automatic routing with the command-palette **Switch scene** action, then return to **Follow context rules**.
+- Build random wallpaper pools from a selected file's folder, optionally including descendant folders, with stable per-context choices and explicit shuffle.
+- Browse supported media in a lazy visual Wallpaper Library with search, Favorites, and Recently Selected.
+- Adjust horizontal/vertical focal point, 100–200% zoom, fill/fit/center/stretch/scale-down sizing, and wallpaper opacity.
+- Crossfade safely between wallpapers while retaining the previous media if the incoming file fails to load.
+- Adjust pane-surface opacity independently or fade each outer pane and its descendants as one visual group.
+- Add elliptical/circular vignette, blur, dim, color overlay, retro film, glitch, or TV-noise effects.
+- Apply settings to the main desktop window and Obsidian pop-out windows.
 - Pause video in hidden windows and respect the operating system's reduced-motion preference.
+- Export/import a validated, versioned JSON backup of portable Veil settings, Scenes, and rules.
 
 Veil is desktop-only because reliable video wallpaper playback and multi-window handling depend on Obsidian's desktop runtime.
 
 ## Privacy and file access
 
-Veil reads the selected wallpaper files and Obsidian's already-indexed path and tag metadata for the active file. It does not make network requests, collect telemetry, run analytics, modify media files, or install updates by itself. Wallpaper paths must be vault-relative; URLs and paths outside the vault are rejected.
+Veil reads only vault-local wallpaper media and Obsidian's already-indexed metadata needed by configured rules, including file path, tags, and frontmatter for active notes. It does not make network requests, collect telemetry, run analytics, modify media files, or install updates by itself. Wallpaper paths must remain vault-relative; URLs and paths outside the vault are rejected.
+
+Favorites and Recently Selected are local convenience metadata stored in Veil's `data.json`. They are not embedded in portable settings exports. Selected media always remains in its original vault location.
 
 ## Installation
 
@@ -52,32 +55,86 @@ The plugin ID is `veil`, which is also the name of its folder inside `.obsidian/
 
 ## Usage
 
-Open **Settings → Community plugins → Veil**, choose the **Wallpaper** tab, and select the fallback wallpaper. Use **Rules** to add ordered wallpaper routes and opacity exclusions.
+Open **Settings → Community plugins → Veil**. The **Wallpaper** tab controls the default appearance; **Rules** contains Scenes, routing, and opacity exclusions.
 
-Rules can match:
+### Scenes
+
+A Scene stores a complete appearance rather than only a wallpaper path. This includes pool settings, focal point and zoom, display mode, wallpaper/pane opacity, transition duration, vignette, blur/dim, color overlay, effect preset, and video/reduced-motion behavior.
+
+Create a Scene from the current global appearance, customize it, then select that Scene as the appearance source of a wallpaper route. Legacy-style inline routes remain available and intentionally preserve Veil 1.3 semantics: they replace only the media while using the global appearance and do not inherit the global wallpaper pool.
+
+Use **Veil: Switch scene** from the command palette for a session-only manual Scene override. Manual override has the highest priority and is never written into settings; choose **Follow context rules** to resume automatic routing.
+
+### Wallpaper pools and library
+
+Enable **Wallpaper pool** on the default appearance or a Scene to choose randomly from supported media in the selected wallpaper's folder. The chosen item remains stable for that context until the pool is shuffled or its configuration changes. **Include subfolders** extends discovery to descendants.
+
+Use **Wallpaper Library** from Settings or the command palette to browse vault media visually. Image thumbnails load lazily; videos use lightweight placeholders so opening a large library does not start decoding every video.
+
+### Routing rules
+
+Ordinary routes can match:
 
 - **Note name** without requiring the `.md` extension;
 - **Exact path** to one vault file;
-- **Folder** and every descendant file;
-- **Tag**, including nested tags such as `#media/movie` when matching `#media`.
+- **Folder** and every descendant note;
+- **Tag**, including nested tags such as `#media/movie` when matching `#media`;
+- **Property**, using `key=value` for case-insensitive scalar/array matching or only `key` to match frontmatter-property existence.
 
-Wallpaper routes are evaluated from top to bottom, and the first enabled match replaces the fallback wallpaper. Opacity exclusions are additive: a matching rule can keep pane surfaces, pane content, or both at 100% opacity. All visual controls preview immediately. Veil stores only its settings in `data.json`; selected media remains in its original vault location.
+Examples of frontmatter property rules:
 
-Use **Actions → Export settings** to download a portable JSON backup. Import replaces the current configuration after Veil verifies the file type and schema, normalizes every value, repairs duplicate rule IDs, and enforces rule-count and file-size limits. Wallpaper media files are referenced by vault-relative path and are not embedded in the export.
+```text
+veil=focus
+rating=5
+published=true
+mood=dark
+```
+
+Property rules also expose reserved Veil system-context fallbacks:
+
+```text
+@theme=dark
+@theme=light
+@time=22:00-06:00
+@day=weekday
+@day=weekend
+@day=mon,wed,fri
+@schedule=mon-fri 08:00-18:00
+@schedule=mon-fri 22:00-06:00
+```
+
+Time and schedule values use the computer's local time. Overnight ranges are supported. Day names are case-insensitive and accept common short or long English forms.
+
+Wallpaper routing priority is deliberate:
+
+1. a temporary manual Scene override;
+2. ordinary note/path/folder/tag/frontmatter wallpaper rules, first match in list order;
+3. adaptive `@theme`, `@time`, `@day`, or `@schedule` wallpaper fallbacks, first match in list order;
+4. the default appearance.
+
+This means an adaptive rule remains a fallback even if it is visually placed above a note-specific rule. Opacity exclusions remain additive: every matching exclusion can independently keep pane surfaces, pane content, or both at full opacity.
+
+### Import and export
+
+Use **Actions → Export settings** to download a portable JSON backup. Import verifies the schema and file size, normalizes values, repairs duplicate IDs, and migrates schema-1 Veil 1.3 exports automatically. Media files, Favorites, Recently Selected, and the session-only manual Scene override are not embedded in exports.
 
 For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V, or OGV file plays depends on the codecs available in the user's Obsidian desktop runtime.
 
 ## Performance and stability
 
-Veil is event-driven: it does not poll the vault, and repeated workspace refreshes are coalesced into one animation frame. Video pauses in hidden windows, and imported settings cannot inject arbitrary CSS colors or point the wallpaper outside the vault.
+Veil is event-driven and does not poll the vault. Repeated workspace refreshes are coalesced into one animation frame, wallpaper pools cache candidate paths, library thumbnails are created only when the library is opened, and video pauses in hidden windows when configured.
 
-Effect cost depends on the media size, window resolution, and graphics hardware:
+Adaptive scheduling also avoids interval polling. Theme changes react to Obsidian's CSS-change event. For `@time`, `@day`, and `@schedule`, Veil computes the next meaningful boundary and keeps at most one one-shot timer until that boundary; if no scheduled rule exists, no scheduling timer exists.
+
+Wallpaper transitions use double buffering: the current wallpaper remains visible until the incoming media has successfully loaded. A failed incoming image/video restores the previous working wallpaper instead of leaving a blank background.
+
+Effect cost depends on media size, window resolution, and graphics hardware:
 
 | Feature | Typical cost | Notes |
 | --- | --- | --- |
 | Opacity, dim, color overlay, vignette | Low | Primarily composited by the GPU. Non-normal overlay blend modes add a small compositing cost. |
 | Retro film | Low–moderate | Uses a static media filter and scanline layer. |
-| Blur | Moderate–high GPU | Cost rises with blur radius, wallpaper resolution, and the number of open windows. |
+| Blur | Moderate–high GPU | Cost rises with blur radius, wallpaper resolution, and number of open windows. |
 | Video or animated GIF | Moderate CPU/GPU | Video decoding depends on codec and resolution. GIF animation cannot be paused by Veil. |
 | Glitch and TV noise | High GPU | These presets animate continuously. Reduced-motion mode freezes their animation. |
 | Video + strong blur + animated preset | Highest | This combination may stutter on integrated graphics or battery-powered devices. |
