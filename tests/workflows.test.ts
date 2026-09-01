@@ -77,7 +77,7 @@ void test("release publishing permissions are isolated from dependency execution
 
   const verifyJob = source.slice(verifyIndex, publishIndex);
   const publishJob = source.slice(publishIndex);
-  assert.match(verifyJob, /permissions:\n      contents: read/);
+  assert.ok(verifyJob.includes("permissions:\n      contents: read"));
   assert.doesNotMatch(verifyJob, /contents: write|id-token: write|attestations: write/);
   assert.match(publishJob, /needs: verify/);
   assert.match(publishJob, /contents: write/);
