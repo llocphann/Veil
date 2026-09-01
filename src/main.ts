@@ -33,7 +33,7 @@ import {
   wallpaperLibraryTargetPatch,
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
-import { wallpaperPoolConfigurationChanged } from "./wallpaper-pool-config";
+import { wallpaperPoolConfigurationChanges } from "./wallpaper-pool-config";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -182,16 +182,23 @@ export default class VeilPlugin extends Plugin {
     if (this.unloaded) return;
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
-    const poolConfigurationChanged = wallpaperPoolConfigurationChanged(previous, next);
+    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
     if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
     this.settings = next;
     if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
       this.manualProfileId = "";
     }
-    if (poolConfigurationChanged) {
+    if (changedPoolContexts.length > 0) {
       this.poolCandidates.clear();
-      this.poolSelections.clear();
-      this.previousPoolSelections.clear();
+      for (const contextKey of changedPoolContexts) {
+        const prefix = `${contextKey}|`;
+        for (const key of Array.from(this.poolSelections.keys())) {
+          if (key.startsWith(prefix)) this.poolSelections.delete(key);
+        }
+        for (const key of Array.from(this.previousPoolSelections.keys())) {
+          if (key.startsWith(prefix)) this.previousPoolSelections.delete(key);
+        }
+      }
     }
     this.rescheduleSystemRouting();
     this.refreshWallpaper();
