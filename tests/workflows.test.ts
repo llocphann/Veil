@@ -25,6 +25,13 @@ for (const path of WORKFLOWS) {
   });
 }
 
+void test("prerelease CI cancels superseded verification runs", () => {
+  const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(source, /concurrency:/);
+  assert.match(source, /github\.event\.pull_request\.number \|\| github\.ref/);
+  assert.match(source, /cancel-in-progress: true/);
+});
+
 void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(source, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
