@@ -832,7 +832,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       { name: "Enabled", control: { type: "toggle", key: key("enabled") } },
       {
         name: "Match by",
-        desc: "Folder rules include descendants; tag rules include nested tags; property rules read YAML/frontmatter from Obsidian's metadata cache.",
+        desc: "Folder rules include descendants; tag rules include nested tags; Property can match YAML/frontmatter or Veil system fallbacks for theme, day, and time.",
         control: { type: "dropdown", key: key("matchType"), options: MATCH_TYPES },
       },
       {
@@ -875,8 +875,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     }
     if (matchType === "property") {
       return {
-        name: "Frontmatter property",
-        desc: "Use key=value to match a scalar or array value, or only key to match property existence. Matching is case-insensitive.",
+        name: "Property / system context",
+        desc: "Use key=value or key for frontmatter. System fallbacks use @theme=dark, @time=22:00-06:00, @day=weekend, or @schedule=mon-fri 08:00-18:00. Normal note/path/folder/tag/frontmatter wallpaper rules always win before system fallbacks.",
         placeholder: "veil=focus",
       };
     }
