@@ -112,7 +112,7 @@ Within each priority tier, Wallpaper routes are evaluated from top to bottom. Ov
 3. adaptive `@theme`, `@time`, `@day`, or `@schedule` wallpaper fallbacks, first match in list order;
 4. the default appearance.
 
-This means an adaptive rule remains a fallback even if it is visually placed above a note-specific rule. Opacity exclusions remain additive: every matching exclusion can independently keep pane surfaces, pane content, or both at full opacity.
+This means an adaptive rule remains a fallback even if it is visually placed above a note-specific rule. Opacity exclusions are additive: every matching exclusion can independently keep pane surfaces, pane content, or both at full opacity.
 
 ### Import and export
 
