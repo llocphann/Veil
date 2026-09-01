@@ -22,7 +22,7 @@ for (const path of WORKFLOWS) {
 
 void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
-  assert.match(source, /actions\/upload-artifact@v4/);
+  assert.match(source, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
   assert.match(source, /github\.ref == 'refs\/heads\/prerelease'/);
   assert.match(source, /retention-days: 7/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
@@ -36,7 +36,7 @@ void test("release workflow verifies and publishes the required artifacts", () =
   assert.match(source, /fetch-depth: 0/);
   assert.match(source, /Verify release source/);
   assert.match(source, /merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/);
-  assert.match(source, /actions\/attest@v4/);
+  assert.match(source, /actions\/attest@1e69f48acb82d1966a394da916b4c1698aa569d6/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
     assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
   }
