@@ -22,7 +22,11 @@ import {
   type VeilAppearance,
   type VeilSettings,
 } from "./settings";
-import { retainedOutgoingForPending } from "./transition-lifecycle";
+import {
+  retainedOutgoingForPending,
+  shouldRetainWallpaperForUnavailableSource,
+  workingWallpaperFallback,
+} from "./transition-lifecycle";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
 import {
   normalizeWallpaperLibraryState,
@@ -633,12 +637,29 @@ export default class VeilPlugin extends Plugin {
       return;
     }
     const context = this.contextForDocument(document);
+    const current = this.documents.get(document) || null;
     const source = this.sourceForDocument(document, context);
     if (!source) {
+      const resolved = this.resolveForContext(context);
+      const shouldRetain = shouldRetainWallpaperForUnavailableSource(
+        resolved.path,
+        Boolean(resolved.rule || resolved.profile),
+      );
+      const fallback = shouldRetain ? workingWallpaperFallback(current) : null;
+      if (fallback) {
+        if (current && current !== fallback) {
+          current.outgoing = null;
+          this.documents.delete(document);
+          this.disposeState(current);
+          this.documents.set(document, fallback);
+        }
+        this.applyOptions(document, fallback, context, fallback.appearance);
+        return;
+      }
       this.clearDocument(document);
       return;
     }
-    let previous = this.documents.get(document) || null;
+    let previous = current;
     if (previous?.key === source.key && previous.layer.isConnected) {
       this.applyOptions(document, previous, context, source.appearance);
       this.setDocumentStatus(document, `${source.contextLabel} · ${source.label}: ${source.path}`, "success");
@@ -711,7 +732,7 @@ export default class VeilPlugin extends Plugin {
       !activeState.disposed &&
       this.documents.get(document) === activeState;
     const ready = (): void => {
-      if (!isCurrent()) return;
+      if (!isCurrent() || activeState.ready) return;
       activeState.ready = true;
       layer.hidden = false;
       this.applyOptions(document, activeState, this.contextForDocument(document));
