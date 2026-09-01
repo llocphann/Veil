@@ -11,6 +11,10 @@ import {
 void test("fresh installs start without vault-specific appearance state", () => {
   assert.deepEqual(normalizeSettings(null), DEFAULT_SETTINGS);
   assert.equal(DEFAULT_SETTINGS.wallpaperPath, "");
+  assert.equal(DEFAULT_SETTINGS.wallpaperPositionX, 50);
+  assert.equal(DEFAULT_SETTINGS.wallpaperPositionY, 50);
+  assert.equal(DEFAULT_SETTINGS.wallpaperZoom, 100);
+  assert.equal(DEFAULT_SETTINGS.transitionDuration, 320);
   assert.equal(DEFAULT_SETTINGS.opacity, 15);
   assert.equal(DEFAULT_SETTINGS.paneOpacity, 70);
   assert.equal(DEFAULT_SETTINGS.paneContentOpacity, 100);
@@ -22,6 +26,10 @@ void test("fresh installs start without vault-specific appearance state", () => 
 
 void test("settings use bounded numbers and allowed enum values", () => {
   const settings = normalizeSettings({
+    wallpaperPositionX: -20,
+    wallpaperPositionY: 180,
+    wallpaperZoom: 999,
+    transitionDuration: 9999,
     opacity: -10,
     paneOpacity: 180,
     paneContentOpacity: 180,
@@ -38,6 +46,10 @@ void test("settings use bounded numbers and allowed enum values", () => {
     vignetteMode: "bad",
     enabled: "false",
   });
+  assert.equal(settings.wallpaperPositionX, 0);
+  assert.equal(settings.wallpaperPositionY, 100);
+  assert.equal(settings.wallpaperZoom, 200);
+  assert.equal(settings.transitionDuration, 2000);
   assert.equal(settings.opacity, 0);
   assert.equal(settings.paneOpacity, 100);
   assert.equal(settings.paneContentOpacity, 100);
@@ -57,6 +69,9 @@ void test("settings use bounded numbers and allowed enum values", () => {
 
 void test("zero values and disabled toggles survive loading", () => {
   const settings = normalizeSettings({
+    wallpaperPositionX: 0,
+    wallpaperPositionY: 0,
+    transitionDuration: 0,
     opacity: 0,
     paneOpacity: 0,
     paneContentOpacity: 0,
@@ -69,6 +84,9 @@ void test("zero values and disabled toggles survive loading", () => {
     respectReducedMotion: false,
   });
   for (const key of [
+    "wallpaperPositionX",
+    "wallpaperPositionY",
+    "transitionDuration",
     "opacity",
     "paneOpacity",
     "paneContentOpacity",
@@ -79,12 +97,13 @@ void test("zero values and disabled toggles survive loading", () => {
   ] as const) {
     assert.equal(settings[key], 0);
   }
+  assert.equal(settings.wallpaperZoom, 100);
   assert.equal(settings.enabled, false);
   assert.equal(settings.pauseWhenHidden, false);
   assert.equal(settings.respectReducedMotion, false);
 });
 
-void test("older data keeps its values and does not opt in to scenes or whole-pane fading", () => {
+void test("older data keeps its values and receives neutral framing defaults", () => {
   const settings = normalizeSettings({
     opacity: 65,
     paneOpacity: 35,
@@ -93,6 +112,10 @@ void test("older data keeps its values and does not opt in to scenes or whole-pa
   assert.equal(settings.opacity, 65);
   assert.equal(settings.paneOpacity, 35);
   assert.equal(settings.wallpaperPath, "Media/scene.gif");
+  assert.equal(settings.wallpaperPositionX, 50);
+  assert.equal(settings.wallpaperPositionY, 50);
+  assert.equal(settings.wallpaperZoom, 100);
+  assert.equal(settings.transitionDuration, 320);
   assert.equal(settings.paneContentOpacity, 100);
   assert.deepEqual(settings.profiles, []);
 });
@@ -130,6 +153,10 @@ void test("profiles and context rules normalize without losing order or compatib
         id: "focus",
         name: "Focus",
         wallpaperPath: ".\\Media\\focus.webp",
+        wallpaperPositionX: -50,
+        wallpaperPositionY: 140,
+        wallpaperZoom: 240,
+        transitionDuration: -20,
         opacity: 120,
         blurEnabled: true,
         blurIntensity: 80,
@@ -166,6 +193,10 @@ void test("profiles and context rules normalize without losing order or compatib
   });
 
   assert.equal(settings.profiles[0]?.wallpaperPath, "Media/focus.webp");
+  assert.equal(settings.profiles[0]?.wallpaperPositionX, 0);
+  assert.equal(settings.profiles[0]?.wallpaperPositionY, 100);
+  assert.equal(settings.profiles[0]?.wallpaperZoom, 200);
+  assert.equal(settings.profiles[0]?.transitionDuration, 0);
   assert.equal(settings.profiles[0]?.opacity, 100);
   assert.equal(settings.profiles[0]?.blurIntensity, 40);
   assert.deepEqual(settings.wallpaperRules.map((rule) => rule.id), ["same", "same-2"]);
@@ -182,6 +213,10 @@ void test("profiles and context rules normalize without losing order or compatib
 void test("new scenes copy the complete current global appearance", () => {
   const settings = normalizeSettings({
     wallpaperPath: "Media/default.webp",
+    wallpaperPositionX: 28,
+    wallpaperPositionY: 73,
+    wallpaperZoom: 135,
+    transitionDuration: 480,
     opacity: 61,
     paneOpacity: 47,
     blurEnabled: true,
@@ -194,6 +229,10 @@ void test("new scenes copy the complete current global appearance", () => {
 
   assert.equal(profile.name, "Scene 1");
   assert.equal(profile.wallpaperPath, "Media/default.webp");
+  assert.equal(profile.wallpaperPositionX, 28);
+  assert.equal(profile.wallpaperPositionY, 73);
+  assert.equal(profile.wallpaperZoom, 135);
+  assert.equal(profile.transitionDuration, 480);
   assert.equal(profile.opacity, 61);
   assert.equal(profile.paneOpacity, 47);
   assert.equal(profile.blurEnabled, true);
