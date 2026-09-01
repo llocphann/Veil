@@ -39,7 +39,7 @@ import {
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
 import {
-  rewriteWallpaperPoolSelectionPaths,
+  rewriteWallpaperPoolSelectionsForRename,
   wallpaperPoolConfigurationChanges,
 } from "./wallpaper-pool-config";
 import { WallpaperSettingsTab } from "./settings-tab";
@@ -193,11 +193,16 @@ export default class VeilPlugin extends Plugin {
     this.previousPoolSelections.clear();
   }
 
-  public updateSettings(patch: Partial<VeilSettings>, rememberRecent = true): void {
+  public updateSettings(
+    patch: Partial<VeilSettings>,
+    rememberRecent = true,
+    preservedPoolContexts: readonly string[] = [],
+  ): void {
     if (this.unloaded) return;
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
     const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
+    const preservedPoolContextIds = new Set(preservedPoolContexts);
     if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
     this.settings = next;
     if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
@@ -206,6 +211,7 @@ export default class VeilPlugin extends Plugin {
     if (changedPoolContexts.length > 0) {
       this.poolCandidates.clear();
       for (const contextKey of changedPoolContexts) {
+        if (preservedPoolContextIds.has(contextKey)) continue;
         const prefix = `${contextKey}|`;
         for (const key of Array.from(this.poolSelections.keys())) {
           if (key.startsWith(prefix)) this.poolSelections.delete(key);
@@ -454,8 +460,6 @@ export default class VeilPlugin extends Plugin {
           value === oldPath || value.startsWith(`${oldPath}/`)
             ? file.path + value.slice(oldPath.length)
             : value;
-        rewriteWallpaperPoolSelectionPaths(this.poolSelections, rename);
-        rewriteWallpaperPoolSelectionPaths(this.previousPoolSelections, rename);
         const next = normalizeSettings(this.settings, normalizePath);
         let changed = false;
         const wallpaperPath = rename(next.wallpaperPath);
@@ -502,7 +506,22 @@ export default class VeilPlugin extends Plugin {
           || renamedLibrary.recent.join("\n") !== this.wallpaperLibrary.recent.join("\n");
         if (libraryChanged) this.wallpaperLibrary = renamedLibrary;
 
-        if (changed) this.updateSettings(next, false);
+        const preservedPoolContexts = Array.from(new Set([
+          ...rewriteWallpaperPoolSelectionsForRename(
+            this.poolSelections,
+            this.settings,
+            next,
+            rename,
+          ),
+          ...rewriteWallpaperPoolSelectionsForRename(
+            this.previousPoolSelections,
+            this.settings,
+            next,
+            rename,
+          ),
+        ]));
+
+        if (changed) this.updateSettings(next, false, preservedPoolContexts);
         else {
           if (libraryChanged) this.scheduleSave();
           this.refreshWallpaper(selectedPoolPathRenamed);
