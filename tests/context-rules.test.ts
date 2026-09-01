@@ -76,24 +76,24 @@ void test("system theme rules match light or dark mode without requiring frontma
   );
 });
 
-void test("system fallbacks can resolve without an active note context", () => {
-  const previousDocument = globalThis.document;
-  try {
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: {
-        body: {
-          classList: {
-            contains: (value: string) => value === "theme-dark",
-          },
-        },
-      },
-    });
-    assert.equal(contextMatches(wallpaperRule("property", "@theme=dark"), null), true);
-  } finally {
-    if (previousDocument === undefined) delete (globalThis as { document?: unknown }).document;
-    else Object.defineProperty(globalThis, "document", { configurable: true, value: previousDocument });
-  }
+void test("system fallbacks can resolve in a workspace window without an active note", () => {
+  const workspaceContext: NoteContext = {
+    path: "",
+    name: "",
+    basename: "",
+    tags: [],
+    properties: {},
+    theme: "dark",
+    now: context.now,
+  };
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@theme=dark"), workspaceContext),
+    true,
+  );
+  assert.equal(
+    contextMatches(wallpaperRule("property", "@time=22:00-06:00"), workspaceContext),
+    true,
+  );
 });
 
 void test("time, day, and schedule fallbacks use local time and support overnight ranges", () => {
