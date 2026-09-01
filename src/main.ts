@@ -931,6 +931,7 @@ export default class VeilPlugin extends Plugin {
       name: candidate.name,
       basename: candidate.basename,
       tags: cache ? getAllTags(cache) || [] : [],
+      properties: cache?.frontmatter || {},
     };
   }
 
