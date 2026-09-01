@@ -79,7 +79,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (profileKey) {
       const profiles = this.plugin.settings.profiles.map((profile) =>
         profile.id === profileKey.id
-          ? { ...profile, [profileKey.field]: value } as VeilProfile
+          ? { ...profile, [profileKey.field]: value }
           : profile,
       );
       this.plugin.updateSettings({ profiles });
