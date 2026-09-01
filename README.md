@@ -105,7 +105,7 @@ Property rules also expose reserved Veil system-context fallbacks:
 
 Time and schedule values use the computer's local time. Overnight ranges are supported. Day names are case-insensitive and accept common short or long English forms.
 
-Wallpaper routing priority is deliberate:
+Within each priority tier, Wallpaper routes are evaluated from top to bottom. Overall wallpaper routing priority is deliberate:
 
 1. a temporary manual Scene override;
 2. ordinary note/path/folder/tag/frontmatter wallpaper rules, first match in list order;
