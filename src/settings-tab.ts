@@ -38,8 +38,30 @@ const SETTINGS_TABS = [
   { id: "support", label: "Support", icon: "heart" },
 ] as const;
 
+const DYNAMIC_GLOBAL_KEYS = new Set<string>([
+  "wallpaperPoolEnabled",
+  "vignetteMode",
+  "blurEnabled",
+  "dimEnabled",
+  "colorOverlayEnabled",
+  "effectPreset",
+]);
+
+const DYNAMIC_PROFILE_FIELDS = new Set<string>([
+  "name",
+  "wallpaperPath",
+  "wallpaperPoolEnabled",
+  "vignetteMode",
+  "blurEnabled",
+  "dimEnabled",
+  "colorOverlayEnabled",
+  "effectPreset",
+]);
+
 type SettingKey = keyof VeilSettings;
 type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
+
+type RuleKind = "wallpaper" | "opacity";
 
 export class WallpaperSettingsTab extends PluginSettingTab {
   private readonly plugin: VeilPlugin;
@@ -83,16 +105,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           : profile,
       );
       this.plugin.updateSettings({ profiles });
-      if ([
-        "name",
-        "wallpaperPath",
-        "wallpaperPoolEnabled",
-        "vignetteMode",
-        "blurEnabled",
-        "dimEnabled",
-        "colorOverlayEnabled",
-        "effectPreset",
-      ].includes(profileKey.field)) this.update();
+      if (DYNAMIC_PROFILE_FIELDS.has(profileKey.field)) this.update();
       else this.refreshDomState();
       return;
     }
@@ -118,8 +131,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     }
 
     if (!(key in DEFAULT_SETTINGS)) return;
-    this.plugin.updateSettings(normalizeSettings({ ...this.plugin.settings, [key]: value }, normalizePath));
-    this.refreshDomState();
+    const next = normalizeSettings({ ...this.plugin.settings, [key]: value }, normalizePath);
+    this.plugin.updateSettings(next);
+    if (DYNAMIC_GLOBAL_KEYS.has(key)) this.update();
+    else this.refreshDomState();
   }
 
   updateStatus(): void {
@@ -130,6 +145,21 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (this.contextEl?.isConnected) {
       this.contextEl.textContent = this.plugin.activeContextSummary();
     }
+  }
+
+  getSettingDefinitions(): SettingDefinitionItem<string>[] {
+    return [
+      this.tabs(),
+      this.wallpaperDefinitions(),
+      this.sceneDefinitions(),
+      this.activeContextDefinition(),
+      this.wallpaperRuleDefinitions(),
+      this.opacityExclusionDefinitions(),
+      this.effectsDefinitions(),
+      this.videoDefinitions(),
+      this.actionsDefinitions(),
+      this.supportDefinitions(),
+    ];
   }
 
   private rangeSlider(
@@ -216,11 +246,16 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           }
 
           const onKeyDown = (event: KeyboardEvent): void => {
-            if (!new Set(["ArrowLeft", "ArrowRight", "Home", "End"]).has(event.key)) return;
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
             const activeElement = this.containerEl.ownerDocument.activeElement;
-            const currentIndex = Math.max(0, buttons.findIndex((button) => button === activeElement));
+            const currentIndex = Math.max(
+              0,
+              buttons.findIndex((button) => button === activeElement),
+            );
             let nextIndex = currentIndex;
-            if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+            if (event.key === "ArrowLeft") {
+              nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+            }
             if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
             if (event.key === "Home") nextIndex = 0;
             if (event.key === "End") nextIndex = buttons.length - 1;
@@ -238,21 +273,6 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  getSettingDefinitions(): SettingDefinitionItem<string>[] {
-    return [
-      this.tabs(),
-      this.wallpaperDefinitions(),
-      this.sceneDefinitions(),
-      this.activeContextDefinition(),
-      this.wallpaperRuleDefinitions(),
-      this.opacityExclusionDefinitions(),
-      this.effectsDefinitions(),
-      this.videoDefinitions(),
-      this.actionsDefinitions(),
-      this.supportDefinitions(),
-    ];
-  }
-
   private wallpaperDefinitions(): SettingDefinitionItem<string> {
     return {
       type: "group",
@@ -261,7 +281,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       items: [
         {
           name: "Live preview",
-          desc: "Changes preview immediately. Context rules can replace the default wallpaper or switch the complete appearance through a scene.",
+          desc: "Changes preview immediately. Rules can replace only the wallpaper or switch the complete appearance through a scene.",
           searchable: false,
         },
         {
@@ -271,7 +291,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
         {
           name: "Wallpaper file",
-          desc: "Choose an image, GIF, or video from this vault, or enter its vault-relative path. When a pool is enabled, this file also anchors the pool folder.",
+          desc: "Choose an image, GIF, or video from this vault. With a pool enabled, this file anchors the pool folder.",
           control: {
             type: "file",
             key: "wallpaperPath",
@@ -280,8 +300,20 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           },
         },
         {
+          name: "Wallpaper library",
+          desc: "Browse all supported vault media visually, search paths, and manage favorites or recently selected files.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Open library")
+                .setIcon("images")
+                .onClick(() => this.plugin.openWallpaperLibrary()),
+            );
+          },
+        },
+        {
           name: "Wallpaper pool",
-          desc: "Randomly choose from supported media in the selected wallpaper's folder. The choice stays stable until you shuffle or the appearance changes.",
+          desc: "Randomly choose supported media from the selected wallpaper's folder. The choice stays stable until shuffled or the appearance changes.",
           control: { type: "toggle", key: "wallpaperPoolEnabled" },
         },
         {
@@ -334,15 +366,27 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         this.rangeSlider(
           "transitionDuration",
           "Wallpaper transition",
-          "Crossfade duration when a rule, scene, or pool shuffle switches to a different wallpaper. Set to 0 for an instant switch.",
+          "Crossfade duration for rule, scene, and pool changes. Set to 0 for an instant switch.",
           0,
           2000,
           20,
           " ms",
         ),
-        this.slider("opacity", "Wallpaper opacity", "0% hides the wallpaper; 100% shows its full opacity."),
-        this.slider("paneOpacity", "Pane background opacity", "Lower values reveal more wallpaper without fading pane content."),
-        this.slider("paneContentOpacity", "Pane & content opacity", "Fade each pane as one group, including nested backgrounds, text, icons, and images."),
+        this.slider(
+          "opacity",
+          "Wallpaper opacity",
+          "0% hides the wallpaper; 100% shows its full opacity.",
+        ),
+        this.slider(
+          "paneOpacity",
+          "Pane background opacity",
+          "Lower values reveal more wallpaper without fading pane content.",
+        ),
+        this.slider(
+          "paneContentOpacity",
+          "Pane & content opacity",
+          "Fade each outer pane as one group, including nested backgrounds, text, icons, and images.",
+        ),
       ],
     };
   }
@@ -395,12 +439,12 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       items: [
         {
           name: "Scene name",
-          desc: "A short label shown when selecting this scene in a rule.",
+          desc: "A short label shown when selecting this scene in a routing rule.",
           control: { type: "text", key: key("name"), placeholder: `Scene ${index + 1}` },
         },
         {
           name: "Wallpaper file",
-          desc: "Media used whenever a context rule resolves to this scene. With a pool enabled, it anchors the pool folder.",
+          desc: "Media used by this scene. With a pool enabled, it anchors the pool folder.",
           control: {
             type: "file",
             key: key("wallpaperPath"),
@@ -410,7 +454,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
         {
           name: "Wallpaper pool",
-          desc: "Randomly choose from supported media in this scene's wallpaper folder and keep the result stable until shuffled.",
+          desc: "Randomly choose from supported media in this scene's wallpaper folder and keep the choice stable until shuffled.",
           control: { type: "toggle", key: key("wallpaperPoolEnabled") },
         },
         {
@@ -419,156 +463,21 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           control: { type: "toggle", key: key("wallpaperPoolIncludeSubfolders") },
           visible: () => profile.wallpaperPoolEnabled,
         },
-        {
-          name: "Display mode",
-          control: { type: "dropdown", key: key("displayMode"), options: DISPLAY_MODES },
-        },
-        this.slider(
-          key("wallpaperPositionX"),
-          "Horizontal focal point",
-          "Scene-specific horizontal crop focus.",
-        ),
-        this.slider(
-          key("wallpaperPositionY"),
-          "Vertical focal point",
-          "Scene-specific vertical crop focus.",
-        ),
-        this.rangeSlider(
-          key("wallpaperZoom"),
-          "Wallpaper zoom",
-          "Scene-specific wallpaper zoom.",
-          100,
-          200,
-          1,
-          "%",
-        ),
-        this.rangeSlider(
-          key("transitionDuration"),
-          "Wallpaper transition",
-          "Scene-specific crossfade duration, including pool shuffles.",
-          0,
-          2000,
-          20,
-          " ms",
-        ),
-        this.slider(key("opacity"), "Wallpaper opacity", "Scene-specific wallpaper opacity."),
-        this.slider(key("paneOpacity"), "Pane background opacity", "Scene-specific pane surface opacity."),
-        this.slider(key("paneContentOpacity"), "Pane & content opacity", "Scene-specific whole-pane opacity."),
-        {
-          name: "Vignette mode",
-          control: {
-            type: "dropdown",
-            key: key("vignetteMode"),
-            options: { off: "Off", ellipse: "Elliptical", circle: "Circular" },
-          },
-        },
-        this.slider(
-          key("vignetteIntensity"),
-          "Vignette intensity",
-          "Scene-specific edge shading strength.",
-          100,
-          "%",
-          () => profile.vignetteMode === "off",
-        ),
-        this.slider(
-          key("vignetteRadius"),
-          "Vignette radius",
-          "Scene-specific clear center before edge shading begins.",
-          100,
-          "%",
-          () => profile.vignetteMode === "off",
-        ),
-        {
-          name: "Blur",
-          desc: "Blur this scene's wallpaper only.",
-          control: { type: "toggle", key: key("blurEnabled") },
-        },
-        this.slider(
-          key("blurIntensity"),
-          "Blur intensity",
-          "Scene-specific blur radius.",
-          40,
-          " px",
-          () => !profile.blurEnabled,
-        ),
-        {
-          name: "Dim",
-          desc: "Reduce this scene's wallpaper brightness.",
-          control: { type: "toggle", key: key("dimEnabled") },
-        },
-        this.slider(
-          key("dimIntensity"),
-          "Dim intensity",
-          "Scene-specific dim strength.",
-          100,
-          "%",
-          () => !profile.dimEnabled,
-        ),
-        {
-          name: "Color overlay",
-          desc: "Place a color layer over this scene's wallpaper.",
-          control: { type: "toggle", key: key("colorOverlayEnabled") },
-        },
-        {
-          name: "Overlay color",
-          control: { type: "color", key: key("colorOverlayColor") },
-          visible: () => profile.colorOverlayEnabled,
-        },
-        {
-          ...this.slider(
-            key("colorOverlayOpacity"),
-            "Overlay opacity",
-            "Scene-specific color overlay strength.",
-            100,
-            "%",
-            () => !profile.colorOverlayEnabled,
-          ),
-          visible: () => profile.colorOverlayEnabled,
-        },
-        {
-          name: "Overlay blend mode",
-          control: {
-            type: "dropdown",
-            key: key("colorOverlayBlendMode"),
-            options: COLOR_OVERLAY_BLEND_MODES,
-          },
-          visible: () => profile.colorOverlayEnabled,
-        },
-        {
-          name: "Effect preset",
-          desc: "Apply one optimized visual preset to this scene.",
-          control: { type: "dropdown", key: key("effectPreset"), options: EFFECT_PRESETS },
-        },
-        this.slider(
-          key("effectIntensity"),
-          "Effect intensity",
-          "Scene-specific effect strength and animation speed.",
-          100,
-          "%",
-          () => profile.effectPreset === "none",
-        ),
-        {
-          name: "Pause video when hidden",
-          desc: "Avoid decoding this scene's video when its window is hidden.",
-          control: { type: "toggle", key: key("pauseWhenHidden") },
-        },
-        {
-          name: "Respect reduced motion",
-          desc: "Pause video, animated effects, and wallpaper crossfades when reduced motion is requested.",
-          control: { type: "toggle", key: key("respectReducedMotion") },
-        },
+        ...this.sceneAppearanceDefinitions(profile, key),
         {
           name: "Copy current global appearance",
-          desc: "Replace this scene's wallpaper, pool behavior, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
+          desc: "Replace this scene's wallpaper, pool, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
           render: (setting) => {
             setting.addButton((button) =>
-              button.setButtonText("Copy current").onClick(() => this.copyGlobalAppearanceToProfile(profile.id)),
+              button
+                .setButtonText("Copy current")
+                .onClick(() => this.copyGlobalAppearanceToProfile(profile.id)),
             );
           },
         },
         {
           name: "Delete scene",
-          desc: "Rules using it fall back to this scene's wallpaper as an inline rule.",
+          desc: "Rules using it fall back to this scene's wallpaper as a legacy inline rule.",
           render: (setting) => {
             setting.addButton((button) =>
               button
@@ -581,6 +490,160 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
       ],
     };
+  }
+
+  private sceneAppearanceDefinitions(
+    profile: VeilProfile,
+    key: (field: string) => string,
+  ): SettingDefinition<string>[] {
+    return [
+      {
+        name: "Display mode",
+        control: { type: "dropdown", key: key("displayMode"), options: DISPLAY_MODES },
+      },
+      this.slider(
+        key("wallpaperPositionX"),
+        "Horizontal focal point",
+        "Scene-specific horizontal crop focus.",
+      ),
+      this.slider(
+        key("wallpaperPositionY"),
+        "Vertical focal point",
+        "Scene-specific vertical crop focus.",
+      ),
+      this.rangeSlider(
+        key("wallpaperZoom"),
+        "Wallpaper zoom",
+        "Scene-specific wallpaper zoom.",
+        100,
+        200,
+        1,
+        "%",
+      ),
+      this.rangeSlider(
+        key("transitionDuration"),
+        "Wallpaper transition",
+        "Scene-specific crossfade duration, including pool shuffles.",
+        0,
+        2000,
+        20,
+        " ms",
+      ),
+      this.slider(key("opacity"), "Wallpaper opacity", "Scene-specific wallpaper opacity."),
+      this.slider(
+        key("paneOpacity"),
+        "Pane background opacity",
+        "Scene-specific pane surface opacity.",
+      ),
+      this.slider(
+        key("paneContentOpacity"),
+        "Pane & content opacity",
+        "Scene-specific whole-pane opacity.",
+      ),
+      {
+        name: "Vignette mode",
+        control: {
+          type: "dropdown",
+          key: key("vignetteMode"),
+          options: { off: "Off", ellipse: "Elliptical", circle: "Circular" },
+        },
+      },
+      this.slider(
+        key("vignetteIntensity"),
+        "Vignette intensity",
+        "Scene-specific edge shading strength.",
+        100,
+        "%",
+        () => profile.vignetteMode === "off",
+      ),
+      this.slider(
+        key("vignetteRadius"),
+        "Vignette radius",
+        "Scene-specific clear center before edge shading begins.",
+        100,
+        "%",
+        () => profile.vignetteMode === "off",
+      ),
+      {
+        name: "Blur",
+        desc: "Blur this scene's wallpaper only.",
+        control: { type: "toggle", key: key("blurEnabled") },
+      },
+      this.slider(
+        key("blurIntensity"),
+        "Blur intensity",
+        "Scene-specific blur radius.",
+        40,
+        " px",
+        () => !profile.blurEnabled,
+      ),
+      {
+        name: "Dim",
+        desc: "Reduce this scene's wallpaper brightness.",
+        control: { type: "toggle", key: key("dimEnabled") },
+      },
+      this.slider(
+        key("dimIntensity"),
+        "Dim intensity",
+        "Scene-specific dim strength.",
+        100,
+        "%",
+        () => !profile.dimEnabled,
+      ),
+      {
+        name: "Color overlay",
+        desc: "Place a color layer over this scene's wallpaper.",
+        control: { type: "toggle", key: key("colorOverlayEnabled") },
+      },
+      {
+        name: "Overlay color",
+        control: { type: "color", key: key("colorOverlayColor") },
+        visible: () => profile.colorOverlayEnabled,
+      },
+      {
+        ...this.slider(
+          key("colorOverlayOpacity"),
+          "Overlay opacity",
+          "Scene-specific color overlay strength.",
+          100,
+          "%",
+          () => !profile.colorOverlayEnabled,
+        ),
+        visible: () => profile.colorOverlayEnabled,
+      },
+      {
+        name: "Overlay blend mode",
+        control: {
+          type: "dropdown",
+          key: key("colorOverlayBlendMode"),
+          options: COLOR_OVERLAY_BLEND_MODES,
+        },
+        visible: () => profile.colorOverlayEnabled,
+      },
+      {
+        name: "Effect preset",
+        desc: "Apply one optimized visual preset to this scene.",
+        control: { type: "dropdown", key: key("effectPreset"), options: EFFECT_PRESETS },
+      },
+      this.slider(
+        key("effectIntensity"),
+        "Effect intensity",
+        "Scene-specific effect strength and animation speed.",
+        100,
+        "%",
+        () => profile.effectPreset === "none",
+      ),
+      {
+        name: "Pause video when hidden",
+        desc: "Avoid decoding this scene's video while its window is hidden.",
+        control: { type: "toggle", key: key("pauseWhenHidden") },
+      },
+      {
+        name: "Respect reduced motion",
+        desc: "Pause video and motion-heavy effects, and disable crossfades when reduced motion is requested.",
+        control: { type: "toggle", key: key("respectReducedMotion") },
+      },
+    ];
   }
 
   private activeContextDefinition(): SettingDefinitionItem<string> {
@@ -611,7 +674,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       heading: "Wallpaper routing",
       cls: "veil-settings-panel-rules",
       emptyState: "No wallpaper rules. The default appearance applies everywhere.",
-      items: this.plugin.settings.wallpaperRules.map((rule, index) => this.wallpaperRulePage(rule, index)),
+      items: this.plugin.settings.wallpaperRules.map((rule, index) =>
+        this.wallpaperRulePage(rule, index)),
       addItem: {
         name: "Add wallpaper rule",
         action: () => {
@@ -651,7 +715,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         ...this.matchRuleSettings(rule, key),
         {
           name: "Appearance source",
-          desc: "A scene switches the complete appearance and may use a pool. Inline wallpaper preserves 1.3 behavior: it changes only the media and always stays a single wallpaper.",
+          desc: "A scene switches the complete appearance and may use a pool. Inline wallpaper preserves 1.3 behavior and changes only the media.",
           control: { type: "dropdown", key: key("profileId"), options: this.profileOptions() },
         },
         {
@@ -670,7 +734,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           desc: "Remove this route from Veil.",
           render: (setting) => {
             setting.addButton((button) =>
-              button.setButtonText("Delete rule").setIcon("trash-2").setDestructive()
+              button
+                .setButtonText("Delete rule")
+                .setIcon("trash-2")
+                .setDestructive()
                 .onClick(() => this.deleteWallpaperRule(rule.id)),
             );
           },
@@ -685,7 +752,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       heading: "Opacity exclusions",
       cls: "veil-settings-panel-rules",
       emptyState: "No exclusions. The resolved scene or global pane opacity applies everywhere.",
-      items: this.plugin.settings.opacityExclusions.map((rule, index) => this.opacityExclusionPage(rule, index)),
+      items: this.plugin.settings.opacityExclusions.map((rule, index) =>
+        this.opacityExclusionPage(rule, index)),
       addItem: {
         name: "Add opacity exclusion",
         action: () => {
@@ -712,14 +780,20 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private opacityExclusionPage(rule: OpacityExclusionRule, index: number): SettingDefinitionPage<string> {
+  private opacityExclusionPage(
+    rule: OpacityExclusionRule,
+    index: number,
+  ): SettingDefinitionPage<string> {
     const key = (field: string): string => `opacity-rule:${rule.id}:${field}`;
     return {
       type: "page",
       name: rule.matchValue || `Opacity exclusion ${index + 1}`,
       desc: "Keep selected pane layers at full opacity in this context.",
       displayValue: () => rule.enabled ? MATCH_TYPES[rule.matchType] : "Disabled",
-      status: () => !rule.enabled || (rule.matchValue && (rule.excludePaneSurface || rule.excludePaneContent)) ? null : "warning",
+      status: () =>
+        !rule.enabled || (rule.matchValue && (rule.excludePaneSurface || rule.excludePaneContent))
+          ? null
+          : "warning",
       items: [
         ...this.matchRuleSettings(rule, key),
         {
@@ -737,7 +811,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           desc: "Remove this exclusion from Veil.",
           render: (setting) => {
             setting.addButton((button) =>
-              button.setButtonText("Delete rule").setIcon("trash-2").setDestructive()
+              button
+                .setButtonText("Delete rule")
+                .setIcon("trash-2")
+                .setDestructive()
                 .onClick(() => this.deleteOpacityRule(rule.id)),
             );
           },
@@ -746,12 +823,16 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private matchRuleSettings(rule: ContextRule, key: (field: string) => string): SettingDefinition<string>[] {
+  private matchRuleSettings(
+    rule: ContextRule,
+    key: (field: string) => string,
+  ): SettingDefinition<string>[] {
+    const textConfig = this.matchValueConfig(rule.matchType);
     return [
       { name: "Enabled", control: { type: "toggle", key: key("enabled") } },
       {
         name: "Match by",
-        desc: "Tag rules also match nested tags. Folder rules include every descendant file.",
+        desc: "Folder rules include descendants; tag rules include nested tags; property rules read YAML/frontmatter from Obsidian's metadata cache.",
         control: { type: "dropdown", key: key("matchType"), options: MATCH_TYPES },
       },
       {
@@ -761,18 +842,49 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         visible: () => rule.matchType === "path",
       },
       {
-        name: rule.matchType === "note" ? "Note name" : rule.matchType === "folder" ? "Folder path" : "Tag",
-        desc: rule.matchType === "note"
-          ? "The note name is matched without requiring the .md extension."
-          : rule.matchType === "folder" ? "Use a vault-relative folder path." : "A leading # is optional.",
+        name: textConfig.name,
+        desc: textConfig.desc,
         control: {
           type: "text",
           key: key("matchValue"),
-          placeholder: rule.matchType === "note" ? "Homepage" : rule.matchType === "folder" ? "Projects" : "#media/movies",
+          placeholder: textConfig.placeholder,
         },
         visible: () => rule.matchType !== "path",
       },
     ];
+  }
+
+  private matchValueConfig(matchType: MatchType): {
+    name: string;
+    desc: string;
+    placeholder: string;
+  } {
+    if (matchType === "note") {
+      return {
+        name: "Note name",
+        desc: "The note name is matched without requiring the .md extension.",
+        placeholder: "Homepage",
+      };
+    }
+    if (matchType === "folder") {
+      return {
+        name: "Folder path",
+        desc: "Use a vault-relative folder path. Every descendant note is included.",
+        placeholder: "Projects",
+      };
+    }
+    if (matchType === "property") {
+      return {
+        name: "Frontmatter property",
+        desc: "Use key=value to match a scalar or array value, or only key to match property existence. Matching is case-insensitive.",
+        placeholder: "veil=focus",
+      };
+    }
+    return {
+      name: "Tag",
+      desc: "A leading # is optional. Parent tags also match nested tags.",
+      placeholder: "#media/movies",
+    };
   }
 
   private effectsDefinitions(): SettingDefinitionItem<string> {
@@ -784,21 +896,83 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         {
           name: "Vignette mode",
           desc: "Shade the edges using the active theme's shadow palette.",
-          control: { type: "dropdown", key: "vignetteMode", options: { off: "Off", ellipse: "Elliptical", circle: "Circular" } },
+          control: {
+            type: "dropdown",
+            key: "vignetteMode",
+            options: { off: "Off", ellipse: "Elliptical", circle: "Circular" },
+          },
         },
-        this.slider("vignetteIntensity", "Vignette intensity", "Strength of the edge shading.", 100, "%", () => this.plugin.settings.vignetteMode === "off"),
-        this.slider("vignetteRadius", "Vignette radius", "Clear center before shading begins.", 100, "%", () => this.plugin.settings.vignetteMode === "off"),
-        { name: "Blur", desc: "Blur the wallpaper only. High values use more GPU resources.", control: { type: "toggle", key: "blurEnabled" } },
-        this.slider("blurIntensity", "Blur intensity", "Blur radius in pixels.", 40, " px", () => !this.plugin.settings.blurEnabled),
-        { name: "Dim", desc: "Reduce wallpaper brightness without dimming the interface.", control: { type: "toggle", key: "dimEnabled" } },
-        this.slider("dimIntensity", "Dim intensity", "0% keeps original brightness; 100% darkens completely.", 100, "%", () => !this.plugin.settings.dimEnabled),
-        { name: "Color overlay", desc: "Place a color layer over the wallpaper.", control: { type: "toggle", key: "colorOverlayEnabled" } },
-        { name: "Overlay color", control: { type: "color", key: "colorOverlayColor" }, visible: () => this.plugin.settings.colorOverlayEnabled },
-        { ...this.slider("colorOverlayOpacity", "Overlay opacity", "Strength of the selected color layer.", 100, "%", () => !this.plugin.settings.colorOverlayEnabled), visible: () => this.plugin.settings.colorOverlayEnabled },
+        this.slider(
+          "vignetteIntensity",
+          "Vignette intensity",
+          "Strength of the edge shading.",
+          100,
+          "%",
+          () => this.plugin.settings.vignetteMode === "off",
+        ),
+        this.slider(
+          "vignetteRadius",
+          "Vignette radius",
+          "Clear center before shading begins.",
+          100,
+          "%",
+          () => this.plugin.settings.vignetteMode === "off",
+        ),
+        {
+          name: "Blur",
+          desc: "Blur the wallpaper only. High values use more GPU resources.",
+          control: { type: "toggle", key: "blurEnabled" },
+        },
+        this.slider(
+          "blurIntensity",
+          "Blur intensity",
+          "Blur radius in pixels.",
+          40,
+          " px",
+          () => !this.plugin.settings.blurEnabled,
+        ),
+        {
+          name: "Dim",
+          desc: "Reduce wallpaper brightness without dimming the interface.",
+          control: { type: "toggle", key: "dimEnabled" },
+        },
+        this.slider(
+          "dimIntensity",
+          "Dim intensity",
+          "0% keeps original brightness; 100% darkens completely.",
+          100,
+          "%",
+          () => !this.plugin.settings.dimEnabled,
+        ),
+        {
+          name: "Color overlay",
+          desc: "Place a color layer over the wallpaper.",
+          control: { type: "toggle", key: "colorOverlayEnabled" },
+        },
+        {
+          name: "Overlay color",
+          control: { type: "color", key: "colorOverlayColor" },
+          visible: () => this.plugin.settings.colorOverlayEnabled,
+        },
+        {
+          ...this.slider(
+            "colorOverlayOpacity",
+            "Overlay opacity",
+            "Strength of the selected color layer.",
+            100,
+            "%",
+            () => !this.plugin.settings.colorOverlayEnabled,
+          ),
+          visible: () => this.plugin.settings.colorOverlayEnabled,
+        },
         {
           name: "Overlay blend mode",
           desc: "Color preserves image detail most closely; other modes alter brightness and contrast.",
-          control: { type: "dropdown", key: "colorOverlayBlendMode", options: COLOR_OVERLAY_BLEND_MODES },
+          control: {
+            type: "dropdown",
+            key: "colorOverlayBlendMode",
+            options: COLOR_OVERLAY_BLEND_MODES,
+          },
           visible: () => this.plugin.settings.colorOverlayEnabled,
         },
         {
@@ -806,7 +980,14 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           desc: "Apply one optimized preset at a time.",
           control: { type: "dropdown", key: "effectPreset", options: EFFECT_PRESETS },
         },
-        this.slider("effectIntensity", "Effect intensity", "Strength and animated update speed.", 100, "%", () => this.plugin.settings.effectPreset === "none"),
+        this.slider(
+          "effectIntensity",
+          "Effect intensity",
+          "Strength and animated update speed.",
+          100,
+          "%",
+          () => this.plugin.settings.effectPreset === "none",
+        ),
         {
           name: "Performance guide",
           desc: "Overlay, dim, and vignette are low cost. Retro is low to moderate. Blur is GPU-heavy at high radius. Glitch and TV noise animate continuously.",
@@ -827,8 +1008,16 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           desc: "Videos loop silently. Web formats work most broadly; other formats depend on codecs in the local Obsidian runtime.",
           searchable: false,
         },
-        { name: "Pause video when the app is hidden", desc: "Avoid decoding video when a window is not visible.", control: { type: "toggle", key: "pauseWhenHidden" } },
-        { name: "Respect reduced motion", desc: "Pause video, animated effects, and wallpaper crossfades when the operating system requests reduced motion. GIF files cannot be paused.", control: { type: "toggle", key: "respectReducedMotion" } },
+        {
+          name: "Pause video when the app is hidden",
+          desc: "Avoid decoding video while a window is not visible.",
+          control: { type: "toggle", key: "pauseWhenHidden" },
+        },
+        {
+          name: "Respect reduced motion",
+          desc: "Pause video and motion-heavy effects, and disable wallpaper crossfades when the operating system requests reduced motion. GIF files cannot be paused.",
+          control: { type: "toggle", key: "respectReducedMotion" },
+        },
       ],
     };
   }
@@ -840,33 +1029,74 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       cls: "veil-settings-panel-actions",
       items: [
         {
+          name: "Open wallpaper library",
+          desc: "Browse supported media with Favorites and Recently Selected filters.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Open library")
+                .setIcon("images")
+                .onClick(() => this.plugin.openWallpaperLibrary()),
+            );
+          },
+        },
+        {
           name: "Reload wallpaper",
           desc: "Retry loading the current file or a video whose autoplay was blocked.",
-          render: (setting) => { setting.addButton((button) => button.setButtonText("Reload").onClick(() => this.plugin.refreshWallpaper(true))); },
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Reload")
+                .onClick(() => this.plugin.refreshWallpaper(true)),
+            );
+          },
         },
         {
           name: "Shuffle wallpaper pool",
-          desc: "Choose a different wallpaper for the active default appearance or scene. The previous choice is avoided when the pool has multiple files.",
-          render: (setting) => { setting.addButton((button) => button.setButtonText("Shuffle").setIcon("shuffle").onClick(() => this.plugin.shuffleWallpaperPool())); },
+          desc: "Choose another wallpaper for the active default appearance or scene, avoiding the previous choice when possible.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Shuffle")
+                .setIcon("shuffle")
+                .onClick(() => this.plugin.shuffleWallpaperPool()),
+            );
+          },
         },
         {
           name: "Export settings",
-          desc: "Download a schema-versioned JSON backup containing settings, scenes, and rules. Media files are not embedded.",
-          render: (setting) => { setting.addButton((button) => button.setButtonText("Export").setIcon("download").onClick(() => this.exportSettings())); },
+          desc: "Download a schema-versioned JSON backup containing settings, scenes, and rules. Media files and local library history are not embedded.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Export")
+                .setIcon("download")
+                .onClick(() => this.exportSettings()),
+            );
+          },
         },
         {
           name: "Import settings",
-          desc: "Replace the current configuration with a validated backup. Schema 1 exports migrate automatically.",
-          render: (setting) => { setting.addButton((button) => button.setButtonText("Import").setIcon("upload").onClick(() => this.chooseImportFile())); },
+          desc: "Replace the portable configuration with a validated backup. Schema 1 exports migrate automatically; local Favorites and Recently Selected remain local.",
+          render: (setting) => {
+            setting.addButton((button) =>
+              button
+                .setButtonText("Import")
+                .setIcon("upload")
+                .onClick(() => this.chooseImportFile()),
+            );
+          },
         },
         {
           name: "Restore defaults",
-          desc: "Clear the wallpaper, scenes, and rules and restore default appearance values. No media files are changed.",
+          desc: "Clear the wallpaper, scenes, and rules and restore default appearance values. Media files and local library metadata are not changed.",
           render: (setting) => {
-            setting.addButton((button) => button.setButtonText("Restore").onClick(() => {
-              this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
-              void this.plugin.flushSettings().then(() => this.update());
-            }));
+            setting.addButton((button) =>
+              button.setButtonText("Restore").onClick(() => {
+                this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
+                void this.plugin.flushSettings().then(() => this.update());
+              }),
+            );
           },
         },
       ],
@@ -885,7 +1115,12 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         render: (setting) => {
           const link = setting.controlEl.createEl("a", {
             cls: "veil-support-link",
-            attr: { href: FUNDING_URL, target: "_blank", rel: "noopener noreferrer", "aria-label": "Buy me a coffee" },
+            attr: {
+              href: FUNDING_URL,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              "aria-label": "Buy me a coffee",
+            },
           });
           const icon = link.createSpan({ cls: "veil-support-link-icon" });
           setIcon(icon, "coffee");
@@ -896,8 +1131,12 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private profileOptions(): Record<string, string> {
-    const options: Record<string, string> = { "": "Inline wallpaper — use global appearance" };
-    for (const profile of this.plugin.settings.profiles) options[profile.id] = profile.name || profile.id;
+    const options: Record<string, string> = {
+      "": "Inline wallpaper — use global appearance",
+    };
+    for (const profile of this.plugin.settings.profiles) {
+      options[profile.id] = profile.name || profile.id;
+    }
     return options;
   }
 
@@ -910,11 +1149,15 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     return Boolean(file && mediaKind(file));
   }
 
-  private parseRuleKey(key: string): { kind: "wallpaper" | "opacity"; id: string; field: string } | null {
+  private parseRuleKey(key: string): { kind: RuleKind; id: string; field: string } | null {
     const [prefix, id, ...fieldParts] = key.split(":");
     if (!id || fieldParts.length === 0) return null;
     if (prefix !== "wallpaper-rule" && prefix !== "opacity-rule") return null;
-    return { kind: prefix === "wallpaper-rule" ? "wallpaper" : "opacity", id, field: fieldParts.join(":") };
+    return {
+      kind: prefix === "wallpaper-rule" ? "wallpaper" : "opacity",
+      id,
+      field: fieldParts.join(":"),
+    };
   }
 
   private parseProfileKey(key: string): { id: string; field: string } | null {
@@ -923,7 +1166,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     return { id, field: fieldParts.join(":") };
   }
 
-  private findRule(kind: "wallpaper" | "opacity", id: string): WallpaperRule | OpacityExclusionRule | undefined {
+  private findRule(
+    kind: RuleKind,
+    id: string,
+  ): WallpaperRule | OpacityExclusionRule | undefined {
     return kind === "wallpaper"
       ? this.plugin.settings.wallpaperRules.find((rule) => rule.id === id)
       : this.plugin.settings.opacityExclusions.find((rule) => rule.id === id);
@@ -933,17 +1179,40 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     return this.plugin.settings.profiles.find((profile) => profile.id === id);
   }
 
-  private setRuleValue(rule: WallpaperRule | OpacityExclusionRule, field: string, value: unknown): void {
-    if (field === "enabled") { rule.enabled = value === true; return; }
-    if (field === "excludePaneSurface" && "excludePaneSurface" in rule) { rule.excludePaneSurface = value === true; return; }
-    if (field === "excludePaneContent" && "excludePaneContent" in rule) { rule.excludePaneContent = value === true; return; }
-    if (field === "matchType") {
-      rule.matchType = Object.keys(MATCH_TYPES).includes(String(value)) ? value as MatchType : "path";
+  private setRuleValue(
+    rule: WallpaperRule | OpacityExclusionRule,
+    field: string,
+    value: unknown,
+  ): void {
+    if (field === "enabled") {
+      rule.enabled = value === true;
       return;
     }
-    if (field === "matchValue") { rule.matchValue = typeof value === "string" ? value : ""; return; }
-    if (field === "profileId" && "profileId" in rule) { rule.profileId = typeof value === "string" ? value : ""; return; }
-    if (field === "wallpaperPath" && "wallpaperPath" in rule) rule.wallpaperPath = typeof value === "string" ? value : "";
+    if (field === "excludePaneSurface" && "excludePaneSurface" in rule) {
+      rule.excludePaneSurface = value === true;
+      return;
+    }
+    if (field === "excludePaneContent" && "excludePaneContent" in rule) {
+      rule.excludePaneContent = value === true;
+      return;
+    }
+    if (field === "matchType") {
+      rule.matchType = Object.keys(MATCH_TYPES).includes(String(value))
+        ? value as MatchType
+        : "path";
+      return;
+    }
+    if (field === "matchValue") {
+      rule.matchValue = typeof value === "string" ? value : "";
+      return;
+    }
+    if (field === "profileId" && "profileId" in rule) {
+      rule.profileId = typeof value === "string" ? value : "";
+      return;
+    }
+    if (field === "wallpaperPath" && "wallpaperPath" in rule) {
+      rule.wallpaperPath = typeof value === "string" ? value : "";
+    }
   }
 
   private copyGlobalAppearanceToProfile(id: string): void {
@@ -951,7 +1220,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (!current) return;
     const copied = createProfile([], this.plugin.settings);
     const profile: VeilProfile = { ...copied, id: current.id, name: current.name };
-    const profiles = this.plugin.settings.profiles.map((candidate) => candidate.id === id ? profile : candidate);
+    const profiles = this.plugin.settings.profiles.map((candidate) =>
+      candidate.id === id ? profile : candidate);
     this.plugin.updateSettings({ profiles });
     void this.plugin.flushSettings().then(() => this.update());
   }
@@ -961,7 +1231,9 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (!profile) return;
     const profiles = this.plugin.settings.profiles.filter((candidate) => candidate.id !== id);
     const wallpaperRules = this.plugin.settings.wallpaperRules.map((rule) =>
-      rule.profileId === id ? { ...rule, profileId: "", wallpaperPath: profile.wallpaperPath } : rule,
+      rule.profileId === id
+        ? { ...rule, profileId: "", wallpaperPath: profile.wallpaperPath }
+        : rule,
     );
     this.plugin.updateSettings({ profiles, wallpaperRules });
     void this.plugin.flushSettings().then(() => this.update());
@@ -990,7 +1262,10 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     link.download = `veil-settings-${new Date().toISOString().slice(0, 10)}.json`;
     link.hidden = true;
     link.click();
-    window.setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 0);
+    window.setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 0);
     new Notice("Veil settings exported.");
   }
 
@@ -1003,14 +1278,20 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     input.addEventListener("cancel", cleanup, { once: true });
     input.addEventListener("change", () => {
       const file = input.files?.[0];
-      if (!file) { cleanup(); return; }
+      if (!file) {
+        cleanup();
+        return;
+      }
       void this.importSettings(file).finally(cleanup);
     }, { once: true });
     input.click();
   }
 
   private async importSettings(file: File): Promise<void> {
-    if (file.size > MAX_IMPORT_BYTES) { new Notice("Veil settings import is limited to one megabyte."); return; }
+    if (file.size > MAX_IMPORT_BYTES) {
+      new Notice("Veil settings import is limited to one megabyte.");
+      return;
+    }
     try {
       const imported = parseVeilSettingsImport(await file.text(), normalizePath);
       this.plugin.updateSettings(imported);
