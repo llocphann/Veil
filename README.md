@@ -13,14 +13,14 @@ Veil places a vault-local image, animated GIF, or video behind the Obsidian work
 ## Features
 
 - Pick an image, animated GIF, or video directly from the current vault.
-- Create reusable **Scenes** that bundle wallpaper, pool behavior, framing, opacity, effects, transition, and video behavior.
+- Create reusable **Scenes** that bundle wallpaper, pool behavior, framing, opacity, effects, transition, and video behavior, then duplicate a Scene when you want a variation without rebuilding it.
 - Route an inline wallpaper or a complete Scene by note name, exact path, folder, tag, or frontmatter property.
 - Add adaptive fallback routes for light/dark theme, local time, day of week, or combined schedules.
 - Temporarily override all automatic routing with the command-palette **Switch scene** action, then return to **Follow context rules**.
 - Build random wallpaper pools from a selected file's folder, optionally including descendant folders, with stable per-context choices and explicit shuffle.
-- Browse supported media in a lazy visual Wallpaper Library with search, Favorites, and Recently Selected.
+- Browse supported media in a lazy visual Wallpaper Library with search, Favorites, Recently Selected, folder/media filters, sorting, and random selection; apply a choice directly to the default appearance, a Scene, or an inline rule.
 - Adjust horizontal/vertical focal point, 100–200% zoom, fill/fit/center/stretch/scale-down sizing, and wallpaper opacity.
-- Crossfade safely between wallpapers while retaining the previous media if the incoming file fails to load.
+- Crossfade safely between wallpapers while retaining the previous media if the incoming file fails to load or navigation changes again before the next wallpaper is ready.
 - Adjust pane-surface opacity independently or fade each outer pane and its descendants as one visual group.
 - Add elliptical/circular vignette, blur, dim, color overlay, retro film, glitch, or TV-noise effects.
 - Apply settings to the main desktop window and Obsidian pop-out windows.
@@ -61,15 +61,15 @@ Open **Settings → Community plugins → Veil**. The **Wallpaper** tab controls
 
 A Scene stores a complete appearance rather than only a wallpaper path. This includes pool settings, focal point and zoom, display mode, wallpaper/pane opacity, transition duration, vignette, blur/dim, color overlay, effect preset, and video/reduced-motion behavior.
 
-Create a Scene from the current global appearance, customize it, then select that Scene as the appearance source of a wallpaper route. Legacy-style inline routes remain available and intentionally preserve Veil 1.3 semantics: they replace only the media while using the global appearance and do not inherit the global wallpaper pool.
+Create a Scene from the current global appearance, customize it, then select that Scene as the appearance source of a wallpaper route. Use **Duplicate scene** to create an independent copy with a new ID and the same complete appearance, which is useful for making variants. Veil accepts up to 64 Scenes. Legacy-style inline routes remain available and intentionally preserve Veil 1.3 semantics: they replace only the media while using the global appearance and do not inherit the global wallpaper pool.
 
 Use **Veil: Switch scene** from the command palette for a session-only manual Scene override. Manual override has the highest priority and is never written into settings; choose **Follow context rules** to resume automatic routing.
 
 ### Wallpaper pools and library
 
-Enable **Wallpaper pool** on the default appearance or a Scene to choose randomly from supported media in the selected wallpaper's folder. The chosen item remains stable for that context until the pool is shuffled or its configuration changes. **Include subfolders** extends discovery to descendants.
+Enable **Wallpaper pool** on the default appearance or a Scene to choose randomly from supported media in the selected wallpaper's folder. The chosen item remains stable for that context until the pool is shuffled or that specific appearance's pool anchor/scope changes. Editing opacity, effects, or an unrelated Scene does not reroll the current pool choice. **Include subfolders** extends discovery to descendants.
 
-Use **Wallpaper Library** from Settings or the command palette to browse vault media visually. Image thumbnails load lazily; videos use lightweight placeholders so opening a large library does not start decoding every video.
+Use **Wallpaper Library** from Settings or the command palette to browse vault media visually. Image thumbnails load lazily; videos use lightweight placeholders so opening a large library does not start decoding every video. You can search paths, filter by top-level folder or media type, sort by name or modification time, choose randomly from the current filtered results, and select an **Apply to** target for the default appearance, a Scene, or a legacy inline wallpaper rule.
 
 ### Routing rules
 
@@ -126,7 +126,7 @@ Veil is event-driven and does not poll the vault. Repeated workspace refreshes a
 
 Adaptive scheduling also avoids interval polling. Theme changes react to Obsidian's CSS-change event. For `@time`, `@day`, and `@schedule`, Veil computes the next meaningful boundary and keeps a single one-shot timer until that boundary; if no scheduled rule exists, no scheduling timer exists.
 
-Wallpaper transitions use double buffering: the current wallpaper remains visible until the incoming media has successfully loaded. A failed incoming image/video restores the previous working wallpaper instead of leaving a blank background.
+Wallpaper transitions use double buffering: the current wallpaper remains visible until the incoming media has successfully loaded. A failed incoming image/video restores the previous working wallpaper instead of leaving a blank background. Rapid navigation also retains the last ready wallpaper while intermediate requested media is still preloading.
 
 Effect cost depends on media size, window resolution, and graphics hardware:
 
