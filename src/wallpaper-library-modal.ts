@@ -8,12 +8,19 @@ type LibrarySort = "default" | "name" | "newest" | "oldest";
 
 const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_STEP = 60;
+const ALL_FOLDERS = "__all__";
+const ROOT_FOLDER = "__root__";
 
 interface WallpaperLibraryController {
   getSelectedPath: () => string;
   getState: () => WallpaperLibraryState;
   selectWallpaper: (path: string) => void;
   toggleFavorite: (path: string) => void;
+}
+
+function topLevelFolder(path: string): string {
+  const separator = path.indexOf("/");
+  return separator < 0 ? ROOT_FOLDER : path.slice(0, separator);
 }
 
 export class WallpaperLibraryModal extends Modal {
@@ -23,6 +30,7 @@ export class WallpaperLibraryModal extends Modal {
   private view: LibraryView = "all";
   private kind: LibraryKind = "all";
   private sort: LibrarySort = "default";
+  private folderScope = ALL_FOLDERS;
   private visibleLimit = INITIAL_VISIBLE_ITEMS;
   private gridEl: HTMLElement | null = null;
   private summaryEl: HTMLElement | null = null;
@@ -80,6 +88,29 @@ export class WallpaperLibraryModal extends Modal {
       });
       this.filterButtons.set(view, button);
     }
+
+    const folderSelect = toolbar.createEl("select", {
+      cls: "veil-wallpaper-library-folder",
+      attr: { "aria-label": "Filter wallpaper folder" },
+    });
+    folderSelect.createEl("option", { value: ALL_FOLDERS, text: "All folders" });
+    const folders = Array.from(new Set(this.files.map((file) => topLevelFolder(file.path))))
+      .sort((left, right) => {
+        if (left === ROOT_FOLDER) return -1;
+        if (right === ROOT_FOLDER) return 1;
+        return left.localeCompare(right);
+      });
+    for (const folder of folders) {
+      folderSelect.createEl("option", {
+        value: folder,
+        text: folder === ROOT_FOLDER ? "Vault root" : folder,
+      });
+    }
+    folderSelect.value = this.folderScope;
+    folderSelect.addEventListener("change", () => {
+      this.folderScope = folderSelect.value || ALL_FOLDERS;
+      this.resetVisibleLimit();
+    });
 
     const kindSelect = toolbar.createEl("select", {
       cls: "veil-wallpaper-library-kind",
@@ -172,6 +203,9 @@ export class WallpaperLibraryModal extends Modal {
           - (recentOrder.get(right.path) ?? Number.MAX_SAFE_INTEGER));
     }
 
+    if (this.folderScope !== ALL_FOLDERS) {
+      files = files.filter((file) => topLevelFolder(file.path) === this.folderScope);
+    }
     if (this.kind !== "all") {
       files = files.filter((file) => mediaKind(file) === this.kind);
     }
