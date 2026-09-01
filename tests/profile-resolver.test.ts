@@ -9,6 +9,7 @@ const context: NoteContext = {
   name: "Alpha.md",
   basename: "Alpha",
   tags: ["#focus"],
+  properties: { veil: "focus" },
 };
 
 void test("profile-backed rules switch the complete appearance", () => {
@@ -81,6 +82,7 @@ void test("unmatched contexts use the global default appearance", () => {
     name: "Today.md",
     basename: "Today",
     tags: [],
+    properties: {},
   };
 
   const resolved = resolveWallpaper(settings, otherContext);
