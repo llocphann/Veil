@@ -248,9 +248,34 @@ export default class VeilPlugin extends Plugin {
 
   public openWallpaperLibrary(): void {
     new WallpaperLibraryModal(this.app, {
-      getSelectedPath: () => this.settings.wallpaperPath,
+      getTargets: () => [
+        {
+          id: "",
+          label: "Default appearance",
+          selectedPath: this.settings.wallpaperPath,
+        },
+        ...this.settings.profiles.map((profile) => ({
+          id: profile.id,
+          label: `Scene: ${profile.name || profile.id}`,
+          selectedPath: profile.wallpaperPath,
+        })),
+      ],
       getState: () => this.wallpaperLibrary,
-      selectWallpaper: (path) => this.updateSettings({ wallpaperPath: path }),
+      selectWallpaper: (targetId, path) => {
+        if (!targetId) {
+          this.updateSettings({ wallpaperPath: path });
+          return;
+        }
+        const profileExists = this.settings.profiles.some((profile) => profile.id === targetId);
+        if (!profileExists) {
+          this.updateSettings({ wallpaperPath: path });
+          return;
+        }
+        const profiles = this.settings.profiles.map((profile) =>
+          profile.id === targetId ? { ...profile, wallpaperPath: path } : profile,
+        );
+        this.updateSettings({ profiles });
+      },
       toggleFavorite: (path) => {
         this.wallpaperLibrary = toggleFavoriteWallpaper(this.wallpaperLibrary, path, normalizePath);
         this.scheduleSave();
@@ -288,7 +313,7 @@ export default class VeilPlugin extends Plugin {
 
   private setManualScene(profileId: string): void {
     if (profileId && !this.settings.profiles.some((profile) => profile.id === profileId)) {
-      new Notice("That Veil scene no longer exists.");
+      new Notice("That veil scene no longer exists.");
       return;
     }
     if (this.manualProfileId === profileId) return;
