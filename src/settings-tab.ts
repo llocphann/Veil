@@ -83,7 +83,15 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           : profile,
       );
       this.plugin.updateSettings({ profiles });
-      if (["name", "wallpaperPath"].includes(profileKey.field)) this.update();
+      if ([
+        "name",
+        "wallpaperPath",
+        "vignetteMode",
+        "blurEnabled",
+        "dimEnabled",
+        "colorOverlayEnabled",
+        "effectPreset",
+      ].includes(profileKey.field)) this.update();
       else this.refreshDomState();
       return;
     }
@@ -123,12 +131,14 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     }
   }
 
-  private slider(
+  private rangeSlider(
     key: string,
     name: string,
     desc: string,
-    maximum = 100,
-    unit = "%",
+    minimum: number,
+    maximum: number,
+    step: number,
+    unit: string,
     disabled?: () => boolean,
   ): SettingDefinition<string> {
     return {
@@ -137,13 +147,24 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       control: {
         type: "slider",
         key,
-        min: 0,
+        min: minimum,
         max: maximum,
-        step: 1,
+        step,
         displayFormat: (value) => `${value}${unit}`,
         disabled,
       },
     };
+  }
+
+  private slider(
+    key: string,
+    name: string,
+    desc: string,
+    maximum = 100,
+    unit = "%",
+    disabled?: () => boolean,
+  ): SettingDefinition<string> {
+    return this.rangeSlider(key, name, desc, 0, maximum, 1, unit, disabled);
   }
 
   private tabs(): SettingDefinitionItem<string> {
@@ -279,6 +300,34 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           desc: "The same sizing rules apply to every supported media type.",
           control: { type: "dropdown", key: "displayMode", options: DISPLAY_MODES },
         },
+        this.slider(
+          "wallpaperPositionX",
+          "Horizontal focal point",
+          "Move the crop focus from the left edge (0%) to the right edge (100%).",
+        ),
+        this.slider(
+          "wallpaperPositionY",
+          "Vertical focal point",
+          "Move the crop focus from the top edge (0%) to the bottom edge (100%).",
+        ),
+        this.rangeSlider(
+          "wallpaperZoom",
+          "Wallpaper zoom",
+          "Zoom into the wallpaper while keeping the selected focal point anchored.",
+          100,
+          200,
+          1,
+          "%",
+        ),
+        this.rangeSlider(
+          "transitionDuration",
+          "Wallpaper transition",
+          "Crossfade duration when a rule or scene switches to a different wallpaper. Set to 0 for an instant switch.",
+          0,
+          2000,
+          20,
+          " ms",
+        ),
         this.slider("opacity", "Wallpaper opacity", "0% hides the wallpaper; 100% shows its full opacity."),
         this.slider("paneOpacity", "Pane background opacity", "Lower values reveal more wallpaper without fading pane content."),
         this.slider("paneContentOpacity", "Pane & content opacity", "Fade each pane as one group, including nested backgrounds, text, icons, and images."),
@@ -351,17 +400,143 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           name: "Display mode",
           control: { type: "dropdown", key: key("displayMode"), options: DISPLAY_MODES },
         },
+        this.slider(
+          key("wallpaperPositionX"),
+          "Horizontal focal point",
+          "Scene-specific horizontal crop focus.",
+        ),
+        this.slider(
+          key("wallpaperPositionY"),
+          "Vertical focal point",
+          "Scene-specific vertical crop focus.",
+        ),
+        this.rangeSlider(
+          key("wallpaperZoom"),
+          "Wallpaper zoom",
+          "Scene-specific wallpaper zoom.",
+          100,
+          200,
+          1,
+          "%",
+        ),
+        this.rangeSlider(
+          key("transitionDuration"),
+          "Wallpaper transition",
+          "Scene-specific crossfade duration.",
+          0,
+          2000,
+          20,
+          " ms",
+        ),
         this.slider(key("opacity"), "Wallpaper opacity", "Scene-specific wallpaper opacity."),
         this.slider(key("paneOpacity"), "Pane background opacity", "Scene-specific pane surface opacity."),
         this.slider(key("paneContentOpacity"), "Pane & content opacity", "Scene-specific whole-pane opacity."),
         {
-          name: "Scene effects",
-          desc: this.sceneEffectsSummary(profile),
-          searchable: false,
+          name: "Vignette mode",
+          control: {
+            type: "dropdown",
+            key: key("vignetteMode"),
+            options: { off: "Off", ellipse: "Elliptical", circle: "Circular" },
+          },
+        },
+        this.slider(
+          key("vignetteIntensity"),
+          "Vignette intensity",
+          "Scene-specific edge shading strength.",
+          100,
+          "%",
+          () => profile.vignetteMode === "off",
+        ),
+        this.slider(
+          key("vignetteRadius"),
+          "Vignette radius",
+          "Scene-specific clear center before edge shading begins.",
+          100,
+          "%",
+          () => profile.vignetteMode === "off",
+        ),
+        {
+          name: "Blur",
+          desc: "Blur this scene's wallpaper only.",
+          control: { type: "toggle", key: key("blurEnabled") },
+        },
+        this.slider(
+          key("blurIntensity"),
+          "Blur intensity",
+          "Scene-specific blur radius.",
+          40,
+          " px",
+          () => !profile.blurEnabled,
+        ),
+        {
+          name: "Dim",
+          desc: "Reduce this scene's wallpaper brightness.",
+          control: { type: "toggle", key: key("dimEnabled") },
+        },
+        this.slider(
+          key("dimIntensity"),
+          "Dim intensity",
+          "Scene-specific dim strength.",
+          100,
+          "%",
+          () => !profile.dimEnabled,
+        ),
+        {
+          name: "Color overlay",
+          desc: "Place a color layer over this scene's wallpaper.",
+          control: { type: "toggle", key: key("colorOverlayEnabled") },
+        },
+        {
+          name: "Overlay color",
+          control: { type: "color", key: key("colorOverlayColor") },
+          visible: () => profile.colorOverlayEnabled,
+        },
+        {
+          ...this.slider(
+            key("colorOverlayOpacity"),
+            "Overlay opacity",
+            "Scene-specific color overlay strength.",
+            100,
+            "%",
+            () => !profile.colorOverlayEnabled,
+          ),
+          visible: () => profile.colorOverlayEnabled,
+        },
+        {
+          name: "Overlay blend mode",
+          control: {
+            type: "dropdown",
+            key: key("colorOverlayBlendMode"),
+            options: COLOR_OVERLAY_BLEND_MODES,
+          },
+          visible: () => profile.colorOverlayEnabled,
+        },
+        {
+          name: "Effect preset",
+          desc: "Apply one optimized visual preset to this scene.",
+          control: { type: "dropdown", key: key("effectPreset"), options: EFFECT_PRESETS },
+        },
+        this.slider(
+          key("effectIntensity"),
+          "Effect intensity",
+          "Scene-specific effect strength and animation speed.",
+          100,
+          "%",
+          () => profile.effectPreset === "none",
+        ),
+        {
+          name: "Pause video when hidden",
+          desc: "Avoid decoding this scene's video when its window is hidden.",
+          control: { type: "toggle", key: key("pauseWhenHidden") },
+        },
+        {
+          name: "Respect reduced motion",
+          desc: "Pause video, animated effects, and wallpaper crossfades when reduced motion is requested.",
+          control: { type: "toggle", key: key("respectReducedMotion") },
         },
         {
           name: "Copy current global appearance",
-          desc: "Copy the current wallpaper, opacity, effects, and video behavior into this scene while keeping its name.",
+          desc: "Replace this scene's wallpaper, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
           render: (setting) => {
             setting.addButton((button) =>
               button.setButtonText("Copy current").onClick(() => this.copyGlobalAppearanceToProfile(profile.id)),
@@ -383,17 +558,6 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
       ],
     };
-  }
-
-  private sceneEffectsSummary(profile: VeilProfile): string {
-    const parts: string[] = [];
-    if (profile.vignetteMode !== "off") parts.push(`vignette ${profile.vignetteMode}`);
-    if (profile.blurEnabled) parts.push(`blur ${profile.blurIntensity}px`);
-    if (profile.dimEnabled) parts.push(`dim ${profile.dimIntensity}%`);
-    if (profile.colorOverlayEnabled) parts.push(`overlay ${profile.colorOverlayOpacity}%`);
-    if (profile.effectPreset !== "none") parts.push(`${profile.effectPreset} ${profile.effectIntensity}%`);
-    if (parts.length === 0) parts.push("no visual effects");
-    return `${parts.join(", ")}; video hidden-pause ${profile.pauseWhenHidden ? "on" : "off"}; reduced motion ${profile.respectReducedMotion ? "on" : "off"}.`;
   }
 
   private activeContextDefinition(): SettingDefinitionItem<string> {
@@ -469,7 +633,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
         {
           name: "Wallpaper file",
-          desc: "Inline mode uses global opacity, effects, and video settings.",
+          desc: "Inline mode uses global framing, opacity, effects, transition, and video settings.",
           control: {
             type: "file",
             key: key("wallpaperPath"),
@@ -641,7 +805,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           searchable: false,
         },
         { name: "Pause video when the app is hidden", desc: "Avoid decoding video when a window is not visible.", control: { type: "toggle", key: "pauseWhenHidden" } },
-        { name: "Respect reduced motion", desc: "Pause video on a still frame when the operating system requests reduced motion. GIF files cannot be paused.", control: { type: "toggle", key: "respectReducedMotion" } },
+        { name: "Respect reduced motion", desc: "Pause video, animated effects, and wallpaper crossfades when the operating system requests reduced motion. GIF files cannot be paused.", control: { type: "toggle", key: "respectReducedMotion" } },
       ],
     };
   }
