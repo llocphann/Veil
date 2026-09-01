@@ -13,6 +13,12 @@ const context: NoteContext = {
   name: "World War Z.md",
   basename: "World War Z",
   tags: ["#media/movie", "#favorite"],
+  properties: {
+    veil: "Cinema",
+    rating: 5,
+    published: true,
+    mood: ["Focus", "Dark"],
+  },
 };
 
 function wallpaperRule(
@@ -36,6 +42,16 @@ void test("context rules match note names, exact paths, folders, and nested tags
   assert.equal(contextMatches(wallpaperRule("folder", "20_Personal_Life/25_Media_Tracker"), context), true);
   assert.equal(contextMatches(wallpaperRule("tag", "#media"), context), true);
   assert.equal(contextMatches(wallpaperRule("folder", "20_Personal_Life/Books"), context), false);
+});
+
+void test("property rules support existence, scalar, boolean, numeric, and array values", () => {
+  assert.equal(contextMatches(wallpaperRule("property", "veil"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "VEIL=cinema"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "rating=5"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "published=true"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "mood=focus"), context), true);
+  assert.equal(contextMatches(wallpaperRule("property", "mood=calm"), context), false);
+  assert.equal(contextMatches(wallpaperRule("property", "missing"), context), false);
 });
 
 void test("the first matching wallpaper rule wins", () => {
