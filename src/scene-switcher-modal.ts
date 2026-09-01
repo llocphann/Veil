@@ -19,7 +19,7 @@ export class SceneSwitcherModal extends SuggestModal<SceneChoice> {
   constructor(app: App, controller: SceneSwitcherController) {
     super(app);
     this.controller = controller;
-    this.setPlaceholder("Switch Veil scene…");
+    this.setPlaceholder("Switch veil scene…");
   }
 
   getSuggestions(query: string): SceneChoice[] {
