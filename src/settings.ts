@@ -34,6 +34,7 @@ export const MATCH_TYPES = {
   path: "Exact path",
   folder: "Folder",
   tag: "Tag",
+  property: "Frontmatter property",
 } as const;
 
 export type MatchType = keyof typeof MATCH_TYPES;
@@ -259,6 +260,7 @@ function normalizeMatchValue(
   const raw = stringValue(value);
   if (matchType === "tag") return raw.replace(/^#+/, "");
   if (matchType === "note") return raw.replace(/\.md$/i, "");
+  if (matchType === "property") return raw;
   return normalizeWallpaperPath(raw, normalize).replace(/\/$/, "");
 }
 
