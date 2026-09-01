@@ -69,3 +69,17 @@ export function wallpaperPoolConfigurationChanged(
 ): boolean {
   return wallpaperPoolConfigurationChanges(previous, next).length > 0;
 }
+
+export function rewriteWallpaperPoolSelectionPaths(
+  selections: Map<string, string>,
+  rewrite: (path: string) => string,
+): boolean {
+  let changed = false;
+  for (const [key, path] of selections) {
+    const next = rewrite(path);
+    if (next === path) continue;
+    selections.set(key, next);
+    changed = true;
+  }
+  return changed;
+}
