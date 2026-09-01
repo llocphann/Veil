@@ -22,6 +22,7 @@ import {
   type VeilAppearance,
   type VeilSettings,
 } from "./settings";
+import { retainedOutgoingForPending } from "./transition-lifecycle";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
 import {
   normalizeWallpaperLibraryState,
@@ -645,9 +646,11 @@ export default class VeilPlugin extends Plugin {
     }
 
     if (previous && (!previous.ready || previous.failed || !previous.layer.isConnected)) {
+      const fallback = retainedOutgoingForPending(previous);
+      if (fallback) previous.outgoing = null;
       this.documents.delete(document);
       this.disposeState(previous);
-      previous = null;
+      previous = fallback;
     } else if (previous) {
       this.settleState(previous);
     }
