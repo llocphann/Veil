@@ -2,6 +2,14 @@
 
 Veil places a vault-local image, animated GIF, or video behind the Obsidian workspace. It keeps the wallpaper separate from interface content, while offering an optional control that fades an entire pane—including nested backgrounds—as one group.
 
+<p align="center">
+  <img src="assets/homepage.png" alt="Ledge Dock in my Obsidian theme" width="82%">
+</p>
+
+<p align="center">
+  <sub>The city background in my theme</sub>
+</p>
+
 ## Features
 
 - Pick media directly from the current vault or enter a vault-relative path.
