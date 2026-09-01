@@ -42,6 +42,7 @@ interface WallpaperSource {
 
 interface DocumentState {
   key: string;
+  path: string;
   kind: Exclude<MediaKind, "">;
   layer: HTMLDivElement;
   media: HTMLImageElement | HTMLVideoElement;
@@ -67,6 +68,9 @@ export default class VeilPlugin extends Plugin {
   };
 
   private readonly documents = new Map<Document, DocumentState>();
+  private readonly poolCandidates = new Map<string, string[]>();
+  private readonly poolSelections = new Map<string, string>();
+  private readonly previousPoolSelections = new Map<string, string>();
   private settingTab: WallpaperSettingsTab | null = null;
   private unloaded = false;
   private layoutReady = false;
@@ -91,6 +95,11 @@ export default class VeilPlugin extends Plugin {
       id: "reload-wallpaper",
       name: "Reload wallpaper",
       callback: () => this.refreshWallpaper(true),
+    });
+    this.addCommand({
+      id: "shuffle-wallpaper-pool",
+      name: "Shuffle wallpaper pool",
+      callback: () => this.shuffleWallpaperPool(),
     });
 
     this.app.workspace.onLayoutReady(() => {
@@ -126,11 +135,17 @@ export default class VeilPlugin extends Plugin {
     this.refreshFrame = null;
     void this.flushSettings();
     this.clearAllDocuments();
+    this.poolCandidates.clear();
+    this.poolSelections.clear();
+    this.previousPoolSelections.clear();
   }
 
   public updateSettings(patch: Partial<VeilSettings>): void {
     if (this.unloaded) return;
     this.settings = normalizeSettings({ ...this.settings, ...patch }, normalizePath);
+    this.poolCandidates.clear();
+    this.poolSelections.clear();
+    this.previousPoolSelections.clear();
     this.refreshWallpaper();
     this.pendingSave = true;
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
@@ -170,18 +185,39 @@ export default class VeilPlugin extends Plugin {
     this.scheduleApplyToWorkspace();
   }
 
+  public shuffleWallpaperPool(): void {
+    const document = this.app.workspace.containerEl.ownerDocument;
+    const context = this.contextForDocument(document);
+    const resolved = resolveWallpaper(this.settings, context);
+    const poolAllowed = !resolved.rule || Boolean(resolved.profile);
+    if (!poolAllowed || !resolved.appearance.wallpaperPoolEnabled) {
+      new Notice("The current appearance is not using a wallpaper pool.");
+      return;
+    }
+
+    const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
+    const selectionKey = this.poolSelectionKey(resolved.appearance, contextKey);
+    const current = this.poolSelections.get(selectionKey);
+    if (current) this.previousPoolSelections.set(selectionKey, current);
+    this.poolSelections.delete(selectionKey);
+    this.sourceRevision += 1;
+    this.scheduleApplyToWorkspace();
+  }
+
   public activeContextSummary(): string {
     const document = this.app.workspace.containerEl.ownerDocument;
     const context = this.contextForDocument(document);
     const resolved = resolveWallpaper(this.settings, context);
     if (!context) return "No active note context in the main window.";
     if (resolved.profile) {
-      return `${context.path} → ${resolved.profile.name} (${resolved.rule?.matchType || "rule"})`;
+      const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
+      return `${context.path} → ${resolved.profile.name}${pool} (${resolved.rule?.matchType || "rule"})`;
     }
     if (resolved.rule) {
       return `${context.path} → inline wallpaper rule (${resolved.rule.matchType}: ${resolved.rule.matchValue})`;
     }
-    return `${context.path} → default appearance`;
+    const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
+    return `${context.path} → default appearance${pool}`;
   }
 
   private scheduleApplyToWorkspace(): void {
@@ -199,16 +235,26 @@ export default class VeilPlugin extends Plugin {
 
   private registerVaultEvents(): void {
     this.registerEvent(
-      this.app.vault.on("create", (file) => this.refreshIfWallpaper(file.path)),
+      this.app.vault.on("create", (file) => {
+        this.poolCandidates.clear();
+        this.refreshIfWallpaper(file.path);
+      }),
     );
     this.registerEvent(
       this.app.vault.on("modify", (file) => this.refreshIfWallpaper(file.path)),
     );
     this.registerEvent(
-      this.app.vault.on("delete", (file) => this.refreshIfWallpaper(file.path)),
+      this.app.vault.on("delete", (file) => {
+        this.poolCandidates.clear();
+        this.refreshIfWallpaper(file.path);
+      }),
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        this.poolCandidates.clear();
+        const selectedPoolPathRenamed = Array.from(this.documents.values()).some(
+          (state) => state.path === oldPath,
+        );
         const rename = (value: string): string =>
           value === oldPath || value.startsWith(`${oldPath}/`)
             ? file.path + value.slice(oldPath.length)
@@ -250,7 +296,7 @@ export default class VeilPlugin extends Plugin {
           }
         }
         if (changed) this.updateSettings(next);
-        else this.refreshWallpaper();
+        else this.refreshWallpaper(selectedPoolPathRenamed);
       }),
     );
   }
@@ -261,7 +307,8 @@ export default class VeilPlugin extends Plugin {
       ...this.settings.profiles.map((profile) => profile.wallpaperPath),
       ...this.settings.wallpaperRules.map((rule) => rule.wallpaperPath),
     ];
-    if (selectedPaths.includes(path)) this.refreshWallpaper(true);
+    const loadedPath = Array.from(this.documents.values()).some((state) => state.path === path);
+    if (selectedPaths.includes(path) || loadedPath) this.refreshWallpaper(true);
   }
 
   private applyToWorkspace(): void {
@@ -425,6 +472,7 @@ export default class VeilPlugin extends Plugin {
 
     const state: DocumentState = {
       key: source.key,
+      path: source.path,
       kind: source.kind,
       layer,
       media,
@@ -657,15 +705,20 @@ export default class VeilPlugin extends Plugin {
     context: NoteContext | null,
   ): WallpaperSource | null {
     const resolved = resolveWallpaper(this.settings, context);
-    const path = resolved.path;
+    const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
+    const poolActive = (!resolved.rule || Boolean(resolved.profile))
+      && resolved.appearance.wallpaperPoolEnabled;
+    const path = poolActive
+      ? this.poolPathForAppearance(resolved.appearance, contextKey)
+      : resolved.path;
     const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
     const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
     const kind = file instanceof TFile ? mediaKind(file) : "";
     const contextLabel = resolved.profile
-      ? `Scene “${resolved.profile.name}”`
+      ? `Scene “${resolved.profile.name}”${poolActive ? " · pool" : ""}`
       : resolved.rule
         ? `Rule ${resolved.rule.matchType}: ${resolved.rule.matchValue}`
-        : "Default appearance";
+        : `Default appearance${poolActive ? " · pool" : ""}`;
     if (!path || !(file instanceof TFile) || !kind) {
       const rulePrefix = resolved.rule ? `${contextLabel}: ` : "";
       this.setDocumentStatus(
@@ -687,11 +740,6 @@ export default class VeilPlugin extends Plugin {
     }
 
     const url = this.app.vault.getResourcePath(file);
-    const contextKey = resolved.profile
-      ? `profile:${resolved.profile.id}`
-      : resolved.rule
-        ? `rule:${resolved.rule.id}`
-        : "default";
     const source: WallpaperSource = {
       path: file.path,
       url,
@@ -720,6 +768,55 @@ export default class VeilPlugin extends Plugin {
       );
     }
     return source;
+  }
+
+  private contextKey(ruleId: string, profileId: string): string {
+    if (profileId) return `profile:${profileId}`;
+    if (ruleId) return `rule:${ruleId}`;
+    return "default";
+  }
+
+  private poolSelectionKey(appearance: VeilAppearance, contextKey: string): string {
+    const anchor = appearance.wallpaperPath;
+    const separator = anchor.lastIndexOf("/");
+    const folder = separator >= 0 ? anchor.slice(0, separator) : "";
+    return `${contextKey}|${folder}|${appearance.wallpaperPoolIncludeSubfolders ? "recursive" : "direct"}`;
+  }
+
+  private poolPathForAppearance(appearance: VeilAppearance, contextKey: string): string {
+    const anchor = appearance.wallpaperPath;
+    if (!anchor) return "";
+    const separator = anchor.lastIndexOf("/");
+    const folder = separator >= 0 ? anchor.slice(0, separator) : "";
+    const recursive = appearance.wallpaperPoolIncludeSubfolders;
+    const candidateKey = `${folder}|${recursive ? "recursive" : "direct"}`;
+    let candidates = this.poolCandidates.get(candidateKey);
+    if (!candidates) {
+      const prefix = folder ? `${folder}/` : "";
+      candidates = this.app.vault.getFiles()
+        .filter((file) => {
+          if (!mediaKind(file)) return false;
+          if (folder && !file.path.startsWith(prefix)) return false;
+          const relative = folder ? file.path.slice(prefix.length) : file.path;
+          return recursive || !relative.includes("/");
+        })
+        .map((file) => file.path)
+        .sort((left, right) => left.localeCompare(right));
+      this.poolCandidates.set(candidateKey, candidates);
+    }
+    if (candidates.length === 0) return anchor;
+
+    const selectionKey = this.poolSelectionKey(appearance, contextKey);
+    const current = this.poolSelections.get(selectionKey);
+    if (current && candidates.includes(current)) return current;
+
+    const previous = this.previousPoolSelections.get(selectionKey);
+    const choices = previous && candidates.length > 1
+      ? candidates.filter((candidate) => candidate !== previous)
+      : candidates;
+    const selected = choices[Math.floor(Math.random() * choices.length)] || anchor;
+    this.poolSelections.set(selectionKey, selected);
+    return selected;
   }
 
   private contextForDocument(document: Document): NoteContext | null {
