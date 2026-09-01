@@ -159,6 +159,24 @@ function scheduleMatches(days: Set<number>, range: ClockRange, now: Date): boole
   return false;
 }
 
+export function contextRuleSyntaxValid(
+  rule: Pick<ContextRule, "matchType" | "matchValue">,
+): boolean {
+  if (!rule.matchValue.trim()) return false;
+  if (rule.matchType !== "property") return true;
+
+  const { key, expected } = propertyParts(rule.matchValue);
+  if (!key) return false;
+  if (!key.startsWith("@")) return true;
+  if (!expected) return false;
+
+  if (key === "@theme") return expected === "light" || expected === "dark";
+  if (key === "@time") return parseClockRange(expected) !== null;
+  if (key === "@day") return parseDays(expected) !== null;
+  if (key === "@schedule") return parseSchedule(expected) !== null;
+  return false;
+}
+
 function systemContextMatches(ruleValue: string, context: NoteContext | null): boolean | null {
   const { key, expected } = propertyParts(ruleValue);
   if (!key.startsWith("@")) return null;
