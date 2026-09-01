@@ -20,6 +20,16 @@ for (const path of WORKFLOWS) {
   });
 }
 
+void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
+  const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(source, /actions\/upload-artifact@v4/);
+  assert.match(source, /github\.ref == 'refs\/heads\/prerelease'/);
+  assert.match(source, /retention-days: 7/);
+  for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
+    assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
+  }
+});
+
 void test("release workflow verifies and publishes the required artifacts", () => {
   const source = fs.readFileSync(".github/workflows/release.yml", "utf8");
   assert.match(source, /Verify release tag/);
