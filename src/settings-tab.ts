@@ -86,6 +86,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       if ([
         "name",
         "wallpaperPath",
+        "wallpaperPoolEnabled",
         "vignetteMode",
         "blurEnabled",
         "dimEnabled",
@@ -270,13 +271,24 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
         {
           name: "Wallpaper file",
-          desc: "Choose an image, GIF, or video from this vault, or enter its vault-relative path.",
+          desc: "Choose an image, GIF, or video from this vault, or enter its vault-relative path. When a pool is enabled, this file also anchors the pool folder.",
           control: {
             type: "file",
             key: "wallpaperPath",
             placeholder: "Media/Wallpapers/example.webp",
             filter: (file: TFile) => Boolean(mediaKind(file)),
           },
+        },
+        {
+          name: "Wallpaper pool",
+          desc: "Randomly choose from supported media in the selected wallpaper's folder. The choice stays stable until you shuffle or the appearance changes.",
+          control: { type: "toggle", key: "wallpaperPoolEnabled" },
+        },
+        {
+          name: "Include subfolders",
+          desc: "Also include supported media in descendant folders of the wallpaper folder.",
+          control: { type: "toggle", key: "wallpaperPoolIncludeSubfolders" },
+          visible: () => this.plugin.settings.wallpaperPoolEnabled,
         },
         {
           name: "Wallpaper status",
@@ -322,7 +334,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         this.rangeSlider(
           "transitionDuration",
           "Wallpaper transition",
-          "Crossfade duration when a rule or scene switches to a different wallpaper. Set to 0 for an instant switch.",
+          "Crossfade duration when a rule, scene, or pool shuffle switches to a different wallpaper. Set to 0 for an instant switch.",
           0,
           2000,
           20,
@@ -378,7 +390,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       type: "page",
       name: profile.name || `Scene ${index + 1}`,
       desc: profile.wallpaperPath || "No wallpaper selected",
-      displayValue: () => ready ? "Ready" : "Needs wallpaper",
+      displayValue: () => ready ? (profile.wallpaperPoolEnabled ? "Pool" : "Ready") : "Needs wallpaper",
       status: () => ready ? null : "warning",
       items: [
         {
@@ -388,13 +400,24 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
         {
           name: "Wallpaper file",
-          desc: "Media used whenever a context rule resolves to this scene.",
+          desc: "Media used whenever a context rule resolves to this scene. With a pool enabled, it anchors the pool folder.",
           control: {
             type: "file",
             key: key("wallpaperPath"),
             placeholder: "Media/Wallpapers/focus.webp",
             filter: (candidate: TFile) => Boolean(mediaKind(candidate)),
           },
+        },
+        {
+          name: "Wallpaper pool",
+          desc: "Randomly choose from supported media in this scene's wallpaper folder and keep the result stable until shuffled.",
+          control: { type: "toggle", key: key("wallpaperPoolEnabled") },
+        },
+        {
+          name: "Include subfolders",
+          desc: "Include descendant folders when building this scene's pool.",
+          control: { type: "toggle", key: key("wallpaperPoolIncludeSubfolders") },
+          visible: () => profile.wallpaperPoolEnabled,
         },
         {
           name: "Display mode",
@@ -422,7 +445,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         this.rangeSlider(
           key("transitionDuration"),
           "Wallpaper transition",
-          "Scene-specific crossfade duration.",
+          "Scene-specific crossfade duration, including pool shuffles.",
           0,
           2000,
           20,
@@ -536,7 +559,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         },
         {
           name: "Copy current global appearance",
-          desc: "Replace this scene's wallpaper, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
+          desc: "Replace this scene's wallpaper, pool behavior, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
           render: (setting) => {
             setting.addButton((button) =>
               button.setButtonText("Copy current").onClick(() => this.copyGlobalAppearanceToProfile(profile.id)),
@@ -628,12 +651,12 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         ...this.matchRuleSettings(rule, key),
         {
           name: "Appearance source",
-          desc: "A scene switches the complete appearance. Inline wallpaper preserves 1.3 behavior and changes only the media.",
+          desc: "A scene switches the complete appearance and may use a pool. Inline wallpaper preserves 1.3 behavior: it changes only the media and always stays a single wallpaper.",
           control: { type: "dropdown", key: key("profileId"), options: this.profileOptions() },
         },
         {
           name: "Wallpaper file",
-          desc: "Inline mode uses global framing, opacity, effects, transition, and video settings.",
+          desc: "Inline mode uses global framing, opacity, effects, transition, and video settings, but not the global wallpaper pool.",
           control: {
             type: "file",
             key: key("wallpaperPath"),
@@ -820,6 +843,11 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           name: "Reload wallpaper",
           desc: "Retry loading the current file or a video whose autoplay was blocked.",
           render: (setting) => { setting.addButton((button) => button.setButtonText("Reload").onClick(() => this.plugin.refreshWallpaper(true))); },
+        },
+        {
+          name: "Shuffle wallpaper pool",
+          desc: "Choose a different wallpaper for the active default appearance or scene. The previous choice is avoided when the pool has multiple files.",
+          render: (setting) => { setting.addButton((button) => button.setButtonText("Shuffle").setIcon("shuffle").onClick(() => this.plugin.shuffleWallpaperPool())); },
         },
         {
           name: "Export settings",
