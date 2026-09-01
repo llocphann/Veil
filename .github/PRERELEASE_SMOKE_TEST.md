@@ -21,6 +21,7 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 - Route Scenes by note name, exact path, folder, tag, and frontmatter property.
 - Verify manual **Switch scene** overrides routing for the session and **Follow context rules** restores automatic routing.
 - Verify `@theme=light|dark`, `@day`, `@time`, and `@schedule`; include one overnight schedule crossing midnight.
+- Enter malformed enabled system expressions such as `@theme=blue`, `@time=25:00-06:00`, and `@schedule=funday 08:00-18:00` in both wallpaper routes and opacity exclusions. Settings should show a warning and the malformed rule must not match at runtime.
 
 ## Pools and library
 
