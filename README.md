@@ -124,7 +124,7 @@ For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V
 
 Veil is event-driven and does not poll the vault. Repeated workspace refreshes are coalesced into one animation frame, wallpaper pools cache candidate paths, library thumbnails are created only when the library is opened, and video pauses in hidden windows when configured.
 
-Adaptive scheduling also avoids interval polling. Theme changes react to Obsidian's CSS-change event. For `@time`, `@day`, and `@schedule`, Veil computes the next meaningful boundary and keeps at most one one-shot timer until that boundary; if no scheduled rule exists, no scheduling timer exists.
+Adaptive scheduling also avoids interval polling. Theme changes react to Obsidian's CSS-change event. For `@time`, `@day`, and `@schedule`, Veil computes the next meaningful boundary and keeps a single one-shot timer until that boundary; if no scheduled rule exists, no scheduling timer exists.
 
 Wallpaper transitions use double buffering: the current wallpaper remains visible until the incoming media has successfully loaded. A failed incoming image/video restores the previous working wallpaper instead of leaving a blank background.
 
