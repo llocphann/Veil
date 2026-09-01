@@ -1100,8 +1100,9 @@ export default class VeilPlugin extends Plugin {
   }
 
   private rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): void {
-    const document = leaf?.view?.containerEl?.ownerDocument;
-    if (!document || !this.isRootLeafForDocument(leaf, document)) return;
+    if (!leaf) return;
+    const document = leaf.view.containerEl.ownerDocument;
+    if (!this.isRootLeafForDocument(leaf, document)) return;
     this.activeRootLeaves.set(document, leaf);
   }
 
