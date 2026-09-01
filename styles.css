@@ -108,6 +108,7 @@ html body.vault-dashboard-background:not(.is-mobile):is(.theme-light, .theme-dar
   pointer-events: none;
   user-select: none;
   opacity: var(--vdb-opacity, 0.15);
+  transition: opacity var(--vdb-transition-duration, 320ms) ease;
 }
 
 .vault-dashboard-wallpaper::before,
@@ -152,7 +153,9 @@ body.is-mobile > .vault-dashboard-wallpaper {
   border-radius: 0;
   box-shadow: none;
   object-fit: var(--vdb-fit, cover);
-  object-position: center;
+  object-position: var(--vdb-position-x, 50%) var(--vdb-position-y, 50%);
+  transform: scale(var(--vdb-media-scale, 1));
+  transform-origin: var(--vdb-position-x, 50%) var(--vdb-position-y, 50%);
   filter: var(--vdb-filter, none);
   pointer-events: none;
   z-index: 1;
@@ -228,15 +231,15 @@ body.is-mobile > .vault-dashboard-wallpaper {
   0%,
   68%,
   100% {
-    transform: scale(1.01) translate3d(0, 0, 0);
+    transform: scale(var(--vdb-glitch-scale, 1.01)) translate3d(0, 0, 0);
   }
 
   70% {
-    transform: scale(1.01) translate3d(var(--vdb-effect-shift, 3px), 0, 0);
+    transform: scale(var(--vdb-glitch-scale, 1.01)) translate3d(var(--vdb-effect-shift, 3px), 0, 0);
   }
 
   74% {
-    transform: scale(1.01) translate3d(calc(0px - var(--vdb-effect-shift, 3px)), 0, 0);
+    transform: scale(var(--vdb-glitch-scale, 1.01)) translate3d(calc(0px - var(--vdb-effect-shift, 3px)), 0, 0);
   }
 }
 
@@ -265,6 +268,10 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .vault-dashboard-wallpaper[data-reduce-motion="true"] {
+    transition-duration: 0ms;
+  }
+
   .vault-dashboard-wallpaper[data-reduce-motion="true"][data-effect="glitch"]::after,
   .vault-dashboard-wallpaper[data-reduce-motion="true"][data-effect="glitch"]
     > .vault-dashboard-wallpaper-media,
