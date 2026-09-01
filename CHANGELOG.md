@@ -4,6 +4,8 @@
 
 - Add reusable **Scenes** that capture wallpaper, pool behavior, framing, opacity, vignette, blur/dim, color overlay, effect, transition, and video playback settings as one profile.
 - Allow wallpaper routing rules to switch to a complete scene while preserving the 1.3 inline-wallpaper behavior.
+- Duplicate an existing Scene from Settings with a fresh ID while preserving its complete wallpaper, pool, appearance, transition, effect, and video configuration.
+- Surface the 64-Scene limit in Settings instead of silently dropping additions beyond the normalized data cap.
 - Add an active-context inspector so the Rules tab shows whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
 - Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
 - Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
