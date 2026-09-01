@@ -26,16 +26,20 @@ function writeFixture(
   );
 }
 
+function runVersionBump(directory: string) {
+  return spawnSync(process.execPath, [path.resolve("version-bump.mjs")], {
+    cwd: directory,
+    encoding: "utf8",
+  });
+}
+
 void test("version bump script updates manifest and versions without dropping history", (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "veil-version-bump-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
 
   writeFixture(directory, "1.4.0", "1.3.0", "1.13.7", { "1.3.0": "1.13.7" });
 
-  const result = spawnSync(process.execPath, [path.resolve("version-bump.mjs")], {
-    cwd: directory,
-    encoding: "utf8",
-  });
+  const result = runVersionBump(directory);
   assert.equal(result.status, 0, result.stderr || result.stdout);
 
   const manifest = JSON.parse(fs.readFileSync(path.join(directory, "manifest.json"), "utf8")) as {
@@ -61,13 +65,27 @@ void test("version bump script refuses to rewrite an existing version's app base
 
   const beforeManifest = fs.readFileSync(path.join(directory, "manifest.json"), "utf8");
   const beforeVersions = fs.readFileSync(path.join(directory, "versions.json"), "utf8");
-  const result = spawnSync(process.execPath, [path.resolve("version-bump.mjs")], {
-    cwd: directory,
-    encoding: "utf8",
-  });
+  const result = runVersionBump(directory);
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /refusing to rewrite release history/);
+  assert.equal(fs.readFileSync(path.join(directory, "manifest.json"), "utf8"), beforeManifest);
+  assert.equal(fs.readFileSync(path.join(directory, "versions.json"), "utf8"), beforeVersions);
+});
+
+void test("version bump script rejects malformed metadata before writing files", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "veil-version-bump-invalid-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+
+  writeFixture(directory, "1.4.0", "1.3.0", "1.13.7", { "1.3.0": "1.13.7" });
+  fs.writeFileSync(path.join(directory, "versions.json"), "[]\n");
+
+  const beforeManifest = fs.readFileSync(path.join(directory, "manifest.json"), "utf8");
+  const beforeVersions = fs.readFileSync(path.join(directory, "versions.json"), "utf8");
+  const result = runVersionBump(directory);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /versions\.json must contain an object/);
   assert.equal(fs.readFileSync(path.join(directory, "manifest.json"), "utf8"), beforeManifest);
   assert.equal(fs.readFileSync(path.join(directory, "versions.json"), "utf8"), beforeVersions);
 });
