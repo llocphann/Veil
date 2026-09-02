@@ -4,20 +4,27 @@ import test from "node:test";
 
 const source = fs.readFileSync("src/settings-tab.ts", "utf8");
 
-void test("Veil settings follow the Ledge-style section taxonomy", () => {
+void test("Veil settings expose only the five primary Ledge-style tabs", () => {
   for (const section of [
     "Wallpaper",
     "Behavior",
     "Routing",
     "Appearance",
     "Scenes",
-    "Data",
-    "About",
   ]) {
     assert.match(source, new RegExp(`label: "${section}"`));
   }
+  assert.doesNotMatch(source, /label: "Data"/);
+  assert.doesNotMatch(source, /label: "About"/);
   assert.doesNotMatch(source, /label: "Actions"/);
   assert.doesNotMatch(source, /label: "Support"/);
+});
+
+void test("data and about render as shared sections below tab content", () => {
+  assert.match(source, /const sharedSections = compact\(\[/);
+  assert.match(source, /"Data & recovery", "veil-settings-section-data"/);
+  assert.match(source, /"About & support", "veil-settings-section-about"/);
+  assert.match(source, /return \[this\.navigationDefinition\(\), \.\.\.tabPanels, \.\.\.sharedSections\]/);
 });
 
 void test("technical actions are redistributed into user-facing sections", () => {
