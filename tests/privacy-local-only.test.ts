@@ -39,11 +39,16 @@ void test("network access is isolated to the optional Wallhaven importer", () =>
 });
 
 void test("Wallhaven importer uses Obsidian requestUrl without other network transports", () => {
-  const networkSource = ["src/wallhaven-client.ts", "src/wallhaven-download.ts"]
+  const networkFiles = ["src/wallhaven-client.ts", "src/wallhaven-download.ts"];
+  const networkSource = networkFiles
     .map((file) => fs.readFileSync(file, "utf8"))
     .join("\n");
   assert.match(networkSource, /import \{[^}]*requestUrl[^}]*\} from "obsidian"/s);
   assert.match(networkSource, /\brequestUrl\s*\(/);
+  for (const file of networkFiles) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.match(source, /requestUrl\(\{[\s\S]*?throw:\s*false,[\s\S]*?\}\)/);
+  }
   for (const forbidden of forbiddenTransports) assert.doesNotMatch(networkSource, forbidden);
   assert.doesNotMatch(networkSource, /\bapikey\b/i);
 });
