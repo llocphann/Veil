@@ -39,11 +39,21 @@ jobs:
 
           path = Path("tests/manifest.test.ts")
           source = path.read_text()
-          old = '''void test("context routing and opacity exclusions are documented and exposed in settings", () => {\n  const readme = fs.readFileSync("README.md", "utf8");\n  const settings = settingsSource();\n  const runtime = fs.readFileSync("src/main.ts", "utf8");\n\n  assert.match(readme, /Wallpaper routes are evaluated from top to bottom/);\n  assert.match(readme, /Opacity exclusions are additive/);\n  assert.match(settings, /heading: "Wallpaper routing"/);\n  assert.match(settings, /heading: "Opacity exclusions"/);\n  assert.match(runtime, /metadataCache\\.on\\(\\"changed\\"/);\n});'''
-          new = '''void test("context routing and opacity exclusions are documented and exposed in settings", () => {\n  const readme = fs.readFileSync("README.md", "utf8");\n  const routingGuide = fs.readFileSync("wiki/Routing-and-Opacity-Exclusions.md", "utf8");\n  const settings = settingsSource();\n  const runtime = fs.readFileSync("src/main.ts", "utf8");\n\n  assert.match(readme, /Routing and Opacity Exclusions/);\n  assert.match(routingGuide, /Ordinary wallpaper rules/);\n  assert.match(routingGuide, /Adaptive system fallbacks/);\n  assert.match(routingGuide, /Exclusions are additive/);\n  assert.match(settings, /heading: "Wallpaper routing"/);\n  assert.match(settings, /heading: "Opacity exclusions"/);\n  assert.match(runtime, /metadataCache\\.on\\(\\"changed\\"/);\n});'''
-          if source.count(old) != 1:
-              raise SystemExit("Expected one stale routing documentation contract")
-          path.write_text(source.replace(old, new))
+          patches = [
+              (
+                  '  const readme = fs.readFileSync("README.md", "utf8");\n  const settings = settingsSource();',
+                  '  const readme = fs.readFileSync("README.md", "utf8");\n  const routingGuide = fs.readFileSync("wiki/Routing-and-Opacity-Exclusions.md", "utf8");\n  const settings = settingsSource();',
+              ),
+              (
+                  '  assert.match(readme, /Wallpaper routes are evaluated from top to bottom/);\n  assert.match(readme, /Opacity exclusions are additive/);',
+                  '  assert.match(readme, /Routing and Opacity Exclusions/);\n  assert.match(routingGuide, /Ordinary wallpaper rules/);\n  assert.match(routingGuide, /Adaptive system fallbacks/);\n  assert.match(routingGuide, /Exclusions are additive/);',
+              ),
+          ]
+          for old, new in patches:
+              if source.count(old) != 1:
+                  raise SystemExit(f"Expected one documentation contract target: {old!r}")
+              source = source.replace(old, new)
+          path.write_text(source)
           PY
 
       - name: Install dependencies
