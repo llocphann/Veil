@@ -42,7 +42,7 @@ import {
   rewriteWallpaperPoolSelectionsForRename,
   wallpaperPoolConfigurationChanges,
 } from "./wallpaper-pool-config";
-import { shouldInvalidatePoolCandidates } from "./pool-cache-invalidation";
+import { invalidatePoolCandidatesForVaultEvent } from "./pool-cache-invalidation";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -163,6 +163,7 @@ export default class VeilPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshWallpaper()));
     this.registerEvent(
       this.app.metadataCache.on("changed", (file) => {
+        if (!this.layoutReady) return;
         if (this.isActiveFile(file)) this.refreshWallpaper();
       }),
     );
@@ -437,9 +438,13 @@ export default class VeilPlugin extends Plugin {
   private registerVaultEvents(): void {
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        if (shouldInvalidatePoolCandidates("create", file.path, "", !(file instanceof TFile))) {
-          this.poolCandidates.clear();
-        }
+        invalidatePoolCandidatesForVaultEvent(
+          this.poolCandidates,
+          "create",
+          file.path,
+          "",
+          !(file instanceof TFile),
+        );
         this.refreshIfWallpaper(file.path);
       }),
     );
@@ -448,18 +453,26 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (shouldInvalidatePoolCandidates("delete", file.path, "", !(file instanceof TFile))) {
-          this.poolCandidates.clear();
-        }
+        invalidatePoolCandidatesForVaultEvent(
+          this.poolCandidates,
+          "delete",
+          file.path,
+          "",
+          !(file instanceof TFile),
+        );
         this.pruneWallpaperLibrary(file.path);
         this.refreshIfWallpaper(file.path);
       }),
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (shouldInvalidatePoolCandidates("rename", file.path, oldPath, !(file instanceof TFile))) {
-          this.poolCandidates.clear();
-        }
+        invalidatePoolCandidatesForVaultEvent(
+          this.poolCandidates,
+          "rename",
+          file.path,
+          oldPath,
+          !(file instanceof TFile),
+        );
         const selectedPoolPathRenamed = Array.from(this.documents.values()).some(
           (state) => state.path === oldPath || state.path.startsWith(`${oldPath}/`),
         );
@@ -1103,15 +1116,20 @@ export default class VeilPlugin extends Plugin {
     return selected;
   }
 
-  private contextForDocument(document: Document): NoteContext | null {
+  private fileForDocument(document: Document): TFile | null {
     const leaf = this.leafForDocument(document);
     const candidate: unknown = (leaf?.view as { file?: unknown } | undefined)?.file;
+    return candidate instanceof TFile ? candidate : null;
+  }
+
+  private contextForDocument(document: Document): NoteContext | null {
+    const candidate = this.fileForDocument(document);
     const theme = document.body.classList.contains("theme-dark")
       ? "dark"
       : document.body.classList.contains("theme-light")
         ? "light"
         : undefined;
-    if (!(candidate instanceof TFile)) {
+    if (!candidate) {
       return {
         path: "",
         name: "",
@@ -1167,7 +1185,7 @@ export default class VeilPlugin extends Plugin {
     const documents = new Set<Document>([this.app.workspace.containerEl.ownerDocument]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
     for (const document of documents) {
-      if (this.contextForDocument(document)?.path === file.path) return true;
+      if (this.fileForDocument(document)?.path === file.path) return true;
     }
     return false;
   }
