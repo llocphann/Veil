@@ -13,6 +13,8 @@ type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 
 type MutableDefinition = SettingDefinitionItem<string> & {
   cls?: string;
+  desc?: string;
+  emptyState?: string;
   heading?: string;
   items?: SettingDefinitionItem<string>[];
   name?: string;
@@ -32,6 +34,67 @@ const BEHAVIOR_ITEM_NAMES = new Set(["Wallpaper transition"]);
 const QUICK_ACTION_NAMES = new Set(["Reload wallpaper", "Shuffle wallpaper pool"]);
 const DATA_ACTION_NAMES = new Set(["Export settings", "Import settings", "Restore defaults"]);
 
+const SIMPLE_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  "Live preview": "Changes appear immediately.",
+  "Enable wallpaper": "Show or hide the wallpaper.",
+  "Wallpaper file": "Choose an image, GIF, or video.",
+  "Wallpaper library": "Browse and choose wallpapers.",
+  "Wallpaper pool": "Randomly use media from the wallpaper folder.",
+  "Include subfolders": "Include media from subfolders.",
+  "Display mode": "Choose how media fits the screen.",
+  "Horizontal focal point": "Move the focus left or right.",
+  "Vertical focal point": "Move the focus up or down.",
+  "Wallpaper zoom": "Zoom the wallpaper.",
+  "Wallpaper transition": "Set wallpaper fade duration.",
+  "Wallpaper opacity": "Set wallpaper transparency.",
+  "Pane background opacity": "Set pane background transparency.",
+  "Pane & content opacity": "Set pane and content transparency.",
+  "Scene name": "Name this scene.",
+  "Duplicate scene": "Create a copy of this scene.",
+  "Copy current global appearance": "Copy the current appearance into this scene.",
+  "Delete scene": "Remove this scene.",
+  "Vignette mode": "Choose the edge shading shape.",
+  "Vignette intensity": "Set edge shading strength.",
+  "Vignette radius": "Set the clear center size.",
+  "Blur": "Blur the wallpaper.",
+  "Blur intensity": "Set blur strength.",
+  "Dim": "Darken the wallpaper.",
+  "Dim intensity": "Set dim strength.",
+  "Color overlay": "Add a color over the wallpaper.",
+  "Overlay opacity": "Set overlay strength.",
+  "Overlay blend mode": "Choose how the overlay blends.",
+  "Effect preset": "Choose a visual effect.",
+  "Effect intensity": "Set effect strength.",
+  "Performance guide": "Blur and animated effects use more GPU.",
+  "Video compatibility": "Videos loop muted; format support depends on codecs.",
+  "Pause video when the app is hidden": "Pause video while the app is hidden.",
+  "Pause video when hidden": "Pause video while the window is hidden.",
+  "Respect reduced motion": "Reduce or pause motion when requested.",
+  "Reload wallpaper": "Reload the current wallpaper.",
+  "Shuffle wallpaper pool": "Choose another wallpaper from the active pool.",
+  "Export settings": "Save settings, scenes, and rules as JSON.",
+  "Import settings": "Load settings, scenes, and rules from JSON.",
+  "Restore defaults": "Reset Veil settings to defaults.",
+  "Buy me a coffee": "Support Veil development.",
+  "Match by": "Choose what this rule matches.",
+  "Exact file path": "Choose one note.",
+  "Note name": "Match a note by name.",
+  "Folder path": "Match notes in this folder.",
+  "Property / system context": "Match frontmatter or @theme, @time, @day, @schedule.",
+  "Tag": "Match a tag or nested tag.",
+  "Appearance source": "Use a scene or one wallpaper file.",
+  "Delete wallpaper rule": "Remove this rule.",
+  "Exclude pane background opacity": "Keep pane backgrounds fully opaque.",
+  "Exclude pane & content opacity": "Keep pane content fully opaque.",
+  "Delete opacity exclusion": "Remove this exclusion.",
+};
+
+const SIMPLE_EMPTY_STATES: Readonly<Record<string, string>> = {
+  Scenes: "No scenes yet.",
+  "Wallpaper routing": "No wallpaper rules yet.",
+  "Opacity exclusions": "No opacity exclusions yet.",
+};
+
 function mutable(definition: SettingDefinitionItem<string>): MutableDefinition {
   return definition;
 }
@@ -42,6 +105,24 @@ function itemName(item: SettingDefinitionItem<string>): string {
 
 function itemsOf(definition: SettingDefinitionItem<string> | undefined): SettingDefinitionItem<string>[] {
   return definition ? [...(mutable(definition).items || [])] : [];
+}
+
+function simplifyDescriptions(
+  definitions: SettingDefinitionItem<string>[],
+): SettingDefinitionItem<string>[] {
+  for (const definition of definitions) {
+    const item = mutable(definition);
+    if (item.name) {
+      const description = SIMPLE_DESCRIPTIONS[item.name];
+      if (description) item.desc = description;
+    }
+    if (item.heading) {
+      const emptyState = SIMPLE_EMPTY_STATES[item.heading];
+      if (emptyState) item.emptyState = emptyState;
+    }
+    if (item.items) simplifyDescriptions(item.items);
+  }
+  return definitions;
 }
 
 function cloneDefinition(
@@ -132,7 +213,11 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
       cloneDefinition(support, "About & support", "veil-settings-section-about"),
     ]);
 
-    return [this.navigationDefinition(), ...tabPanels, ...sharedSections];
+    return [
+      this.navigationDefinition(),
+      ...simplifyDescriptions(tabPanels),
+      ...simplifyDescriptions(sharedSections),
+    ];
   }
 
   private navigationDefinition(): SettingDefinitionItem<string> {
