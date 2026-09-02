@@ -3,10 +3,10 @@ import { WallpaperSettingsTab as BaseWallpaperSettingsTab } from "./settings-tab
 
 const SETTINGS_SECTIONS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
-  { id: "behavior", label: "Behavior", icon: "timer" },
-  { id: "routing", label: "Routing", icon: "list-filter" },
   { id: "appearance", label: "Appearance", icon: "palette" },
+  { id: "behavior", label: "Behavior", icon: "timer" },
   { id: "scenes", label: "Scenes", icon: "layers-3" },
+  { id: "routing", label: "Routing", icon: "list-filter" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
