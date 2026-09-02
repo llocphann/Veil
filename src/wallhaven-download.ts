@@ -20,7 +20,12 @@ async function ensureFolder(vault: Vault, folderPath: string): Promise<void> {
     const existing = vault.getAbstractFileByPath(current);
     if (existing instanceof TFolder) continue;
     if (existing) throw new Error(`Cannot create ${current}: a file already uses that path.`);
-    await vault.createFolder(current);
+    try {
+      await vault.createFolder(current);
+    } catch (error) {
+      if (vault.getAbstractFileByPath(current) instanceof TFolder) continue;
+      throw error;
+    }
   }
 }
 
@@ -56,5 +61,8 @@ export async function importWallhavenWallpaper(
   }
 
   await ensureFolder(vault, WALLHAVEN_DOWNLOAD_FOLDER);
+  const created = vault.getAbstractFileByPath(localPath);
+  if (created instanceof TFile) return created;
+  if (created) throw new Error(`Cannot save ${localPath}: that path is already a folder.`);
   return vault.createBinary(localPath, response.arrayBuffer);
 }
