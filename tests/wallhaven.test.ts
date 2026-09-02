@@ -72,7 +72,9 @@ void test("Wallhaven local paths are deterministic and image-only", () => {
     data: [wallpaper()],
     meta: { current_page: 1, last_page: 1, per_page: 24, total: 1 },
   });
-  assert.equal(wallhavenLocalPath(parsed.data[0]!), "Wallpapers/Wallhaven/wallhaven-94x38z.jpg");
+  const first = parsed.data[0];
+  assert.ok(first);
+  assert.equal(wallhavenLocalPath(first), "Wallpapers/Wallhaven/wallhaven-94x38z.jpg");
   assert.equal(
     wallhavenLocalPath({ id: "zzzzzz", fileType: "image/png" }),
     "Wallpapers/Wallhaven/wallhaven-zzzzzz.png",
