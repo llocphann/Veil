@@ -96,7 +96,7 @@ jobs:
               this.renderWallhavenGrid();
             }
           }
-'''.replace("          ", "")
+          '''.replace("          ", "")
           source = source[:start] + replacement.rstrip() + source[end:]
           path.write_text(source)
 
