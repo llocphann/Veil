@@ -73,7 +73,7 @@ jobs:
 
           void test("settings changes retain unrelated wallpaper pool candidate caches", () => {
             const updateSettingsBody = source.match(
-              /public updateSettings\\([\\s\\S]*?\\n  public flushSettings\\(/,
+              /public updateSettings\\([\\s\\S]*?\\n\\s{2}public flushSettings\\(/,
             )?.[0] || "";
             assert.match(updateSettingsBody, /staleWallpaperPoolCandidateCacheKeys\\(previous, next\\)/);
             assert.match(updateSettingsBody, /this\\.poolCandidates\\.delete\\(key\\)/);
