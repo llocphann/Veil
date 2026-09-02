@@ -348,7 +348,16 @@ export class WallpaperLibraryModal extends Modal {
         "aria-label": `Use ${file.path} for ${target.label}`,
       },
     });
+    // Obsidian and themes commonly give every button an input-sized fixed
+    // height. This card is intentionally a button for keyboard/accessibility,
+    // so reset those global dimensions before rendering the 16:10 preview.
+    select.style.height = "auto";
+    select.style.minHeight = "0";
+    select.style.maxHeight = "none";
+    select.style.whiteSpace = "normal";
+
     const preview = select.createDiv({ cls: "veil-wallpaper-library-preview" });
+    preview.style.flex = "0 0 auto";
     if (kind === "image") {
       const image = preview.createEl("img", {
         attr: {
