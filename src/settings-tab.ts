@@ -13,7 +13,7 @@ type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 
 type MutableDefinition = SettingDefinitionItem<string> & {
   cls?: string;
-  desc?: string;
+  desc?: string | DocumentFragment;
   emptyState?: string;
   heading?: string;
   items?: SettingDefinitionItem<string>[];
