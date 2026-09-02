@@ -251,7 +251,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
   }
 
   64% {
-    transform: translate3d(var(--vdb-effect-shift, 3px), -1%, 0);
+    transform: translate3d(var(--vdb-effect-shift, 3px), -1%, 0, 0);
   }
 
   70% {
@@ -315,10 +315,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
 .veil-settings-tabs {
   width: 100%;
   display: flex;
-  gap: var(--size-4-1);
-  padding: var(--size-4-1);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
+  justify-content: center;
   background: var(--background-secondary);
   overflow-x: auto;
   scrollbar-width: thin;
