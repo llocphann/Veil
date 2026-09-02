@@ -6,6 +6,7 @@ import {
   wallhavenLocalPath,
   type WallhavenCategoryMask,
   type WallhavenSearchMeta,
+  type WallhavenSearchOptions,
   type WallhavenSorting,
   type WallhavenWallpaper,
 } from "./wallhaven";
@@ -60,6 +61,7 @@ export class WallpaperLibraryModal extends Modal {
   private wallhavenResults: WallhavenWallpaper[] = [];
   private wallhavenMeta: WallhavenSearchMeta | null = null;
   private wallhavenHasSearched = false;
+  private wallhavenLastSearch: WallhavenSearchOptions | null = null;
   private wallhavenQuery = "";
   private wallhavenCategories: WallhavenCategoryMask = "111";
   private wallhavenAtleast = "";
@@ -529,41 +531,47 @@ export class WallpaperLibraryModal extends Modal {
   }
 
   private async runWallhavenSearch(append: boolean): Promise<void> {
-    if (this.wallhavenBusy) return;
-    const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
-    this.wallhavenBusy = true;
-    if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
-    if (this.summaryEl) this.summaryEl.textContent = append ? "Loading more from Wallhaven…" : "Searching Wallhaven…";
-
-    try {
-      const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
-        ? "date_added"
-        : this.wallhavenSorting;
-      const result = await searchWallhavenApi({
+  if (this.wallhavenBusy) return;
+  const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
+  const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
+    ? "date_added"
+    : this.wallhavenSorting;
+  const options: WallhavenSearchOptions = append && this.wallhavenLastSearch
+    ? this.wallhavenLastSearch
+    : {
         query: this.wallhavenQuery,
         categories: this.wallhavenCategories,
         atleast: this.wallhavenAtleast,
         ratios: this.wallhavenRatios,
         sorting,
-        page: nextPage,
-      });
-      if (append) {
-        const known = new Set(this.wallhavenResults.map((wallpaper) => wallpaper.id));
-        this.wallhavenResults.push(...result.data.filter((wallpaper) => !known.has(wallpaper.id)));
-      } else {
-        this.wallhavenResults = result.data;
-      }
-      this.wallhavenMeta = result.meta;
-      this.wallhavenHasSearched = true;
-    } catch (error) {
-      new Notice(errorMessage(error));
-    } finally {
-      this.wallhavenBusy = false;
-      if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = false;
-      this.renderWallhavenGrid();
-    }
+      };
+  this.wallhavenBusy = true;
+  if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
+  if (this.summaryEl) {
+    this.summaryEl.textContent = append
+      ? "Loading more from Wallhaven…"
+      : "Searching Wallhaven…";
   }
 
+  try {
+    const result = await searchWallhavenApi({ ...options, page: nextPage });
+    if (append) {
+      const known = new Set(this.wallhavenResults.map((wallpaper) => wallpaper.id));
+      this.wallhavenResults.push(...result.data.filter((wallpaper) => !known.has(wallpaper.id)));
+    } else {
+      this.wallhavenResults = result.data;
+    }
+    this.wallhavenMeta = result.meta;
+    this.wallhavenHasSearched = true;
+    if (!append) this.wallhavenLastSearch = options;
+  } catch (error) {
+    new Notice(errorMessage(error));
+  } finally {
+    this.wallhavenBusy = false;
+    if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = false;
+    this.renderWallhavenGrid();
+  }
+}
   private renderWallhavenGrid(): void {
     if (this.source !== "wallhaven") return;
     const grid = this.gridEl;

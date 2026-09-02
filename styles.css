@@ -403,6 +403,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
 
 .veil-wallpaper-library-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--size-4-2);
   align-items: center;
   margin: var(--size-4-3) 0;
