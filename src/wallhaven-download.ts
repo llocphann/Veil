@@ -64,5 +64,11 @@ export async function importWallhavenWallpaper(
   const created = vault.getAbstractFileByPath(localPath);
   if (created instanceof TFile) return created;
   if (created) throw new Error(`Cannot save ${localPath}: that path is already a folder.`);
-  return vault.createBinary(localPath, response.arrayBuffer);
+  try {
+    return await vault.createBinary(localPath, response.arrayBuffer);
+  } catch (error) {
+    const concurrent = vault.getAbstractFileByPath(localPath);
+    if (concurrent instanceof TFile) return concurrent;
+    throw error;
+  }
 }
