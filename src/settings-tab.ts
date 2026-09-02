@@ -143,9 +143,13 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
         name: "Settings sections",
         searchable: false,
         render: (setting) => {
-          this.containerEl.classList.remove("veil-settings-root");
-          delete this.containerEl.dataset.veilSettingsTab;
+          this.containerEl.classList.add("veil-settings-root");
+          this.containerEl.dataset.veilSettingsTab = this.activeSection;
           setting.settingEl.classList.add("veil-settings-tabs-setting");
+          setting.controlEl.setCssStyles({
+            width: "100%",
+            justifyContent: "flex-start",
+          });
 
           const tabList = setting.controlEl.createDiv({ cls: "veil-settings-tabs" });
           tabList.setAttribute("role", "tablist");
@@ -167,6 +171,7 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
 
           const activate = (sectionId: SettingsSectionId, focus = false): void => {
             this.activeSection = sectionId;
+            this.containerEl.dataset.veilSettingsTab = sectionId;
             for (const candidate of buttons) {
               const selected = candidate.dataset.tabId === sectionId;
               candidate.setAttribute("aria-selected", String(selected));
