@@ -11,8 +11,12 @@ void test("metadata cache changes skip active-file work before layout is ready",
   );
 });
 
-void test("active-file checks do not rebuild full note contexts", () => {
+void test("note contexts and active-file checks share the cheap file lookup", () => {
   assert.match(source, /private fileForDocument\(document: Document\): TFile \| null/);
+  assert.match(
+    source,
+    /private contextForDocument\(document: Document\): NoteContext \| null \{\s*const candidate = this\.fileForDocument\(document\);/,
+  );
   assert.match(
     source,
     /if \(this\.fileForDocument\(document\)\?\.path === file\.path\) return true;/,
