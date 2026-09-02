@@ -45,6 +45,7 @@ export async function importWallhavenWallpaper(
     url: wallpaper.path,
     method: "GET",
     headers: { Accept: wallpaper.fileType },
+    throw: false,
   });
   if (response.status === 429) {
     throw new Error("Wallhaven rate limit reached. Try again in a moment.");
