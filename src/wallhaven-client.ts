@@ -11,6 +11,7 @@ export async function searchWallhaven(options: WallhavenSearchOptions): Promise<
     url: wallhavenSearchUrl(options),
     method: "GET",
     headers: { Accept: "application/json" },
+    throw: false,
   });
   if (response.status === 429) {
     throw new Error("Wallhaven rate limit reached. Try again in a moment.");
