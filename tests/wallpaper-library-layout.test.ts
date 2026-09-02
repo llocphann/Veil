@@ -6,11 +6,12 @@ const source = fs.readFileSync("src/wallpaper-library-modal.ts", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 
 void test("wallpaper cards override fixed Obsidian button dimensions", () => {
-  assert.match(source, /select\.style\.height = "auto"/);
-  assert.match(source, /select\.style\.minHeight = "0"/);
-  assert.match(source, /select\.style\.maxHeight = "none"/);
-  assert.match(source, /select\.style\.whiteSpace = "normal"/);
-  assert.match(source, /preview\.style\.flex = "0 0 auto"/);
+  assert.match(
+    source,
+    /select\.setCssStyles\(\{[\s\S]*?height: "auto"[\s\S]*?minHeight: "0"[\s\S]*?maxHeight: "none"[\s\S]*?whiteSpace: "normal"/,
+  );
+  assert.match(source, /preview\.setCssStyles\(\{ flex: "0 0 auto" \}\)/);
+  assert.doesNotMatch(source, /select\.style\.|preview\.style\./);
 });
 
 void test("wallpaper thumbnails retain a stable preview ratio and crop mode", () => {
