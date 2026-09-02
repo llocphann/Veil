@@ -7,8 +7,6 @@ const SETTINGS_SECTIONS = [
   { id: "routing", label: "Routing", icon: "list-filter" },
   { id: "appearance", label: "Appearance", icon: "palette" },
   { id: "scenes", label: "Scenes", icon: "layers-3" },
-  { id: "data", label: "Data", icon: "database-backup" },
-  { id: "about", label: "About", icon: "info" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -73,10 +71,9 @@ function compact(
  * Presentation adapter for Veil settings.
  *
  * The underlying settings implementation remains in settings-tab-base.ts so
- * routing, validation, import/export, and Scene behavior stay unchanged. This
- * class only reorganizes those definitions using the same mental model as
- * Ledge: feature surface, behavior, routing, appearance, reusable items,
- * portable data, and about/support.
+ * routing, validation, import/export, and Scene behavior stay unchanged. The
+ * tab bar exposes only the primary feature sections; portable data controls
+ * and about/support are rendered as shared sections beneath every tab.
  */
 export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
   private activeSection: SettingsSectionId = "wallpaper";
@@ -108,7 +105,7 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
     const quickActions = actionItems.filter((item) => QUICK_ACTION_NAMES.has(itemName(item)));
     const dataActions = actionItems.filter((item) => DATA_ACTION_NAMES.has(itemName(item)));
 
-    const panels = compact([
+    const tabPanels = compact([
       cloneDefinition(wallpaper, "Wallpaper", "veil-settings-panel-wallpaper", sourceItems),
       cloneDefinition(
         video,
@@ -128,11 +125,14 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
       ),
       cloneDefinition(effects, "Effects", "veil-settings-panel-appearance"),
       cloneDefinition(scenes, "Scenes", "veil-settings-panel-scenes"),
-      cloneDefinition(actions, "Data & recovery", "veil-settings-panel-data", dataActions),
-      cloneDefinition(support, "About & support", "veil-settings-panel-about"),
     ]);
 
-    return [this.navigationDefinition(), ...panels];
+    const sharedSections = compact([
+      cloneDefinition(actions, "Data & recovery", "veil-settings-section-data", dataActions),
+      cloneDefinition(support, "About & support", "veil-settings-section-about"),
+    ]);
+
+    return [this.navigationDefinition(), ...tabPanels, ...sharedSections];
   }
 
   private navigationDefinition(): SettingDefinitionItem<string> {
@@ -143,10 +143,6 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
         name: "Settings sections",
         searchable: false,
         render: (setting) => {
-          // The base implementation used data attributes plus static CSS to
-          // switch six panels. The adapter has seven sections, so it toggles
-          // the rendered top-level panels directly and leaves the shared Ledge
-          // tab styling intact.
           this.containerEl.classList.remove("veil-settings-root");
           delete this.containerEl.dataset.veilSettingsTab;
           setting.settingEl.classList.add("veil-settings-tabs-setting");
