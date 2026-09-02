@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Avoid rebuilding wallpaper-pool candidate lists for unrelated vault changes, and invalidate only pool scopes affected by changed media.
+- Avoid rebuilding wallpaper-pool candidate lists for unrelated vault changes, invalidate only pool scopes affected by changed media, and retain reusable folder scans across pool-setting changes.
 - Reduce metadata-cache refresh work by skipping pre-layout events and checking active file paths without rebuilding full note contexts.
 - Keep documentation regression checks aligned with the detailed routing guide after the README moved advanced usage into the Wiki.
 
