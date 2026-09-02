@@ -42,6 +42,7 @@ import {
   rewriteWallpaperPoolSelectionsForRename,
   wallpaperPoolConfigurationChanges,
 } from "./wallpaper-pool-config";
+import { shouldInvalidatePoolCandidates } from "./pool-cache-invalidation";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -436,7 +437,9 @@ export default class VeilPlugin extends Plugin {
   private registerVaultEvents(): void {
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        this.poolCandidates.clear();
+        if (shouldInvalidatePoolCandidates("create", file.path, "", !(file instanceof TFile))) {
+          this.poolCandidates.clear();
+        }
         this.refreshIfWallpaper(file.path);
       }),
     );
@@ -445,14 +448,18 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        this.poolCandidates.clear();
+        if (shouldInvalidatePoolCandidates("delete", file.path, "", !(file instanceof TFile))) {
+          this.poolCandidates.clear();
+        }
         this.pruneWallpaperLibrary(file.path);
         this.refreshIfWallpaper(file.path);
       }),
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        this.poolCandidates.clear();
+        if (shouldInvalidatePoolCandidates("rename", file.path, oldPath, !(file instanceof TFile))) {
+          this.poolCandidates.clear();
+        }
         const selectedPoolPathRenamed = Array.from(this.documents.values()).some(
           (state) => state.path === oldPath || state.path.startsWith(`${oldPath}/`),
         );
