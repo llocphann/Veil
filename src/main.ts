@@ -40,6 +40,7 @@ import {
 } from "./wallpaper-library-targets";
 import {
   rewriteWallpaperPoolSelectionsForRename,
+  staleWallpaperPoolCandidateCacheKeys,
   wallpaperPoolConfigurationChanges,
 } from "./wallpaper-pool-config";
 import { invalidatePoolCandidatesForVaultEvent } from "./pool-cache-invalidation";
@@ -204,14 +205,15 @@ export default class VeilPlugin extends Plugin {
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
     const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
+    const stalePoolCandidateKeys = staleWallpaperPoolCandidateCacheKeys(previous, next);
     const preservedPoolContextIds = new Set(preservedPoolContexts);
     if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
     this.settings = next;
     if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
       this.manualProfileId = "";
     }
+    for (const key of stalePoolCandidateKeys) this.poolCandidates.delete(key);
     if (changedPoolContexts.length > 0) {
-      this.poolCandidates.clear();
       for (const contextKey of changedPoolContexts) {
         if (preservedPoolContextIds.has(contextKey)) continue;
         const prefix = `${contextKey}|`;

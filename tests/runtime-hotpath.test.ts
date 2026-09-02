@@ -27,3 +27,12 @@ void test("note contexts and active-file checks share the cheap file lookup", ()
   assert.doesNotMatch(activeFileBody, /contextForDocument/);
   assert.doesNotMatch(activeFileBody, /metadataCache/);
 });
+
+void test("settings changes retain unrelated wallpaper pool candidate caches", () => {
+  const updateSettingsBody = source.match(
+    /public updateSettings\([\s\S]*?\n\s{2}public flushSettings\(/,
+  )?.[0] || "";
+  assert.match(updateSettingsBody, /staleWallpaperPoolCandidateCacheKeys\(previous, next\)/);
+  assert.match(updateSettingsBody, /this\.poolCandidates\.delete\(key\)/);
+  assert.doesNotMatch(updateSettingsBody, /this\.poolCandidates\.clear\(\)/);
+});
