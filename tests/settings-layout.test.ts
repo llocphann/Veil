@@ -25,6 +25,8 @@ void test("data and about render as shared sections below tab content", () => {
   assert.match(source, /"Data & recovery", "veil-settings-section-data"/);
   assert.match(source, /"About & support", "veil-settings-section-about"/);
   assert.match(source, /return \[this\.navigationDefinition\(\), \.\.\.tabPanels, \.\.\.sharedSections\]/);
+  assert.doesNotMatch(source, /veil-settings-panel-data/);
+  assert.doesNotMatch(source, /veil-settings-panel-about/);
 });
 
 void test("technical actions are redistributed into user-facing sections", () => {
