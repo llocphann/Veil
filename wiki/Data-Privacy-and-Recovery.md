@@ -56,7 +56,7 @@ Veil keeps at most 128 Favorites and 24 Recent paths.
 
 ## Privacy model
 
-Veil is designed around vault-local media.
+Veil is designed around vault-local wallpaper playback.
 
 It reads:
 
@@ -66,18 +66,30 @@ It reads:
 - the active light/dark theme state;
 - the local computer date/time when adaptive rules are configured.
 
-Veil does **not**:
+Normal wallpaper playback does not use the network. Veil does not send telemetry or analytics, upload vault metadata, modify existing wallpaper media files, or install/update itself.
 
-- make network requests for wallpaper media;
-- send telemetry or analytics;
-- upload vault metadata;
-- modify wallpaper media files;
-- install or update itself;
-- allow wallpaper URLs or paths outside the vault.
+### Optional Wallhaven browser
+
+The **Wallpaper Library → Wallhaven** source is the only built-in feature that intentionally uses the network.
+
+No request is made merely because Veil loads, a vault opens, the Wallpaper Library opens, or you switch to the Wallhaven source. A Wallhaven request starts only when you press **Search** or **Load more**, or when you explicitly select a result that is not already downloaded.
+
+During a Wallhaven browser session:
+
+- search terms and selected filters are sent to `wallhaven.cc`;
+- result thumbnails load from Wallhaven's thumbnail host;
+- only the wallpaper you explicitly select is downloaded from Wallhaven's image host;
+- Veil does not send note contents, frontmatter, tags, vault file lists, or routing state to Wallhaven;
+- the built-in browser requests SFW content only;
+- no Wallhaven account or API key is used or stored.
+
+A selected image is saved under `Wallpapers/Wallhaven/` through Obsidian's Vault API. After that, Veil stores and uses only the vault-relative path for wallpaper playback, Scenes, Routing, pools, Favorites, and Recent behavior.
 
 ## Path safety
 
-Wallpaper paths must be vault-relative. URLs, protocol-prefixed paths, absolute paths, and `..` traversal outside the vault are rejected.
+Wallpaper paths must be vault-relative. URLs, protocol-prefixed paths, absolute paths, and `..` traversal outside the vault are rejected as runtime wallpaper sources.
+
+The Wallhaven importer is separate from runtime wallpaper resolution: it validates Wallhaven-owned HTTPS hosts, downloads a selected image into the vault, then hands the resulting local path to the normal Veil pipeline.
 
 Wiki-style wallpaper paths such as `[[Media/wallpaper.webp]]` are normalized when settings are loaded/imported, but the stored result remains a normal vault-relative path.
 
