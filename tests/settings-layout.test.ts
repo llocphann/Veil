@@ -6,21 +6,38 @@ const source = fs.readFileSync("src/settings-tab.ts", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 
 void test("Veil settings expose the five primary tabs in the intended order", () => {
-  assert.match(
-    source,
-    /const SETTINGS_SECTIONS = \[[\s\S]*?label: "Wallpaper"[\s\S]*?label: "Appearance"[\s\S]*?label: "Behavior"[\s\S]*?label: "Scenes"[\s\S]*?label: "Routing"[\s\S]*?\] as const;/,
-  );
+  const expected = ["Wallpaper", "Appearance", "Behavior", "Scenes", "Routing"];
+  const labels = [...source.matchAll(/\{ id: "[^"]+", label: "([^"]+)"/g)]
+    .map((match) => match[1]);
+  assert.deepEqual(labels.slice(0, expected.length), expected);
   assert.doesNotMatch(source, /label: "Data"/);
   assert.doesNotMatch(source, /label: "About"/);
   assert.doesNotMatch(source, /label: "Actions"/);
   assert.doesNotMatch(source, /label: "Support"/);
 });
 
+void test("settings descriptions stay concise", () => {
+  const block = source.match(
+    /const SIMPLE_DESCRIPTIONS:[\s\S]*?= \{([\s\S]*?)\n\};/,
+  )?.[1] || "";
+  const descriptions = [...block.matchAll(/:\s*"([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(descriptions.length >= 40);
+  for (const description of descriptions) {
+    const wordCount = description.trim().split(/\s+/).length;
+    assert.ok(wordCount <= 10, `Description is too long (${wordCount} words): ${description}`);
+  }
+  assert.match(source, /\.\.\.simplifyDescriptions\(tabPanels\)/);
+  assert.match(source, /\.\.\.simplifyDescriptions\(sharedSections\)/);
+  assert.match(source, /Scenes: "No scenes yet\."/);
+  assert.match(source, /"Wallpaper routing": "No wallpaper rules yet\."/);
+  assert.match(source, /"Opacity exclusions": "No opacity exclusions yet\."/);
+});
+
 void test("data and about render as shared sections below tab content", () => {
   assert.match(source, /const sharedSections = compact\(\[/);
   assert.match(source, /"Data & recovery", "veil-settings-section-data"/);
   assert.match(source, /"About & support", "veil-settings-section-about"/);
-  assert.match(source, /return \[this\.navigationDefinition\(\), \.\.\.tabPanels, \.\.\.sharedSections\]/);
+  assert.match(source, /simplifyDescriptions\(sharedSections\)/);
   assert.doesNotMatch(source, /veil-settings-panel-data/);
   assert.doesNotMatch(source, /veil-settings-panel-about/);
 });
