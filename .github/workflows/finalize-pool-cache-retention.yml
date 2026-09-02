@@ -47,17 +47,17 @@ jobs:
           } from "./wallpaper-pool-config";'''.replace("          ", ""),
               ),
               (
-                  '''    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
-              const preservedPoolContextIds = new Set(preservedPoolContexts);'''.replace("              ", ""),
-                  '''    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
-              const stalePoolCandidateKeys = staleWallpaperPoolCandidateCacheKeys(previous, next);
-              const preservedPoolContextIds = new Set(preservedPoolContexts);'''.replace("              ", ""),
+                  "    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);\n"
+                  "    const preservedPoolContextIds = new Set(preservedPoolContexts);",
+                  "    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);\n"
+                  "    const stalePoolCandidateKeys = staleWallpaperPoolCandidateCacheKeys(previous, next);\n"
+                  "    const preservedPoolContextIds = new Set(preservedPoolContexts);",
               ),
               (
-                  '''    if (changedPoolContexts.length > 0) {
-                    this.poolCandidates.clear();'''.replace("                    ", ""),
-                  '''    for (const key of stalePoolCandidateKeys) this.poolCandidates.delete(key);
-              if (changedPoolContexts.length > 0) {'''.replace("              ", ""),
+                  "    if (changedPoolContexts.length > 0) {\n"
+                  "      this.poolCandidates.clear();",
+                  "    for (const key of stalePoolCandidateKeys) this.poolCandidates.delete(key);\n"
+                  "    if (changedPoolContexts.length > 0) {",
               ),
           ]
           for old, new in replacements:
