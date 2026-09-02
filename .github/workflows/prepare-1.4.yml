@@ -1,0 +1,42 @@
+name: Prepare Veil 1.4.0
+
+on:
+  push:
+    branches:
+      - prerelease
+    paths:
+      - ".github/workflows/prepare-1.4.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Prepare version metadata
+        run: |
+          npm version 1.4.0 --no-git-tag-version
+          git diff --check
+          node -e "const p=require('./package.json'); const m=require('./manifest.json'); const v=require('./versions.json'); if (p.version !== '1.4.0' || m.version !== '1.4.0' || v['1.4.0'] !== m.minAppVersion) throw new Error('1.4.0 metadata is incomplete');"
+
+      - name: Commit version metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json manifest.json versions.json
+          git commit -m "release: prepare Veil 1.4.0"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:prerelease
