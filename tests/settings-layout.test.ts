@@ -5,16 +5,11 @@ import test from "node:test";
 const source = fs.readFileSync("src/settings-tab.ts", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 
-void test("Veil settings expose only the five primary Ledge-style tabs", () => {
-  for (const section of [
-    "Wallpaper",
-    "Behavior",
-    "Routing",
-    "Appearance",
-    "Scenes",
-  ]) {
-    assert.match(source, new RegExp(`label: "${section}"`));
-  }
+void test("Veil settings expose the five primary tabs in the intended order", () => {
+  assert.match(
+    source,
+    /const SETTINGS_SECTIONS = \[[\s\S]*?label: "Wallpaper"[\s\S]*?label: "Appearance"[\s\S]*?label: "Behavior"[\s\S]*?label: "Scenes"[\s\S]*?label: "Routing"[\s\S]*?\] as const;/,
+  );
   assert.doesNotMatch(source, /label: "Data"/);
   assert.doesNotMatch(source, /label: "About"/);
   assert.doesNotMatch(source, /label: "Actions"/);
