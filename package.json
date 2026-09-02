@@ -1,11 +1,16 @@
 {
   "name": "veil-obsidian-plugin",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A configurable context-aware local wallpaper layer for Obsidian workspaces.",
   "main": "main.js",
   "private": true,
   "type": "module",
-  "keywords": ["obsidian", "wallpaper", "background", "video"],
+  "keywords": [
+    "obsidian",
+    "wallpaper",
+    "background",
+    "video"
+  ],
   "license": "GPL-3.0-only",
   "scripts": {
     "dev": "node esbuild.config.mjs",
