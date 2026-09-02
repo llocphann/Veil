@@ -34,7 +34,7 @@
 - Track the most recently active root leaf independently for each desktop/pop-out document so split windows resolve note, tag, property, and Scene rules from the correct local context.
 - Keep theme fallbacks strictly scoped to the theme reported by each document context rather than consulting a global document fallback.
 - Add a command-palette Scene switcher for temporary session-only manual overrides, with a `Follow context rules` option to resume automatic routing.
-- Reorganize Settings using the same task-oriented navigation model as Ledge, adapted for Veil: **Wallpaper, Behavior, Routing, Appearance, Scenes, Data, About**. Runtime actions, transfer/recovery controls, effects, playback, and routing are grouped by user intent instead of implementation category.
+- Reorganize Settings using the same task-oriented navigation model as Ledge, adapted for Veil: **Wallpaper, Behavior, Routing, Appearance, Scenes** remain primary tabs, while **Data & recovery** and **About & support** are shared sections rendered beneath the selected tab instead of taking tab slots.
 - Preserve the complete declarative Settings implementation behind a small presentation adapter so the new organization does not fork Scene/rule validation, import/export, or control behavior.
 - Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
 - Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
