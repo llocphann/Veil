@@ -34,42 +34,33 @@ jobs:
 
           path = Path("src/wallpaper-library-modal.ts")
           source = path.read_text()
-          replacements = [
-              (
-                  '  type WallhavenSearchMeta,\n  type WallhavenSorting,',
-                  '  type WallhavenSearchMeta,\n  type WallhavenSearchOptions,\n  type WallhavenSorting,',
-              ),
-              (
-                  '  private wallhavenHasSearched = false;\n  private wallhavenQuery = "";',
-                  '  private wallhavenHasSearched = false;\n  private wallhavenLastSearch: WallhavenSearchOptions | null = null;\n  private wallhavenQuery = "";',
-              ),
-              (
-                  '''  private async runWallhavenSearch(append: boolean): Promise<void> {
-            if (this.wallhavenBusy) return;
-            const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
-            this.wallhavenBusy = true;
-            if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
-            if (this.summaryEl) this.summaryEl.textContent = append ? "Loading more from Wallhaven…" : "Searching Wallhaven…";
 
-            try {
-              const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
-                ? "date_added"
-                : this.wallhavenSorting;
-              const result = await searchWallhavenApi({
-                query: this.wallhavenQuery,
-                categories: this.wallhavenCategories,
-                atleast: this.wallhavenAtleast,
-                ratios: this.wallhavenRatios,
-                sorting,
-                page: nextPage,
-              });'''.replace("          ", ""),
-                  '''  private async runWallhavenSearch(append: boolean): Promise<void> {
+          old_import = "  type WallhavenSearchMeta,\n  type WallhavenSorting,"
+          new_import = "  type WallhavenSearchMeta,\n  type WallhavenSearchOptions,\n  type WallhavenSorting,"
+          if source.count(old_import) != 1:
+              raise SystemExit(f"Expected one WallhavenSearchOptions import target, found {source.count(old_import)}")
+          source = source.replace(old_import, new_import)
+
+          old_field = '  private wallhavenHasSearched = false;\n  private wallhavenQuery = "";'
+          new_field = '  private wallhavenHasSearched = false;\n  private wallhavenLastSearch: WallhavenSearchOptions | null = null;\n  private wallhavenQuery = "";'
+          if source.count(old_field) != 1:
+              raise SystemExit(f"Expected one last-search field target, found {source.count(old_field)}")
+          source = source.replace(old_field, new_field)
+
+          start_marker = "  private async runWallhavenSearch(append: boolean): Promise<void> {"
+          end_marker = "\n  private renderWallhavenGrid(): void {"
+          start = source.find(start_marker)
+          end = source.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit("Could not locate Wallhaven search function boundaries")
+
+          replacement = '''  private async runWallhavenSearch(append: boolean): Promise<void> {
             if (this.wallhavenBusy) return;
             const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
             const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
               ? "date_added"
               : this.wallhavenSorting;
-            const options = append && this.wallhavenLastSearch
+            const options: WallhavenSearchOptions = append && this.wallhavenLastSearch
               ? this.wallhavenLastSearch
               : {
                   query: this.wallhavenQuery,
@@ -80,35 +71,42 @@ jobs:
                 };
             this.wallhavenBusy = true;
             if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
-            if (this.summaryEl) this.summaryEl.textContent = append ? "Loading more from Wallhaven…" : "Searching Wallhaven…";
+            if (this.summaryEl) {
+              this.summaryEl.textContent = append
+                ? "Loading more from Wallhaven…"
+                : "Searching Wallhaven…";
+            }
 
             try {
-              const result = await searchWallhavenApi({ ...options, page: nextPage });'''.replace("          ", ""),
-              ),
-              (
-                  '      this.wallhavenMeta = result.meta;\n      this.wallhavenHasSearched = true;',
-                  '      this.wallhavenMeta = result.meta;\n      this.wallhavenHasSearched = true;\n      if (!append) this.wallhavenLastSearch = options;',
-              ),
-          ]
-          for old, new in replacements:
-              count = source.count(old)
-              if count != 1:
-                  raise SystemExit(f"Expected one modal patch target, found {count}: {old[:120]!r}")
-              source = source.replace(old, new)
+              const result = await searchWallhavenApi({ ...options, page: nextPage });
+              if (append) {
+                const known = new Set(this.wallhavenResults.map((wallpaper) => wallpaper.id));
+                this.wallhavenResults.push(...result.data.filter((wallpaper) => !known.has(wallpaper.id)));
+              } else {
+                this.wallhavenResults = result.data;
+              }
+              this.wallhavenMeta = result.meta;
+              this.wallhavenHasSearched = true;
+              if (!append) this.wallhavenLastSearch = options;
+            } catch (error) {
+              new Notice(errorMessage(error));
+            } finally {
+              this.wallhavenBusy = false;
+              if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = false;
+              this.renderWallhavenGrid();
+            }
+          }
+'''.replace("          ", "")
+          source = source[:start] + replacement.rstrip() + source[end:]
           path.write_text(source)
 
           css_path = Path("styles.css")
           css = css_path.read_text()
-          old = '''.veil-wallpaper-library-toolbar {
-            display: flex;
-            gap: var(--size-4-2);'''.replace("          ", "")
-          new = '''.veil-wallpaper-library-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: var(--size-4-2);'''.replace("          ", "")
-          if css.count(old) != 1:
-              raise SystemExit(f"Expected one toolbar CSS patch target, found {css.count(old)}")
-          css_path.write_text(css.replace(old, new))
+          old_css = ".veil-wallpaper-library-toolbar {\n  display: flex;\n  gap: var(--size-4-2);"
+          new_css = ".veil-wallpaper-library-toolbar {\n  display: flex;\n  flex-wrap: wrap;\n  gap: var(--size-4-2);"
+          if css.count(old_css) != 1:
+              raise SystemExit(f"Expected one toolbar CSS patch target, found {css.count(old_css)}")
+          css_path.write_text(css.replace(old_css, new_css))
           PY
 
       - name: Install dependencies
