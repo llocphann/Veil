@@ -10,10 +10,12 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 
 ## Settings organization
 
-- Open **Settings → Veil** and confirm the task-oriented tabs are **Wallpaper, Behavior, Routing, Appearance, Scenes, Data, About**, with the same compact icon-tab interaction style used by Ledge.
+- Open **Settings → Veil** and confirm the primary tabs are **Wallpaper, Behavior, Routing, Appearance, Scenes**, with the same compact icon-tab interaction style used by Ledge.
 - Confirm **Wallpaper** contains source/pool/library controls; **Behavior** contains transition, video/motion, Reload, and Shuffle; **Routing** contains Active context, wallpaper routes, and opacity exclusions.
-- Confirm **Appearance** contains framing/opacity plus Effects; **Scenes** contains reusable Scene management; **Data** contains Export, Import, and Restore; **About** contains the support action.
-- Switch tabs with mouse and keyboard Left/Right/Home/End. Only the selected section should be visible, and changing a setting that re-renders the page must preserve the active section.
+- Confirm **Appearance** contains framing/opacity plus Effects; **Scenes** contains reusable Scene management.
+- Confirm **Data & recovery** is no longer a tab and remains visible below the selected tab content with Export, Import, and Restore controls.
+- Confirm **About & support** is no longer a tab and appears directly below Data & recovery with the support action.
+- Switch primary tabs with mouse and keyboard Left/Right/Home/End. Only the selected primary section should change; Data & recovery and About & support must remain below it, and changing a setting that re-renders the page must preserve the active tab.
 - Search Settings for controls from different sections and confirm the declarative Settings search still exposes the expected controls without duplicate Actions/Support categories.
 
 ## Windows and navigation
