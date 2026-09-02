@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const source = fs.readFileSync("src/settings-tab.ts", "utf8");
+const styles = fs.readFileSync("styles.css", "utf8");
 
 void test("Veil settings expose only the five primary Ledge-style tabs", () => {
   for (const section of [
@@ -39,6 +40,15 @@ void test("tab control follows Ledge root and control layout semantics", () => {
   );
   assert.doesNotMatch(source, /classList\.remove\("veil-settings-root"\)/);
   assert.doesNotMatch(source, /delete this\.containerEl\.dataset\.veilSettingsTab/);
+});
+
+void test("tab strip is frameless and centers its buttons", () => {
+  const block = styles.match(/\.veil-settings-tabs\s*\{([\s\S]*?)\}/)?.[1] || "";
+  assert.match(block, /justify-content:\s*center;/);
+  assert.doesNotMatch(block, /\bgap\s*:/);
+  assert.doesNotMatch(block, /\bpadding\s*:/);
+  assert.doesNotMatch(block, /\bborder\s*:/);
+  assert.doesNotMatch(block, /\bborder-radius\s*:/);
 });
 
 void test("technical actions are redistributed into user-facing sections", () => {
