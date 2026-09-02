@@ -1,0 +1,96 @@
+name: Publish Veil 1.4.0
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-1.4.yml"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: "1.4.0"
+      RELEASE_SHA: ${{ github.event.before }}
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.before }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify release source
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          node - <<'NODE'
+          const p = require('./package.json');
+          const m = require('./manifest.json');
+          const v = require('./versions.json');
+          if (p.version !== process.env.RELEASE_TAG) throw new Error(`package version is ${p.version}`);
+          if (m.version !== process.env.RELEASE_TAG) throw new Error(`manifest version is ${m.version}`);
+          if (v[process.env.RELEASE_TAG] !== m.minAppVersion) throw new Error('versions.json is missing the release baseline');
+          NODE
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint, test, and build
+        run: npm run check
+
+      - name: Prepare release notes
+        run: |
+          awk -v version="$RELEASE_TAG" '
+            $0 == "## " version { in_section=1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > /tmp/RELEASE_NOTES.md
+          test -s /tmp/RELEASE_NOTES.md
+
+      - name: Attest release files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      - name: Create tag and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag "$RELEASE_TAG" "$RELEASE_SHA"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${RELEASE_TAG}"
+          gh release create "$RELEASE_TAG" \
+            --verify-tag \
+            --title "Veil ${RELEASE_TAG}" \
+            --notes-file /tmp/RELEASE_NOTES.md \
+            main.js manifest.json styles.css
+
+      - name: Remove publish helper
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          rm .github/workflows/publish-1.4.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/publish-1.4.yml
+          git commit -m "chore: remove 1.4.0 publish helper"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
