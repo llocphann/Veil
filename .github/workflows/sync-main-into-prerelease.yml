@@ -27,13 +27,24 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Merge current main
+      - name: Merge current main and update docs contract
         run: |
           git fetch origin main
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git merge --no-commit --no-ff origin/main
           rm .github/workflows/sync-main-into-prerelease.yml
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/manifest.test.ts")
+          source = path.read_text()
+          old = '''void test("context routing and opacity exclusions are documented and exposed in settings", () => {\n  const readme = fs.readFileSync("README.md", "utf8");\n  const settings = settingsSource();\n  const runtime = fs.readFileSync("src/main.ts", "utf8");\n\n  assert.match(readme, /Wallpaper routes are evaluated from top to bottom/);\n  assert.match(readme, /Opacity exclusions are additive/);\n  assert.match(settings, /heading: "Wallpaper routing"/);\n  assert.match(settings, /heading: "Opacity exclusions"/);\n  assert.match(runtime, /metadataCache\\.on\\(\\"changed\\"/);\n});'''
+          new = '''void test("context routing and opacity exclusions are documented and exposed in settings", () => {\n  const readme = fs.readFileSync("README.md", "utf8");\n  const routingGuide = fs.readFileSync("wiki/Routing-and-Opacity-Exclusions.md", "utf8");\n  const settings = settingsSource();\n  const runtime = fs.readFileSync("src/main.ts", "utf8");\n\n  assert.match(readme, /Routing and Opacity Exclusions/);\n  assert.match(routingGuide, /Ordinary wallpaper rules/);\n  assert.match(routingGuide, /Adaptive system fallbacks/);\n  assert.match(routingGuide, /Exclusions are additive/);\n  assert.match(settings, /heading: "Wallpaper routing"/);\n  assert.match(settings, /heading: "Opacity exclusions"/);\n  assert.match(runtime, /metadataCache\\.on\\(\\"changed\\"/);\n});'''
+          if source.count(old) != 1:
+              raise SystemExit("Expected one stale routing documentation contract")
+          path.write_text(source.replace(old, new))
+          PY
 
       - name: Install dependencies
         run: npm ci
