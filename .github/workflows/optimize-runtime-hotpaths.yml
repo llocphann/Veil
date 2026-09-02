@@ -100,7 +100,7 @@ jobs:
               /if \(this\.fileForDocument\(document\)\?\.path === file\.path\) return true;/,
             );
             const activeFileBody = source.match(
-              /private isActiveFile\(file: TFile\): boolean \{([\s\S]*?)\n  \}/,
+              /private isActiveFile\(file: TFile\): boolean \{([\s\S]*?)\n {2}\}/,
             )?.[1] || "";
             assert.doesNotMatch(activeFileBody, /contextForDocument/);
             assert.doesNotMatch(activeFileBody, /metadataCache/);
