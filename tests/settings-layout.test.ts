@@ -29,6 +29,18 @@ void test("data and about render as shared sections below tab content", () => {
   assert.doesNotMatch(source, /veil-settings-panel-about/);
 });
 
+void test("tab control follows Ledge root and control layout semantics", () => {
+  assert.match(source, /classList\.add\("veil-settings-root"\)/);
+  assert.match(source, /dataset\.veilSettingsTab = this\.activeSection/);
+  assert.match(source, /dataset\.veilSettingsTab = sectionId/);
+  assert.match(
+    source,
+    /setting\.controlEl\.setCssStyles\(\{[\s\S]*?width: "100%"[\s\S]*?justifyContent: "flex-start"/,
+  );
+  assert.doesNotMatch(source, /classList\.remove\("veil-settings-root"\)/);
+  assert.doesNotMatch(source, /delete this\.containerEl\.dataset\.veilSettingsTab/);
+});
+
 void test("technical actions are redistributed into user-facing sections", () => {
   assert.match(source, /QUICK_ACTION_NAMES[\s\S]*Reload wallpaper[\s\S]*Shuffle wallpaper pool/);
   assert.match(source, /DATA_ACTION_NAMES[\s\S]*Export settings[\s\S]*Import settings[\s\S]*Restore defaults/);
