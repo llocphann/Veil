@@ -1,0 +1,131 @@
+name: Finalize Wallhaven integration
+
+on:
+  push:
+    branches:
+      - prerelease
+    paths:
+      - ".github/workflows/finalize-wallhaven.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Patch Wallhaven paging and responsive toolbar
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/wallpaper-library-modal.ts")
+          source = path.read_text()
+          replacements = [
+              (
+                  '  type WallhavenSearchMeta,\n  type WallhavenSorting,',
+                  '  type WallhavenSearchMeta,\n  type WallhavenSearchOptions,\n  type WallhavenSorting,',
+              ),
+              (
+                  '  private wallhavenHasSearched = false;\n  private wallhavenQuery = "";',
+                  '  private wallhavenHasSearched = false;\n  private wallhavenLastSearch: WallhavenSearchOptions | null = null;\n  private wallhavenQuery = "";',
+              ),
+              (
+                  '''  private async runWallhavenSearch(append: boolean): Promise<void> {
+            if (this.wallhavenBusy) return;
+            const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
+            this.wallhavenBusy = true;
+            if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
+            if (this.summaryEl) this.summaryEl.textContent = append ? "Loading more from Wallhaven…" : "Searching Wallhaven…";
+
+            try {
+              const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
+                ? "date_added"
+                : this.wallhavenSorting;
+              const result = await searchWallhavenApi({
+                query: this.wallhavenQuery,
+                categories: this.wallhavenCategories,
+                atleast: this.wallhavenAtleast,
+                ratios: this.wallhavenRatios,
+                sorting,
+                page: nextPage,
+              });'''.replace("          ", ""),
+                  '''  private async runWallhavenSearch(append: boolean): Promise<void> {
+            if (this.wallhavenBusy) return;
+            const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
+            const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
+              ? "date_added"
+              : this.wallhavenSorting;
+            const options = append && this.wallhavenLastSearch
+              ? this.wallhavenLastSearch
+              : {
+                  query: this.wallhavenQuery,
+                  categories: this.wallhavenCategories,
+                  atleast: this.wallhavenAtleast,
+                  ratios: this.wallhavenRatios,
+                  sorting,
+                };
+            this.wallhavenBusy = true;
+            if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
+            if (this.summaryEl) this.summaryEl.textContent = append ? "Loading more from Wallhaven…" : "Searching Wallhaven…";
+
+            try {
+              const result = await searchWallhavenApi({ ...options, page: nextPage });'''.replace("          ", ""),
+              ),
+              (
+                  '      this.wallhavenMeta = result.meta;\n      this.wallhavenHasSearched = true;',
+                  '      this.wallhavenMeta = result.meta;\n      this.wallhavenHasSearched = true;\n      if (!append) this.wallhavenLastSearch = options;',
+              ),
+          ]
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected one modal patch target, found {count}: {old[:120]!r}")
+              source = source.replace(old, new)
+          path.write_text(source)
+
+          css_path = Path("styles.css")
+          css = css_path.read_text()
+          old = '''.veil-wallpaper-library-toolbar {
+            display: flex;
+            gap: var(--size-4-2);'''.replace("          ", "")
+          new = '''.veil-wallpaper-library-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--size-4-2);'''.replace("          ", "")
+          if css.count(old) != 1:
+              raise SystemExit(f"Expected one toolbar CSS patch target, found {css.count(old)}")
+          css_path.write_text(css.replace(old, new))
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Wallhaven integration
+        run: npm run check
+
+      - name: Commit verified Wallhaven finalization
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          rm .github/workflows/finalize-wallhaven.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/wallpaper-library-modal.ts styles.css .github/workflows/finalize-wallhaven.yml
+          git commit -m "fix: harden Wallhaven library state"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:prerelease
