@@ -2,44 +2,22 @@
 
 ## Unreleased
 
-- Add reusable **Scenes** that capture wallpaper, pool behavior, framing, opacity, vignette, blur/dim, color overlay, effect, transition, and video playback settings as one profile.
-- Allow wallpaper routing rules to switch to a complete scene while preserving the 1.3 inline-wallpaper behavior.
-- Duplicate an existing Scene from Settings with a fresh ID while preserving its complete wallpaper, pool, appearance, transition, effect, and video configuration.
-- Keep the ` copy` suffix visible when duplicating Scene names at the 80-character limit so the duplicate cannot appear to have the same name as its source.
-- Surface the 64-Scene limit in Settings instead of silently dropping additions beyond the normalized data cap.
-- Surface the 96-item limits for wallpaper rules and opacity exclusions, and reject oversized imported collections instead of silently truncating portable settings.
-- Add an active-context inspector so routing settings show whether the current note resolves to the default appearance, an inline wallpaper rule, or a scene.
-- Add horizontal/vertical focal-point controls and 100–200% wallpaper zoom globally and per scene.
-- Crossfade between successfully loaded wallpapers with configurable 0–2000 ms duration, retaining the previous wallpaper if the incoming media fails.
-- Keep the last successfully loaded wallpaper visible across rapid A → B → C navigation when B is still preloading, rather than disposing the fallback and flashing a blank workspace.
-- Keep the last working wallpaper when a configured default/Scene/rule source is temporarily missing, invalid, or unsupported; clearing the default wallpaper intentionally still restores the theme background.
-- Ignore duplicate ready callbacks from cached images/load events so a single incoming wallpaper cannot start its transition twice.
-- Respect reduced-motion preferences by disabling scene crossfades in addition to pausing motion-heavy effects and video.
-- Expose all scene-specific effects and playback controls directly inside each Scene editor.
-- Add wallpaper pools for the default appearance and scenes, with optional descendant-folder discovery, stable per-context selection, and an explicit shuffle command that avoids the previous item when possible.
-- Keep pool selections stable across appearance-only edits, and invalidate only the default/Scene pool whose anchor or pool scope actually changed instead of rerolling unrelated Scenes.
-- Preserve a pool's currently selected media across vault file/folder renames by rewriting cached current/previous selections to the new path instead of rerolling the pool.
-- Add a lazy visual wallpaper library command with search, Favorites, Recently Selected, image thumbnails, lightweight video placeholders, and batched rendering for large vaults.
-- Add wallpaper-library folder/media filters, modification-time/name sorting, and a random pick constrained to the current visible result set.
-- Keep **Random visible** constrained to the cards currently rendered by the library's incremental 60-item view, rather than selecting an off-screen result that has not been revealed yet.
-- Let the Wallpaper Library apply a selected or random wallpaper directly to the default appearance, any Scene, or any legacy inline wallpaper rule without changing the other targets.
-- Keep Favorites and Recently Selected as local vault metadata in `data.json`; rename/delete events keep that metadata synchronized without polluting portable Scene settings exports.
-- Add frontmatter property routing. Property rules accept `key=value` for case-insensitive scalar/array matching, or `key` to match property existence.
-- Add adaptive system-context fallback routing through Property rules: `@theme=light|dark`, `@time=HH:MM-HH:MM`, `@day=...`, and `@schedule=<days> HH:MM-HH:MM`, including overnight ranges.
-- Warn in Settings when enabled frontmatter/system routing syntax is malformed, using the same parser as runtime matching for both wallpaper routes and opacity exclusions.
-- Keep note/path/folder/tag/frontmatter wallpaper rules above adaptive system fallbacks regardless of list position; a session-only manual Scene override remains the highest-priority appearance source.
-- Schedule time/day routing with a single one-shot timeout at the next meaningful boundary instead of interval polling; theme changes remain event-driven through Obsidian's CSS-change event.
-- Fix overnight scheduled fallbacks so an early-morning carryover such as `mon-fri 22:00-06:00` still schedules the current day's 06:00 end boundary instead of waiting for the next evening.
-- Preserve per-window system context even when a desktop window has no active note, so adaptive theme/time/day fallbacks still resolve correctly there.
-- Track the most recently active root leaf independently for each desktop/pop-out document so split windows resolve note, tag, property, and Scene rules from the correct local context.
-- Keep theme fallbacks strictly scoped to the theme reported by each document context rather than consulting a global document fallback.
-- Add a command-palette Scene switcher for temporary session-only manual overrides, with a `Follow context rules` option to resume automatic routing.
-- Reorganize Settings using the same task-oriented navigation model as Ledge, adapted for Veil: **Wallpaper, Behavior, Routing, Appearance, Scenes** remain primary tabs, while **Data & recovery** and **About & support** are shared sections rendered beneath the selected tab instead of taking tab slots.
-- Preserve the complete declarative Settings implementation behind a small presentation adapter so the new organization does not fork Scene/rule validation, import/export, or control behavior.
-- Upgrade settings exports to schema 2 and automatically migrate schema 1 exports from Veil 1.3.
-- Split scene resolution into a dedicated resolver with regression coverage for scene routing and legacy rules.
-- Harden release automation with immutable action SHAs, source/tag verification before dependency installation, production-bundle checks, and a read-only verification job that hands verified artifacts to a separate publish-only job with write/OIDC permissions.
-- Explicitly approve every locked dependency install script by package and version, and make npm fail closed before any newly introduced or unreviewed install script can execute.
+## 1.4.0
+
+- Add reusable **Scenes** that save wallpaper, framing, opacity, effects, transitions, and video behavior together.
+- Let routing rules switch complete Scenes or keep the legacy inline-wallpaper behavior from 1.3.
+- Add frontmatter property routing and adaptive `@theme`, `@time`, `@day`, and `@schedule` fallbacks, including overnight schedules.
+- Add a session-only Scene switcher with **Follow context rules** to return to automatic routing.
+- Add wallpaper pools for the default appearance and Scenes, with optional subfolders, stable selections, and manual shuffle.
+- Add a visual Wallpaper Library with search, Favorites, Recently Selected, filters, sorting, target selection, and **Random visible**.
+- Add horizontal and vertical focal points, 100–200% zoom, and configurable wallpaper crossfades.
+- Keep the last working wallpaper visible during rapid navigation or when a configured source is temporarily unavailable.
+- Improve multi-window and pop-out handling so each window resolves its own note and system context correctly.
+- Reorganize Settings into **Wallpaper → Appearance → Behavior → Scenes → Routing**, with shared Data and About sections below the tabs.
+- Shorten Settings descriptions for faster scanning and fix Wallpaper Library thumbnails being compressed by theme/button styles.
+- Upgrade settings export/import to schema 2 while automatically migrating Veil 1.3 schema 1 backups.
+- Add validation and visible limits for Scenes, routing rules, opacity exclusions, and imported collections.
+- Harden release, CI, lifecycle cleanup, dependency-script approval, bundle verification, and local-only privacy checks.
 
 ## 1.3.0
 
