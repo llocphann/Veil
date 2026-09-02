@@ -1,0 +1,105 @@
+name: Finalize Veil pool cache retention
+
+on:
+  push:
+    branches:
+      - prerelease
+    paths:
+      - ".github/workflows/finalize-pool-cache-retention.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Patch candidate cache retention
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/main.ts")
+          source = path.read_text()
+          replacements = [
+              (
+                  '''import {
+            rewriteWallpaperPoolSelectionsForRename,
+            wallpaperPoolConfigurationChanges,
+          } from "./wallpaper-pool-config";'''.replace("          ", ""),
+                  '''import {
+            rewriteWallpaperPoolSelectionsForRename,
+            staleWallpaperPoolCandidateCacheKeys,
+            wallpaperPoolConfigurationChanges,
+          } from "./wallpaper-pool-config";'''.replace("          ", ""),
+              ),
+              (
+                  '''    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
+              const preservedPoolContextIds = new Set(preservedPoolContexts);'''.replace("              ", ""),
+                  '''    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
+              const stalePoolCandidateKeys = staleWallpaperPoolCandidateCacheKeys(previous, next);
+              const preservedPoolContextIds = new Set(preservedPoolContexts);'''.replace("              ", ""),
+              ),
+              (
+                  '''    if (changedPoolContexts.length > 0) {
+                    this.poolCandidates.clear();'''.replace("                    ", ""),
+                  '''    for (const key of stalePoolCandidateKeys) this.poolCandidates.delete(key);
+              if (changedPoolContexts.length > 0) {'''.replace("              ", ""),
+              ),
+          ]
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one main.ts patch target, found {count}: {old[:100]!r}")
+              source = source.replace(old, new)
+          path.write_text(source)
+
+          test_path = Path("tests/runtime-hotpath.test.ts")
+          tests = test_path.read_text()
+          addition = '''
+
+          void test("settings changes retain unrelated wallpaper pool candidate caches", () => {
+            const updateSettingsBody = source.match(
+              /public updateSettings\\([\\s\\S]*?\\n  public flushSettings\\(/,
+            )?.[0] || "";
+            assert.match(updateSettingsBody, /staleWallpaperPoolCandidateCacheKeys\\(previous, next\\)/);
+            assert.match(updateSettingsBody, /this\\.poolCandidates\\.delete\\(key\\)/);
+            assert.doesNotMatch(updateSettingsBody, /this\\.poolCandidates\\.clear\\(\\)/);
+          });
+          '''.replace("          ", "")
+          if "settings changes retain unrelated wallpaper pool candidate caches" in tests:
+              raise SystemExit("Runtime cache retention test already exists")
+          test_path.write_text(tests.rstrip() + addition)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify final optimization
+        run: npm run check
+
+      - name: Commit final optimization
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          rm .github/workflows/finalize-pool-cache-retention.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main.ts tests/runtime-hotpath.test.ts .github/workflows/finalize-pool-cache-retention.yml
+          git commit -m "perf: retain reusable pool candidate caches"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:prerelease
