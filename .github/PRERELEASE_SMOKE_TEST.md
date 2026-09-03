@@ -48,6 +48,7 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 - Search for an SFW wallpaper and exercise category, minimum-resolution, aspect-ratio, and sort filters. Confirm only image results are shown and **Load more** appends the next page when available.
 - Select a Wallhaven result for Default appearance. Confirm exactly one JPG/PNG is created under `Wallpapers/Wallhaven/` and the configured wallpaper becomes that vault-relative file.
 - While a Wallhaven result is still downloading, immediately try to select another result. All result cards should remain disabled until the active import finishes, and only one full-resolution import should run at a time.
+- While a Wallhaven download is pending, switch to **Vault** and choose a different wallpaper for the same target. The Wallhaven image may still finish saving locally, but it must not replace the newer Vault selection when the download completes.
 - Select the same Wallhaven result again and confirm the existing local file is reused rather than duplicated or renamed.
 - Import separately to a Scene and an inline wallpaper rule; unrelated targets must remain unchanged.
 - After an import succeeds, disconnect the network, close/reopen Wallpaper Library, navigate notes, switch Scenes, and restart Obsidian. The imported wallpaper must continue working from the vault without a network connection.
