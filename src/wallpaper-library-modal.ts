@@ -674,8 +674,19 @@ export class WallpaperLibraryModal extends Modal {
     });
   }
 
+  private targetSelectedPath(targetId: string): string | null {
+    const target = this.controller.getTargets().find((candidate) => candidate.id === targetId);
+    return target?.selectedPath ?? null;
+  }
+
   private async importAndSelectWallhaven(wallpaper: WallhavenWallpaper, targetId: string): Promise<void> {
     if (this.wallhavenDownloading.size > 0) return;
+    const expectedSelectedPath = this.targetSelectedPath(targetId);
+    if (expectedSelectedPath === null) {
+      new Notice("Wallpaper target is no longer available.");
+      return;
+    }
+
     const localPath = wallhavenLocalPath(wallpaper);
     const existed = this.app.vault.getAbstractFileByPath(localPath) instanceof TFile;
     this.wallhavenDownloading.add(wallpaper.id);
@@ -686,8 +697,16 @@ export class WallpaperLibraryModal extends Modal {
         this.files.push(file);
         this.files.sort((left, right) => left.path.localeCompare(right.path));
       }
-      this.controller.selectWallpaper(targetId, file.path);
-      new Notice(existed ? "Applied downloaded Wallhaven wallpaper." : `Saved ${file.path}`);
+
+      const currentSelectedPath = this.targetSelectedPath(targetId);
+      if (currentSelectedPath === null) {
+        new Notice(`Saved ${file.path}; the target is no longer available.`);
+      } else if (currentSelectedPath !== expectedSelectedPath) {
+        new Notice(`Saved ${file.path}; a newer wallpaper choice was kept.`);
+      } else {
+        this.controller.selectWallpaper(targetId, file.path);
+        new Notice(existed ? "Applied downloaded Wallhaven wallpaper." : `Saved ${file.path}`);
+      }
     } catch (error) {
       new Notice(errorMessage(error));
     } finally {

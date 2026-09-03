@@ -34,6 +34,14 @@ void test("Wallhaven serializes full-resolution imports", () => {
   assert.match(download, /if \(activeWallhavenImport === operation\) activeWallhavenImport = null;/);
 });
 
+void test("Wallhaven completion cannot overwrite a newer target choice", () => {
+  assert.match(library, /private targetSelectedPath\(targetId: string\): string \| null/);
+  assert.match(library, /const expectedSelectedPath = this\.targetSelectedPath\(targetId\);/);
+  assert.match(library, /const currentSelectedPath = this\.targetSelectedPath\(targetId\);/);
+  assert.match(library, /currentSelectedPath !== expectedSelectedPath/);
+  assert.match(library, /a newer wallpaper choice was kept/);
+});
+
 void test("Wallpaper Library toolbars can wrap on narrow windows", () => {
   assert.match(
     styles,
