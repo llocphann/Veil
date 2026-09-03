@@ -5,6 +5,7 @@ import {
   isWallhavenOriginalUrl,
   isWallhavenThumbnailUrl,
   parseWallhavenSearchResponse,
+  wallhavenImageBytesMatchType,
   wallhavenLocalPath,
   wallhavenSearchUrl,
 } from "../src/wallhaven";
@@ -87,6 +88,18 @@ void test("Wallhaven URL guards reject non-Wallhaven and insecure origins", () =
   assert.equal(isWallhavenOriginalUrl("https://wallhaven.cc/w/94x38z"), false);
   assert.equal(isWallhavenThumbnailUrl("https://th.wallhaven.cc/lg/94/94x38z.jpg"), true);
   assert.equal(isWallhavenThumbnailUrl("https://w.wallhaven.cc/lg/94/94x38z.jpg"), false);
+});
+
+void test("Wallhaven image payloads match their declared type", () => {
+  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0x00]).buffer;
+  const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]).buffer;
+  const html = new TextEncoder().encode("<html>").buffer;
+
+  assert.equal(wallhavenImageBytesMatchType(jpeg, "image/jpeg"), true);
+  assert.equal(wallhavenImageBytesMatchType(png, "image/png"), true);
+  assert.equal(wallhavenImageBytesMatchType(jpeg, "image/png"), false);
+  assert.equal(wallhavenImageBytesMatchType(png, "image/jpeg"), false);
+  assert.equal(wallhavenImageBytesMatchType(html, "image/jpeg"), false);
 });
 
 void test("Wallhaven file sizes stay compact for library cards", () => {

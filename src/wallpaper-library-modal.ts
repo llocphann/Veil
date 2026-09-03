@@ -82,7 +82,7 @@ export class WallpaperLibraryModal extends Modal {
     this.contentEl.createEl("h2", { text: "Wallpaper library" });
     this.contentEl.createEl("p", {
       cls: "veil-wallpaper-library-description",
-      text: "Browse vault media or import SFW wallpapers from Wallhaven. Imported files are saved to your vault and used locally.",
+      text: "Browse vault media or import safe-for-work wallpapers online. Imported files are saved to your vault and used locally.",
     });
 
     this.refreshVaultFiles();
@@ -288,8 +288,8 @@ export class WallpaperLibraryModal extends Modal {
       cls: "veil-wallpaper-library-search",
       attr: {
         type: "search",
-        placeholder: "Search Wallhaven…",
-        "aria-label": "Search Wallhaven",
+        placeholder: "Search online wallpapers…",
+        "aria-label": "Search online wallpapers",
       },
     });
     search.value = this.wallhavenQuery;
@@ -531,47 +531,47 @@ export class WallpaperLibraryModal extends Modal {
   }
 
   private async runWallhavenSearch(append: boolean): Promise<void> {
-  if (this.wallhavenBusy) return;
-  const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
-  const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
-    ? "date_added"
-    : this.wallhavenSorting;
-  const options: WallhavenSearchOptions = append && this.wallhavenLastSearch
-    ? this.wallhavenLastSearch
-    : {
-        query: this.wallhavenQuery,
-        categories: this.wallhavenCategories,
-        atleast: this.wallhavenAtleast,
-        ratios: this.wallhavenRatios,
-        sorting,
-      };
-  this.wallhavenBusy = true;
-  if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
-  if (this.summaryEl) {
-    this.summaryEl.textContent = append
-      ? "Loading more from Wallhaven…"
-      : "Searching Wallhaven…";
-  }
-
-  try {
-    const result = await searchWallhavenApi({ ...options, page: nextPage });
-    if (append) {
-      const known = new Set(this.wallhavenResults.map((wallpaper) => wallpaper.id));
-      this.wallhavenResults.push(...result.data.filter((wallpaper) => !known.has(wallpaper.id)));
-    } else {
-      this.wallhavenResults = result.data;
+    if (this.wallhavenBusy) return;
+    const nextPage = append ? (this.wallhavenMeta?.currentPage || 0) + 1 : 1;
+    const sorting = !this.wallhavenQuery.trim() && this.wallhavenSorting === "relevance"
+      ? "date_added"
+      : this.wallhavenSorting;
+    const options: WallhavenSearchOptions = append && this.wallhavenLastSearch
+      ? this.wallhavenLastSearch
+      : {
+          query: this.wallhavenQuery,
+          categories: this.wallhavenCategories,
+          atleast: this.wallhavenAtleast,
+          ratios: this.wallhavenRatios,
+          sorting,
+        };
+    this.wallhavenBusy = true;
+    if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
+    if (this.summaryEl) {
+      this.summaryEl.textContent = append
+        ? "Loading more from Wallhaven…"
+        : "Searching Wallhaven…";
     }
-    this.wallhavenMeta = result.meta;
-    this.wallhavenHasSearched = true;
-    if (!append) this.wallhavenLastSearch = options;
-  } catch (error) {
-    new Notice(errorMessage(error));
-  } finally {
-    this.wallhavenBusy = false;
-    if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = false;
-    this.renderWallhavenGrid();
+
+    try {
+      const result = await searchWallhavenApi({ ...options, page: nextPage });
+      if (append) {
+        const known = new Set(this.wallhavenResults.map((wallpaper) => wallpaper.id));
+        this.wallhavenResults.push(...result.data.filter((wallpaper) => !known.has(wallpaper.id)));
+      } else {
+        this.wallhavenResults = result.data;
+      }
+      this.wallhavenMeta = result.meta;
+      this.wallhavenHasSearched = true;
+      if (!append) this.wallhavenLastSearch = options;
+    } catch (error) {
+      new Notice(errorMessage(error));
+    } finally {
+      this.wallhavenBusy = false;
+      if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = false;
+      this.renderWallhavenGrid();
+    }
   }
-}
   private renderWallhavenGrid(): void {
     if (this.source !== "wallhaven") return;
     const grid = this.gridEl;
@@ -583,7 +583,7 @@ export class WallpaperLibraryModal extends Modal {
     const target = this.activeTarget();
 
     if (!this.wallhavenHasSearched) {
-      summary.textContent = "Wallhaven is optional and SFW-only. Press Search to connect.";
+      summary.textContent = "Online import is optional and safe-for-work only. Press search to connect.";
       grid.createDiv({
         cls: "veil-wallpaper-library-empty",
         text: "Search Wallhaven to import a wallpaper into your vault.",
@@ -625,6 +625,7 @@ export class WallpaperLibraryModal extends Modal {
     const local = this.app.vault.getAbstractFileByPath(localPath);
     const downloaded = local instanceof TFile;
     const downloading = this.wallhavenDownloading.has(wallpaper.id);
+    const downloadBusy = this.wallhavenDownloading.size > 0;
     const selected = target.selectedPath === localPath;
     const card = grid.createDiv({ cls: "veil-wallpaper-library-card" });
     card.dataset.selected = String(selected);
@@ -638,7 +639,7 @@ export class WallpaperLibraryModal extends Modal {
           : `Download Wallhaven ${wallpaper.id} and use it for ${target.label}`,
       },
     });
-    select.disabled = downloading;
+    select.disabled = downloadBusy;
     select.setCssStyles({
       height: "auto",
       minHeight: "0",
@@ -674,7 +675,7 @@ export class WallpaperLibraryModal extends Modal {
   }
 
   private async importAndSelectWallhaven(wallpaper: WallhavenWallpaper, targetId: string): Promise<void> {
-    if (this.wallhavenDownloading.has(wallpaper.id)) return;
+    if (this.wallhavenDownloading.size > 0) return;
     const localPath = wallhavenLocalPath(wallpaper);
     const existed = this.app.vault.getAbstractFileByPath(localPath) instanceof TFile;
     this.wallhavenDownloading.add(wallpaper.id);

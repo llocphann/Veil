@@ -104,6 +104,20 @@ export function isWallhavenThumbnailUrl(value: string): boolean {
   return httpsUrlForHost(value, "th.wallhaven.cc") !== null;
 }
 
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
+
+export function wallhavenImageBytesMatchType(
+  data: ArrayBuffer,
+  fileType: WallhavenWallpaper["fileType"],
+): boolean {
+  const bytes = new Uint8Array(data);
+  if (fileType === "image/png") {
+    return bytes.length >= PNG_SIGNATURE.length
+      && PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
+  }
+  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+}
+
 function parseWallpaper(value: unknown): WallhavenWallpaper | null {
   if (!isRecord(value)) return null;
   const id = typeof value.id === "string" && /^[a-z0-9]{6}$/.test(value.id) ? value.id : "";

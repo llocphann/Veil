@@ -23,6 +23,12 @@ void test("Wallhaven source does not search automatically when opened", () => {
   assert.match(renderSource, /addEventListener\("click", \(\) => \{\s*void this\.runWallhavenSearch\(false\);/);
 });
 
+void test("Wallhaven serializes full-resolution imports", () => {
+  assert.match(library, /const downloadBusy = this\.wallhavenDownloading\.size > 0;/);
+  assert.match(library, /select\.disabled = downloadBusy;/);
+  assert.match(library, /if \(this\.wallhavenDownloading\.size > 0\) return;/);
+});
+
 void test("Wallpaper Library toolbars can wrap on narrow windows", () => {
   assert.match(
     styles,

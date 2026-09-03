@@ -2,6 +2,7 @@ import { TFile, TFolder, normalizePath, requestUrl, type Vault } from "obsidian"
 import {
   WALLHAVEN_DOWNLOAD_FOLDER,
   isWallhavenOriginalUrl,
+  wallhavenImageBytesMatchType,
   wallhavenLocalPath,
   type WallhavenWallpaper,
 } from "./wallhaven";
@@ -59,6 +60,9 @@ export async function importWallhavenWallpaper(
   }
   if (response.arrayBuffer.byteLength === 0) {
     throw new Error("Wallhaven returned an empty wallpaper file.");
+  }
+  if (!wallhavenImageBytesMatchType(response.arrayBuffer, wallpaper.fileType)) {
+    throw new Error("Wallhaven returned invalid image data.");
   }
 
   await ensureFolder(vault, WALLHAVEN_DOWNLOAD_FOLDER);
