@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add an optional SFW Wallhaven browser to Wallpaper Library that searches on demand, keeps pagination tied to the last explicit search, serializes full-resolution imports, validates downloaded JPEG/PNG data, saves the selected image into `Wallpapers/Wallhaven/`, and uses the local file afterward.
+- Keep a newer wallpaper choice active if an earlier Wallhaven download finishes later; the imported file is still saved locally without overriding the newer selection.
 - Keep Wallpaper Library controls usable on narrower windows by allowing its toolbars to wrap.
 - Avoid rebuilding wallpaper-pool candidate lists for unrelated vault changes, invalidate only pool scopes affected by changed media, and retain reusable folder scans across pool-setting changes.
 - Reduce metadata-cache refresh work by skipping pre-layout events and checking active file paths without rebuilding full note contexts.
