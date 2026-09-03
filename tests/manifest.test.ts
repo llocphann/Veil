@@ -85,11 +85,14 @@ void test("stylesheet avoids Community CSS lint warnings", () => {
 
 void test("context routing and opacity exclusions are documented and exposed in settings", () => {
   const readme = fs.readFileSync("README.md", "utf8");
+  const routingGuide = fs.readFileSync("wiki/Routing-and-Opacity-Exclusions.md", "utf8");
   const settings = settingsSource();
   const runtime = fs.readFileSync("src/main.ts", "utf8");
 
-  assert.match(readme, /Wallpaper routes are evaluated from top to bottom/);
-  assert.match(readme, /Opacity exclusions are additive/);
+  assert.match(readme, /Routing and Opacity Exclusions/);
+  assert.match(routingGuide, /Ordinary wallpaper rules/);
+  assert.match(routingGuide, /Adaptive system fallbacks/);
+  assert.match(routingGuide, /Exclusions are additive/);
   assert.match(settings, /heading: "Wallpaper routing"/);
   assert.match(settings, /heading: "Opacity exclusions"/);
   assert.match(runtime, /metadataCache\.on\("changed"/);

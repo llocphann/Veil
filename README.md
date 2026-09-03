@@ -6,11 +6,12 @@ Veil adds vault-local image, animated GIF, and video wallpapers to Obsidian. It 
   <img src="assets/homepage.png" alt="Veil wallpaper behind an Obsidian workspace" width="82%">
 </p>
 
-> Veil is desktop-only. Wallpaper media always stays inside your vault.
+> Veil is desktop-only. Wallpaper media always stays inside your vault after selection.
 
 ## Highlights
 
 - Use images, animated GIFs, or videos stored in the current vault.
+- Search and import SFW wallpapers from **Wallhaven** directly from the Wallpaper Library.
 - Create **Scenes** that save wallpaper, framing, opacity, effects, transitions, and video behavior together.
 - Route a wallpaper or Scene by note name, path, folder, tag, frontmatter, theme, day, or time.
 - Build stable random wallpaper pools and shuffle them when you want a new choice.
@@ -33,7 +34,7 @@ If Veil is available in the Community Plugins directory, open **Settings → Com
 ## Quick start
 
 1. Open **Settings → Community plugins → Veil**.
-2. In **Wallpaper**, choose a vault image, GIF, or video.
+2. In **Wallpaper**, choose a vault image, GIF, or video, or open **Wallpaper Library → Wallhaven** to import an SFW wallpaper.
 3. Use **Appearance** to adjust framing, opacity, and effects.
 4. Use **Scenes** when you want reusable complete looks.
 5. Use **Routing** when Veil should change automatically for different notes or contexts.
@@ -57,7 +58,11 @@ Start with:
 
 ## Privacy
 
-Veil reads only vault-local wallpaper media and Obsidian metadata needed by your configured rules. It does not make network requests, collect telemetry, run analytics, or modify your media files. URLs and paths outside the vault are rejected.
+Veil reads vault-local wallpaper media and Obsidian metadata needed by your configured rules. Normal wallpaper playback does not require the network, and Veil does not collect telemetry or run analytics.
+
+Veil connects to Wallhaven only when you use the optional Wallhaven browser in **Wallpaper Library**. Search terms and selected filters are sent to `wallhaven.cc`; result thumbnails load from Wallhaven, and the full image is downloaded only when you explicitly select it. Imported wallpapers are saved inside your vault under `Wallpapers/Wallhaven/` and are used locally afterward. Veil does not send note contents or vault metadata to Wallhaven.
+
+The built-in Wallhaven browser is SFW-only and does not use or store a Wallhaven API key.
 
 ## Support
 
