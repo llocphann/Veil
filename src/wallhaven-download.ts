@@ -7,6 +7,8 @@ import {
   type WallhavenWallpaper,
 } from "./wallhaven";
 
+let activeWallhavenImport: Promise<TFile> | null = null;
+
 function headerValue(headers: Record<string, string>, name: string): string {
   const expected = name.toLowerCase();
   const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === expected);
@@ -30,14 +32,11 @@ async function ensureFolder(vault: Vault, folderPath: string): Promise<void> {
   }
 }
 
-export async function importWallhavenWallpaper(
+async function downloadWallhavenWallpaper(
   vault: Vault,
   wallpaper: WallhavenWallpaper,
+  localPath: string,
 ): Promise<TFile> {
-  const localPath = normalizePath(wallhavenLocalPath(wallpaper));
-  const existing = vault.getAbstractFileByPath(localPath);
-  if (existing instanceof TFile) return existing;
-  if (existing) throw new Error(`Cannot save ${localPath}: that path is already a folder.`);
   if (!isWallhavenOriginalUrl(wallpaper.path)) {
     throw new Error("Wallhaven returned an unsafe download URL.");
   }
@@ -75,5 +74,26 @@ export async function importWallhavenWallpaper(
     const concurrent = vault.getAbstractFileByPath(localPath);
     if (concurrent instanceof TFile) return concurrent;
     throw error;
+  }
+}
+
+export async function importWallhavenWallpaper(
+  vault: Vault,
+  wallpaper: WallhavenWallpaper,
+): Promise<TFile> {
+  const localPath = normalizePath(wallhavenLocalPath(wallpaper));
+  const existing = vault.getAbstractFileByPath(localPath);
+  if (existing instanceof TFile) return existing;
+  if (existing) throw new Error(`Cannot save ${localPath}: that path is already a folder.`);
+  if (activeWallhavenImport) {
+    throw new Error("Another Wallhaven wallpaper is already downloading. Wait for it to finish.");
+  }
+
+  const operation = downloadWallhavenWallpaper(vault, wallpaper, localPath);
+  activeWallhavenImport = operation;
+  try {
+    return await operation;
+  } finally {
+    if (activeWallhavenImport === operation) activeWallhavenImport = null;
   }
 }
