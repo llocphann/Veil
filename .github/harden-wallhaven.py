@@ -175,7 +175,7 @@ wallhaven_test_path.write_text(wallhaven_test)
 
 library_test_path = Path("tests/wallhaven-library.test.ts")
 library_test = library_test_path.read_text()
-serial_test = '''void test("Wallhaven serializes full-resolution imports", () => {
+serial_test = r'''void test("Wallhaven serializes full-resolution imports", () => {
   assert.match(library, /const downloadBusy = this\.wallhavenDownloading\.size > 0;/);
   assert.match(library, /select\.disabled = downloadBusy;/);
   assert.match(library, /if \(this\.wallhavenDownloading\.size > 0\) return;/);
@@ -194,8 +194,8 @@ changelog_path = Path("CHANGELOG.md")
 changelog = changelog_path.read_text()
 changelog = replace_once(
     changelog,
-    "- Add an optional SFW Wallhaven browser to Wallpaper Library that searches on demand, downloads only the selected image into `Wallpapers/Wallhaven/`, and uses the local file afterward.",
-    "- Add an optional SFW Wallhaven browser to Wallpaper Library that searches on demand, serializes full-resolution imports, validates downloaded JPEG/PNG data, saves the selected image into `Wallpapers/Wallhaven/`, and uses the local file afterward.",
+    "- Add an optional SFW Wallhaven browser to Wallpaper Library that searches on demand, keeps pagination tied to the last explicit search, downloads only the selected image into `Wallpapers/Wallhaven/`, and uses the local file afterward.",
+    "- Add an optional SFW Wallhaven browser to Wallpaper Library that searches on demand, keeps pagination tied to the last explicit search, serializes full-resolution imports, validates downloaded JPEG/PNG data, saves the selected image into `Wallpapers/Wallhaven/`, and uses the local file afterward.",
     "Wallhaven changelog",
 )
 changelog_path.write_text(changelog)
