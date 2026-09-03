@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const library = fs.readFileSync("src/wallpaper-library-modal.ts", "utf8");
+const download = fs.readFileSync("src/wallhaven-download.ts", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 
 void test("Wallhaven paging stays bound to the last explicit search", () => {
@@ -27,6 +28,10 @@ void test("Wallhaven serializes full-resolution imports", () => {
   assert.match(library, /const downloadBusy = this\.wallhavenDownloading\.size > 0;/);
   assert.match(library, /select\.disabled = downloadBusy;/);
   assert.match(library, /if \(this\.wallhavenDownloading\.size > 0\) return;/);
+  assert.match(download, /let activeWallhavenImport: Promise<TFile> \| null = null;/);
+  assert.match(download, /if \(activeWallhavenImport\) \{/);
+  assert.match(download, /activeWallhavenImport = operation;/);
+  assert.match(download, /if \(activeWallhavenImport === operation\) activeWallhavenImport = null;/);
 });
 
 void test("Wallpaper Library toolbars can wrap on narrow windows", () => {
