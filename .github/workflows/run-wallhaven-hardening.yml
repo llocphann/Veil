@@ -48,3 +48,5 @@ jobs:
           git add -A
           git commit -m "fix: harden Wallhaven imports"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:prerelease
+
+# Retry after aligning the staged patch with the current changelog.
