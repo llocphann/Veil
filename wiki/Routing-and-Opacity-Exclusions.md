@@ -9,7 +9,7 @@ Routing lets Veil choose a wallpaper or Scene from the active note and system co
 ## Priority
 
 1. Manual Scene override.
-2. Note/path/folder/tag/frontmatter rules — first match wins.
+2. Ordinary note/path/folder/tag/frontmatter rules — first match wins.
 3. `@theme`, `@time`, `@day`, `@schedule` fallbacks — first match wins.
 4. Default appearance.
 
@@ -17,7 +17,9 @@ An adaptive `@...` rule never outranks an ordinary note rule, even if it appears
 
 Veil supports up to **96 wallpaper rules**.
 
-## Match types
+## Ordinary wallpaper rules
+
+Match types:
 
 - **Note name** — basename, `.md` optional.
 - **Exact path** — one vault-relative file path.
@@ -34,7 +36,7 @@ published=true
 featured
 ```
 
-## System fallbacks
+## Adaptive system fallbacks
 
 Use the frontmatter/system-context field with these reserved forms:
 
@@ -67,7 +69,9 @@ They can independently keep these at 100% opacity:
 - **Pane background**
 - **Pane & content**
 
-Exclusions are **additive**: every matching enabled exclusion is evaluated. Veil supports up to **96 opacity exclusions**.
+## Exclusions are additive
+
+Every matching enabled exclusion is evaluated. Veil supports up to **96 opacity exclusions**.
 
 ## Common mistakes
 
