@@ -20,8 +20,7 @@ type LibraryView = "all" | "favorites" | "recent";
 type LibraryKind = "all" | Exclude<MediaKind, "">;
 type LibrarySort = "default" | "name" | "newest" | "oldest";
 
-const INITIAL_VISIBLE_ITEMS = 60;
-const VISIBLE_ITEMS_STEP = 60;
+const WALLPAPERS_PER_PAGE = 8;
 const ALL_FOLDERS = "__all__";
 const ROOT_FOLDER = "__root__";
 
@@ -53,10 +52,11 @@ export class WallpaperLibraryModal extends Modal {
   private sort: LibrarySort = "default";
   private folderScope = ALL_FOLDERS;
   private targetId = "";
-  private visibleLimit = INITIAL_VISIBLE_ITEMS;
+  private vaultPage = 1;
+  private showMetadata = false;
   private gridEl: HTMLElement | null = null;
   private summaryEl: HTMLElement | null = null;
-  private moreEl: HTMLElement | null = null;
+  private paginationEl: HTMLElement | null = null;
   private filterButtons = new Map<LibraryView, HTMLButtonElement>();
   private wallhavenResults: WallhavenWallpaper[] = [];
   private wallhavenMeta: WallhavenSearchMeta | null = null;
@@ -67,6 +67,7 @@ export class WallpaperLibraryModal extends Modal {
   private wallhavenAtleast = "";
   private wallhavenRatios = "";
   private wallhavenSorting: WallhavenSorting = "relevance";
+  private wallhavenPage = 1;
   private wallhavenBusy = false;
   private wallhavenSearchButton: HTMLButtonElement | null = null;
   private wallhavenDownloading = new Set<string>();
@@ -131,7 +132,7 @@ export class WallpaperLibraryModal extends Modal {
     this.sourceEl = null;
     this.gridEl = null;
     this.summaryEl = null;
-    this.moreEl = null;
+    this.paginationEl = null;
     this.wallhavenSearchButton = null;
     this.contentEl.empty();
   }
@@ -163,7 +164,7 @@ export class WallpaperLibraryModal extends Modal {
     sourceEl.empty();
     this.gridEl = null;
     this.summaryEl = null;
-    this.moreEl = null;
+    this.paginationEl = null;
     this.wallhavenSearchButton = null;
     if (this.source === "wallhaven") this.renderWallhavenSource(sourceEl);
     else this.renderVaultSource(sourceEl);
@@ -182,7 +183,7 @@ export class WallpaperLibraryModal extends Modal {
     search.value = this.query;
     search.addEventListener("input", () => {
       this.query = search.value.trim().toLowerCase();
-      this.resetVisibleLimit();
+      this.resetVaultPage();
     });
 
     const filters = toolbar.createDiv({ cls: "veil-wallpaper-library-filters" });
@@ -199,7 +200,7 @@ export class WallpaperLibraryModal extends Modal {
       });
       button.addEventListener("click", () => {
         this.view = view;
-        this.visibleLimit = INITIAL_VISIBLE_ITEMS;
+        this.vaultPage = 1;
         this.updateFilterButtons();
         this.renderVaultGrid();
       });
@@ -226,7 +227,7 @@ export class WallpaperLibraryModal extends Modal {
     folderSelect.value = this.folderScope;
     folderSelect.addEventListener("change", () => {
       this.folderScope = folderSelect.value || ALL_FOLDERS;
-      this.resetVisibleLimit();
+      this.resetVaultPage();
     });
 
     const kindSelect = toolbar.createEl("select", {
@@ -244,7 +245,7 @@ export class WallpaperLibraryModal extends Modal {
     kindSelect.addEventListener("change", () => {
       const value = kindSelect.value;
       this.kind = value === "image" || value === "video" ? value : "all";
-      this.resetVisibleLimit();
+      this.resetVaultPage();
     });
 
     const sortSelect = toolbar.createEl("select", {
@@ -265,7 +266,7 @@ export class WallpaperLibraryModal extends Modal {
       this.sort = value === "name" || value === "newest" || value === "oldest"
         ? value
         : "default";
-      this.resetVisibleLimit();
+      this.resetVaultPage();
     });
 
     const randomButton = toolbar.createEl("button", {
@@ -274,10 +275,11 @@ export class WallpaperLibraryModal extends Modal {
       attr: { type: "button" },
     });
     randomButton.addEventListener("click", () => this.selectRandomVisible());
+    this.createMetadataToggle(toolbar);
 
     this.summaryEl = container.createDiv({ cls: "veil-wallpaper-library-summary" });
     this.gridEl = container.createDiv({ cls: "veil-wallpaper-library-grid" });
-    this.moreEl = container.createDiv({ cls: "veil-wallpaper-library-more" });
+    this.paginationEl = container.createDiv({ cls: "veil-wallpaper-library-pagination" });
     this.updateFilterButtons();
     this.renderVaultGrid();
   }
@@ -383,11 +385,35 @@ export class WallpaperLibraryModal extends Modal {
     this.wallhavenSearchButton.addEventListener("click", () => {
       void this.runWallhavenSearch(false);
     });
+    this.createMetadataToggle(toolbar);
 
     this.summaryEl = container.createDiv({ cls: "veil-wallpaper-library-summary" });
     this.gridEl = container.createDiv({ cls: "veil-wallpaper-library-grid" });
-    this.moreEl = container.createDiv({ cls: "veil-wallpaper-library-more" });
+    this.paginationEl = container.createDiv({ cls: "veil-wallpaper-library-pagination" });
     this.renderWallhavenGrid();
+  }
+
+  private createMetadataToggle(container: HTMLElement): void {
+    const button = container.createEl("button", {
+      cls: "veil-wallpaper-library-metadata-toggle",
+      text: "Metadata",
+      attr: {
+        type: "button",
+        "aria-pressed": String(this.showMetadata),
+        title: this.showMetadata ? "Hide wallpaper metadata" : "Show wallpaper metadata",
+      },
+    });
+    button.classList.toggle("is-active", this.showMetadata);
+    button.addEventListener("click", () => {
+      this.showMetadata = !this.showMetadata;
+      button.setAttribute("aria-pressed", String(this.showMetadata));
+      button.setAttribute(
+        "title",
+        this.showMetadata ? "Hide wallpaper metadata" : "Show wallpaper metadata",
+      );
+      button.classList.toggle("is-active", this.showMetadata);
+      this.renderActiveGrid();
+    });
   }
 
   private populateTargetSelect(select: HTMLSelectElement): void {
@@ -411,8 +437,8 @@ export class WallpaperLibraryModal extends Modal {
     this.targetId = target.id;
   }
 
-  private resetVisibleLimit(): void {
-    this.visibleLimit = INITIAL_VISIBLE_ITEMS;
+  private resetVaultPage(): void {
+    this.vaultPage = 1;
     this.renderVaultGrid();
   }
 
@@ -422,6 +448,40 @@ export class WallpaperLibraryModal extends Modal {
       button.setAttribute("aria-pressed", String(active));
       button.classList.toggle("is-active", active);
     }
+  }
+
+  private pageCount(totalItems: number): number {
+    return Math.max(1, Math.ceil(totalItems / WALLPAPERS_PER_PAGE));
+  }
+
+  private renderPagination(
+    container: HTMLElement,
+    currentPage: number,
+    totalPages: number,
+    onChange: (page: number) => void,
+    busy = false,
+  ): void {
+    container.empty();
+    if (totalPages <= 1) return;
+
+    const previous = container.createEl("button", {
+      text: "Previous",
+      attr: { type: "button", "aria-label": "Previous wallpaper page" },
+    });
+    previous.disabled = busy || currentPage <= 1;
+    previous.addEventListener("click", () => onChange(currentPage - 1));
+
+    container.createSpan({
+      cls: "veil-wallpaper-library-page-status",
+      text: `Page ${currentPage} of ${totalPages}`,
+    });
+
+    const next = container.createEl("button", {
+      text: busy ? "Loading…" : "Next",
+      attr: { type: "button", "aria-label": "Next wallpaper page" },
+    });
+    next.disabled = busy || currentPage >= totalPages;
+    next.addEventListener("click", () => onChange(currentPage + 1));
   }
 
   private visibleFiles(): TFile[] {
@@ -465,11 +525,12 @@ export class WallpaperLibraryModal extends Modal {
 
   private selectRandomVisible(): void {
     const target = this.activeTarget();
-    const selected = randomVisibleWallpaper(
-      this.visibleFiles(),
-      this.visibleLimit,
-      target.selectedPath,
-    );
+    const files = this.visibleFiles();
+    const totalPages = this.pageCount(files.length);
+    this.vaultPage = Math.min(Math.max(1, this.vaultPage), totalPages);
+    const start = (this.vaultPage - 1) * WALLPAPERS_PER_PAGE;
+    const pageFiles = files.slice(start, start + WALLPAPERS_PER_PAGE);
+    const selected = randomVisibleWallpaper(pageFiles, pageFiles.length, target.selectedPath);
     if (!selected) return;
     this.controller.selectWallpaper(target.id, selected.path);
     this.renderVaultGrid();
@@ -484,20 +545,25 @@ export class WallpaperLibraryModal extends Modal {
     if (this.source !== "vault") return;
     const grid = this.gridEl;
     const summary = this.summaryEl;
-    const more = this.moreEl;
-    if (!grid || !summary || !more) return;
+    const pagination = this.paginationEl;
+    if (!grid || !summary || !pagination) return;
 
     grid.empty();
-    more.empty();
+    pagination.empty();
     const target = this.activeTarget();
     const files = this.visibleFiles();
-    const visible = files.slice(0, this.visibleLimit);
+    const totalPages = this.pageCount(files.length);
+    this.vaultPage = Math.min(Math.max(1, this.vaultPage), totalPages);
+    const start = (this.vaultPage - 1) * WALLPAPERS_PER_PAGE;
+    const visible = files.slice(start, start + WALLPAPERS_PER_PAGE);
     const imageCount = files.reduce((count, file) => count + Number(mediaKind(file) === "image"), 0);
     const videoCount = files.length - imageCount;
     const countText = files.length === 1
       ? `1 wallpaper · ${imageCount} image · ${videoCount} videos`
       : `${files.length} wallpapers · ${imageCount} images · ${videoCount} videos`;
-    summary.textContent = `${countText} · Apply to: ${target.label}`;
+    summary.textContent = files.length > 0
+      ? `${countText} · Page ${this.vaultPage} of ${totalPages} · Apply to: ${target.label}`
+      : `${countText} · Apply to: ${target.label}`;
 
     if (visible.length === 0) {
       grid.createDiv({
@@ -517,17 +583,15 @@ export class WallpaperLibraryModal extends Modal {
       this.renderCard(grid, file, favorites.has(file.path), file.path === target.selectedPath, target);
     }
 
-    if (visible.length < files.length) {
-      const button = more.createEl("button", {
-        cls: "veil-wallpaper-library-show-more",
-        text: `Show ${Math.min(VISIBLE_ITEMS_STEP, files.length - visible.length)} more`,
-        attr: { type: "button" },
-      });
-      button.addEventListener("click", () => {
-        this.visibleLimit += VISIBLE_ITEMS_STEP;
+    this.renderPagination(
+      pagination,
+      this.vaultPage,
+      totalPages,
+      (page) => {
+        this.vaultPage = page;
         this.renderVaultGrid();
-      });
-    }
+      },
+    );
   }
 
   private async runWallhavenSearch(append: boolean): Promise<void> {
@@ -549,9 +613,10 @@ export class WallpaperLibraryModal extends Modal {
     if (this.wallhavenSearchButton) this.wallhavenSearchButton.disabled = true;
     if (this.summaryEl) {
       this.summaryEl.textContent = append
-        ? "Loading more from Wallhaven…"
+        ? "Loading the next wallpaper page…"
         : "Searching Wallhaven…";
     }
+    if (this.paginationEl) this.paginationEl.empty();
 
     try {
       const result = await searchWallhavenApi({ ...options, page: nextPage });
@@ -560,6 +625,7 @@ export class WallpaperLibraryModal extends Modal {
         this.wallhavenResults.push(...result.data.filter((wallpaper) => !known.has(wallpaper.id)));
       } else {
         this.wallhavenResults = result.data;
+        this.wallhavenPage = 1;
       }
       this.wallhavenMeta = result.meta;
       this.wallhavenHasSearched = true;
@@ -572,14 +638,42 @@ export class WallpaperLibraryModal extends Modal {
       this.renderWallhavenGrid();
     }
   }
+
+  private goToWallhavenPage(page: number): void {
+    const totalPages = this.pageCount(this.wallhavenMeta?.total ?? this.wallhavenResults.length);
+    if (page < 1 || page > totalPages || this.wallhavenBusy) return;
+    const start = (page - 1) * WALLPAPERS_PER_PAGE;
+    if (start < this.wallhavenResults.length) {
+      this.wallhavenPage = page;
+      this.renderWallhavenGrid();
+      return;
+    }
+
+    const meta = this.wallhavenMeta;
+    if (!meta || meta.currentPage >= meta.lastPage) return;
+    void this.loadNextWallhavenResults(page);
+  }
+
+  private async loadNextWallhavenResults(targetPage: number): Promise<void> {
+    const previousCount = this.wallhavenResults.length;
+    await this.runWallhavenSearch(true);
+    if (
+      this.wallhavenResults.length > previousCount
+      && (targetPage - 1) * WALLPAPERS_PER_PAGE < this.wallhavenResults.length
+    ) {
+      this.wallhavenPage = targetPage;
+      this.renderWallhavenGrid();
+    }
+  }
+
   private renderWallhavenGrid(): void {
     if (this.source !== "wallhaven") return;
     const grid = this.gridEl;
     const summary = this.summaryEl;
-    const more = this.moreEl;
-    if (!grid || !summary || !more) return;
+    const pagination = this.paginationEl;
+    if (!grid || !summary || !pagination) return;
     grid.empty();
-    more.empty();
+    pagination.empty();
     const target = this.activeTarget();
 
     if (!this.wallhavenHasSearched) {
@@ -593,27 +687,35 @@ export class WallpaperLibraryModal extends Modal {
 
     const meta = this.wallhavenMeta;
     const total = meta?.total ?? this.wallhavenResults.length;
-    summary.textContent = `${total} SFW results · ${this.wallhavenResults.length} loaded · Apply to: ${target.label}`;
+    const totalPages = this.pageCount(total);
+    this.wallhavenPage = Math.min(Math.max(1, this.wallhavenPage), totalPages);
+    const start = (this.wallhavenPage - 1) * WALLPAPERS_PER_PAGE;
+    const visible = this.wallhavenResults.slice(start, start + WALLPAPERS_PER_PAGE);
+    summary.textContent = `${total} SFW results · Page ${this.wallhavenPage} of ${totalPages} · ${this.wallhavenResults.length} loaded · Apply to: ${target.label}`;
+
     if (this.wallhavenResults.length === 0) {
       grid.createDiv({ cls: "veil-wallpaper-library-empty", text: "No Wallhaven wallpapers matched this search." });
       return;
     }
 
-    for (const wallpaper of this.wallhavenResults) {
-      this.renderWallhavenCard(grid, wallpaper, target);
+    if (visible.length === 0) {
+      grid.createDiv({
+        cls: "veil-wallpaper-library-empty",
+        text: this.wallhavenBusy ? "Loading wallpapers…" : "This page is not loaded yet.",
+      });
+    } else {
+      for (const wallpaper of visible) {
+        this.renderWallhavenCard(grid, wallpaper, target);
+      }
     }
 
-    if (meta && meta.currentPage < meta.lastPage) {
-      const button = more.createEl("button", {
-        cls: "veil-wallpaper-library-show-more",
-        text: this.wallhavenBusy ? "Loading…" : "Load more",
-        attr: { type: "button" },
-      });
-      button.disabled = this.wallhavenBusy;
-      button.addEventListener("click", () => {
-        void this.runWallhavenSearch(true);
-      });
-    }
+    this.renderPagination(
+      pagination,
+      this.wallhavenPage,
+      totalPages,
+      (page) => this.goToWallhavenPage(page),
+      this.wallhavenBusy,
+    );
   }
 
   private renderWallhavenCard(
@@ -664,11 +766,13 @@ export class WallpaperLibraryModal extends Modal {
       cls: "veil-wallpaper-library-type",
       text: downloading ? "DOWNLOADING" : downloaded ? "IN VAULT" : "WALLHAVEN",
     });
-    select.createSpan({ cls: "veil-wallpaper-library-name", text: `wallhaven-${wallpaper.id}` });
-    select.createSpan({
-      cls: "veil-wallpaper-library-path",
-      text: `${wallpaper.resolution} · ${formatWallhavenFileSize(wallpaper.fileSize)} · ${wallpaper.category}`,
-    });
+    if (this.showMetadata) {
+      select.createSpan({ cls: "veil-wallpaper-library-name", text: `wallhaven-${wallpaper.id}` });
+      select.createSpan({
+        cls: "veil-wallpaper-library-path",
+        text: `${wallpaper.resolution} · ${formatWallhavenFileSize(wallpaper.fileSize)} · ${wallpaper.category}`,
+      });
+    }
     select.addEventListener("click", () => {
       void this.importAndSelectWallhaven(wallpaper, target.id);
     });
@@ -765,8 +869,10 @@ export class WallpaperLibraryModal extends Modal {
       cls: "veil-wallpaper-library-type",
       text: file.extension.toUpperCase(),
     });
-    select.createSpan({ cls: "veil-wallpaper-library-name", text: file.name });
-    select.createSpan({ cls: "veil-wallpaper-library-path", text: file.path });
+    if (this.showMetadata) {
+      select.createSpan({ cls: "veil-wallpaper-library-name", text: file.name });
+      select.createSpan({ cls: "veil-wallpaper-library-path", text: file.path });
+    }
     select.addEventListener("click", () => {
       this.controller.selectWallpaper(target.id, file.path);
       this.renderVaultGrid();
