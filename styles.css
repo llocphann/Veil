@@ -389,10 +389,15 @@ body.is-mobile > .vault-dashboard-wallpaper {
   color: var(--text-success, var(--text-accent));
 }
 
-/* Wallpaper library is rendered only on explicit user request through the command palette. */
+/* Keep the library visually inside the settings content lane instead of
+ * covering the persistent settings/plugin navigation rail. */
 .veil-wallpaper-library-modal {
-  width: min(1540px, 96vw);
-  max-width: 96vw;
+  --veil-wallpaper-library-pane-offset: clamp(80px, 6.5vw, 112px);
+
+  position: relative;
+  left: var(--veil-wallpaper-library-pane-offset);
+  width: min(1540px, calc(96vw - var(--veil-wallpaper-library-pane-offset)));
+  max-width: calc(96vw - var(--veil-wallpaper-library-pane-offset));
 }
 
 .veil-wallpaper-library-description,
@@ -689,6 +694,12 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 @media (max-width: 900px) {
+  .veil-wallpaper-library-modal {
+    left: 0;
+    width: min(1540px, 96vw);
+    max-width: 96vw;
+  }
+
   .veil-wallpaper-library-toolbar > select,
   .veil-wallpaper-library-target {
     max-width: min(18rem, 60vw);
