@@ -33,6 +33,13 @@ function poolSelectionKey(configuration: PoolConfiguration): string {
   }`;
 }
 
+function poolCandidateCacheKey(configuration: PoolConfiguration): string | null {
+  if (!configuration.enabled || !configuration.wallpaperPath) return null;
+  return `${poolFolder(configuration.wallpaperPath)}|${
+    configuration.includeSubfolders ? "recursive" : "direct"
+  }`;
+}
+
 export function wallpaperPoolConfiguration(settings: VeilSettings): PoolConfiguration[] {
   return [
     configurationFor(
@@ -71,6 +78,25 @@ export function wallpaperPoolConfigurationChanges(
         || !nextConfiguration
         || !configurationEqual(previousConfiguration, nextConfiguration);
     })
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export function staleWallpaperPoolCandidateCacheKeys(
+  previous: VeilSettings,
+  next: VeilSettings,
+): string[] {
+  const before = new Set<string>();
+  const after = new Set<string>();
+  for (const configuration of wallpaperPoolConfiguration(previous)) {
+    const key = poolCandidateCacheKey(configuration);
+    if (key) before.add(key);
+  }
+  for (const configuration of wallpaperPoolConfiguration(next)) {
+    const key = poolCandidateCacheKey(configuration);
+    if (key) after.add(key);
+  }
+  return Array.from(before)
+    .filter((key) => !after.has(key))
     .sort((left, right) => left.localeCompare(right));
 }
 

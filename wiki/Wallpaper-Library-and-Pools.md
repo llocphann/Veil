@@ -33,7 +33,27 @@ An **inline wallpaper rule** intentionally does not use the global/default wallp
 
 Open the Library from **Wallpaper → Wallpaper library**, **Behavior → Quick actions**, or the Command Palette.
 
-The Library scans supported media already inside the vault. Images use lazy-loaded previews. Videos use lightweight placeholders instead of decoding every video just to display the browser.
+The Library has two sources: **Vault** and **Wallhaven**.
+
+### Vault source
+
+The Vault source scans supported media already inside the vault. Images use lazy-loaded previews. Videos use lightweight placeholders instead of decoding every video just to display the browser.
+
+### Wallhaven source
+
+The Wallhaven source is an optional SFW-only importer. It does not require a Wallhaven account or API key.
+
+Nothing is downloaded automatically when you open the Library or switch to the Wallhaven source. Press **Search** to connect to Wallhaven. You can search by keyword and filter by category, minimum resolution, aspect ratio, and sort order.
+
+Wallhaven returns up to 24 results per page. **Load more** requests the next page.
+
+When you select a Wallhaven result, Veil downloads only that full-resolution image and saves it under:
+
+`Wallpapers/Wallhaven/wallhaven-<id>.jpg` or `Wallpapers/Wallhaven/wallhaven-<id>.png`
+
+The file is created through Obsidian's Vault API. Veil then applies the new **vault-local path** to the selected target. Normal wallpaper playback never depends on the remote Wallhaven URL.
+
+If the same Wallhaven ID is already present at its deterministic local path, Veil reuses the existing file instead of downloading it again.
 
 ### Apply to
 
@@ -43,11 +63,11 @@ At the top of the Library, **Apply to** chooses what selecting a wallpaper will 
 - any existing **Scene**;
 - any wallpaper routing rule currently using **Inline wallpaper** mode.
 
-Rules that already point to a Scene do not appear as separate Library targets because their media is owned by the Scene.
+The same target selector is used by both Vault and Wallhaven sources. Rules that already point to a Scene do not appear as separate Library targets because their media is owned by the Scene.
 
 ### Search and filters
 
-You can search by vault-relative path. The Library can also filter by:
+For Vault media, you can search by vault-relative path and filter by:
 
 - **All / Favorites / Recent**;
 - top-level vault folder;
@@ -55,15 +75,19 @@ You can search by vault-relative path. The Library can also filter by:
 
 Sorting options are **Default order**, **Name**, **Newest modified**, and **Oldest modified**.
 
+For Wallhaven, search requests are explicit and SFW-only. Veil never bulk-downloads results or preloads full-resolution originals.
+
 ### Favorites and Recent
 
 Favorites are manual bookmarks. Recently Selected is updated when a wallpaper path is selected for the default appearance, a Scene, or an inline rule.
 
 Veil keeps up to **128 Favorites** and **24 Recently Selected** entries. These lists live locally in Veil's `data.json` and are not included in portable settings exports.
 
+A newly imported Wallhaven wallpaper becomes a normal vault file, so after import it can be favorited, routed, pooled, renamed, or deleted like any other local wallpaper.
+
 ### Random visible
 
-**Random visible** chooses from the currently filtered results that are presently loaded into the Library grid. The Library initially shows 60 items and loads 60 more at a time with **Show more**.
+**Random visible** applies to the Vault source and chooses from the currently filtered results that are presently loaded into the Library grid. The Library initially shows 60 items and loads 60 more at a time with **Show more**.
 
 That means if a filter matches 300 files but only the first 60 are currently visible, **Random visible** chooses from those 60. Use **Show more** to expand the random-selection scope.
 

@@ -10,9 +10,9 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 
 ## Settings organization
 
-- Open **Settings → Veil** and confirm the primary tabs are **Wallpaper, Behavior, Routing, Appearance, Scenes**, with the same compact icon-tab interaction style used by Ledge.
-- Confirm **Wallpaper** contains source/pool/library controls; **Behavior** contains transition, video/motion, Reload, and Shuffle; **Routing** contains Active context, wallpaper routes, and opacity exclusions.
-- Confirm **Appearance** contains framing/opacity plus Effects; **Scenes** contains reusable Scene management.
+- Open **Settings → Veil** and confirm the primary tabs are **Wallpaper, Appearance, Behavior, Scenes, Routing**, with the same compact icon-tab interaction style used by Ledge.
+- Confirm **Wallpaper** contains source/pool/library controls; **Appearance** contains framing/opacity plus Effects; **Behavior** contains transition, video/motion, Reload, and Shuffle.
+- Confirm **Scenes** contains reusable Scene management; **Routing** contains Active context, wallpaper routes, and opacity exclusions.
 - Confirm **Data & recovery** is no longer a tab and remains visible below the selected tab content with Export, Import, and Restore controls.
 - Confirm **About & support** is no longer a tab and appears directly below Data & recovery with the support action.
 - Switch primary tabs with mouse and keyboard Left/Right/Home/End. Only the selected primary section should change; Data & recovery and About & support must remain below it, and changing a setting that re-renders the page must preserve the active tab.
@@ -41,6 +41,20 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 - Open Wallpaper Library with a large media folder. Search/filter/sort, Favorites, Recent, **Random visible**, and **Show more** should remain responsive.
 - Apply Library selections separately to Default appearance, a Scene, and an inline wallpaper rule; unrelated targets must stay unchanged.
 
+## Wallhaven import
+
+- Open Wallpaper Library and switch between **Vault** and **Wallhaven**. Existing Vault Library behavior must remain unchanged.
+- Switch to **Wallhaven** without pressing Search and confirm no results are fetched automatically. The initial view should explain that Search is required.
+- Search for an SFW wallpaper and exercise category, minimum-resolution, aspect-ratio, and sort filters. Confirm only image results are shown and **Load more** appends the next page when available.
+- Select a Wallhaven result for Default appearance. Confirm exactly one JPG/PNG is created under `Wallpapers/Wallhaven/` and the configured wallpaper becomes that vault-relative file.
+- While a Wallhaven result is still downloading, immediately try to select another result. All result cards should remain disabled until the active import finishes, and only one full-resolution import should run at a time.
+- While a Wallhaven download is pending, switch to **Vault** and choose a different wallpaper for the same target. The Wallhaven image may still finish saving locally, but it must not replace the newer Vault selection when the download completes.
+- Select the same Wallhaven result again and confirm the existing local file is reused rather than duplicated or renamed.
+- Import separately to a Scene and an inline wallpaper rule; unrelated targets must remain unchanged.
+- After an import succeeds, disconnect the network, close/reopen Wallpaper Library, navigate notes, switch Scenes, and restart Obsidian. The imported wallpaper must continue working from the vault without a network connection.
+- Confirm imported Wallhaven files appear in the Vault source and can be favorited, included in pools, renamed, and deleted like other vault media.
+- Confirm no Wallhaven API key/account setting exists and the built-in browser does not expose sketchy/NSFW purity controls.
+
 ## Effects and motion
 
 - Check focal X/Y, zoom, fill/fit/center/stretch/scale-down, vignette, blur, dim, overlay, retro, glitch, and TV noise.
@@ -55,4 +69,4 @@ Use the `veil-prerelease-<sha>` artifact produced by the **Verify Veil** workflo
 
 ## Pass criteria
 
-A release candidate passes only if there are no console exceptions, no blank/stale wallpaper after transitions or window close, no unexpected pool rerolls, no settings/data loss, and the exact tested commit is green in **Verify Veil**.
+A release candidate passes only if there are no console exceptions, no blank/stale wallpaper after transitions or window close, no unexpected pool rerolls, no settings/data loss, Wallhaven imports remain local after download, and the exact tested commit is green in **Verify Veil**.
