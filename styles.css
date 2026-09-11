@@ -424,15 +424,18 @@ body.is-mobile > .vault-dashboard-wallpaper {
   margin: var(--size-4-3) 0;
 }
 
-/* A flex line break keeps search visually distinct without centering the whole
- * toolbar. Chromium/Electron supports :has(), which Obsidian already requires
- * for several modern theme/layout patterns. */
-.veil-wallpaper-library-toolbar:has(> .veil-wallpaper-library-search)::after {
+/* Force the search control onto its own line without centering the whole
+ * toolbar. The source selector row does not need this line break. */
+.veil-wallpaper-library-toolbar::after {
   content: "";
   order: 10;
   flex: 0 0 100%;
   width: 0;
   height: 0;
+}
+
+.veil-wallpaper-library-target-row + .veil-wallpaper-library-toolbar::after {
+  content: none;
 }
 
 .veil-wallpaper-library-search {
@@ -441,21 +444,24 @@ body.is-mobile > .vault-dashboard-wallpaper {
   width: min(760px, 100%);
   min-width: 0;
   height: 34px;
+}
+
+.veil-wallpaper-library-search[aria-label="Search wallpaper library"] {
   margin-right: auto;
   margin-left: auto;
 }
 
-/* Wallhaven keeps its explicit Search action attached to the search field on
- * the second row instead of leaving the button among unrelated filters. */
-.veil-wallpaper-library-toolbar:not(:has(.veil-wallpaper-library-random)):has(> .veil-wallpaper-library-search)
-  > button:not(.veil-wallpaper-library-metadata-toggle) {
-  order: 20;
-  margin-right: auto;
+.veil-wallpaper-library-search[aria-label="Search online wallpapers"] {
+  margin-right: 0;
+  margin-left: auto;
 }
 
-.veil-wallpaper-library-toolbar:not(:has(.veil-wallpaper-library-random)):has(> .veil-wallpaper-library-search)
-  > .veil-wallpaper-library-search {
-  margin-right: 0;
+/* Wallhaven's Search action follows the online search field on the second row.
+ * Vault's Random action has its own class and remains in the filter row. */
+.veil-wallpaper-library-toolbar
+  > button:not(.veil-wallpaper-library-metadata-toggle):not(.veil-wallpaper-library-random) {
+  order: 20;
+  margin-right: auto;
 }
 
 .veil-wallpaper-library-toolbar > select,
@@ -474,8 +480,8 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 /* Native selects should size to their current label rather than inherit a wide
- * generic input width. field-sizing is supported by current Electron/Chromium;
- * width:auto remains a harmless fallback. */
+ * generic input width. Current Electron supports field-sizing; width:auto is a
+ * harmless fallback for older clients. */
 .veil-wallpaper-library-toolbar > select,
 .veil-wallpaper-library-target {
   width: auto;
