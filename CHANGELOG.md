@@ -2,12 +2,18 @@
 
 ## Unreleased
 
-- Add an optional SFW Wallhaven browser to Wallpaper Library that searches on demand, keeps pagination tied to the last explicit search, serializes full-resolution imports, validates downloaded JPEG/PNG data, saves the selected image into `Wallpapers/Wallhaven/`, and uses the local file afterward.
-- Keep a newer wallpaper choice active if an earlier Wallhaven download finishes later; the imported file is still saved locally without overriding the newer selection.
-- Keep Wallpaper Library controls usable on narrower windows by allowing its toolbars to wrap.
-- Avoid rebuilding wallpaper-pool candidate lists for unrelated vault changes, invalidate only pool scopes affected by changed media, and retain reusable folder scans across pool-setting changes.
-- Reduce metadata-cache refresh work by skipping pre-layout events and checking active file paths without rebuilding full note contexts.
-- Keep documentation regression checks aligned with the detailed routing guide after the README moved advanced usage into the Wiki.
+## 1.5.0
+
+- Add an optional SFW Wallhaven browser to Wallpaper Library with explicit search, category, minimum-resolution, ratio, and sorting controls.
+- Keep Wallhaven pagination tied to the last explicit search, deduplicate appended results, and import only the wallpaper the user selects.
+- Validate Wallhaven hosts, HTTP status, declared MIME type, and JPEG/PNG file signatures before saving originals into `Wallpapers/Wallhaven/`; Veil then uses the local vault copy for playback.
+- Serialize full-resolution Wallhaven imports, reuse deterministic files that are already present, and prevent slower stale downloads from overriding a newer wallpaper selection.
+- Redesign Wallpaper Library around pagination with 20 wallpapers per page, a five-column desktop grid, larger previews, optional metadata, and current-page Random visible behavior.
+- Regroup Wallpaper Library filters and secondary actions, use content-sized selectors, keep search on its own row, improve responsive wrapping, and remain compatible with Obsidian Community CSS lint rules.
+- Keep the Wallpaper Library modal visually within the Veil settings content lane on desktop instead of overlapping the Settings/plugin sidebar.
+- Scope wallpaper-pool cache invalidation to media changes that affect the relevant pool folders, retain reusable folder scans across pool-setting updates, and reduce metadata-cache hot-path work.
+- Split detailed usage guidance into README/Wiki documentation and keep routing/privacy documentation regression checks aligned with the new structure.
+- Expand regression coverage for Wallhaven search/import hardening, stale-completion protection, pool cache invalidation, runtime hot paths, Wallpaper Library pagination/layout, and Community CSS compatibility.
 
 ## 1.4.0
 
