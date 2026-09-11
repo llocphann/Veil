@@ -20,7 +20,7 @@ type LibraryView = "all" | "favorites" | "recent";
 type LibraryKind = "all" | Exclude<MediaKind, "">;
 type LibrarySort = "default" | "name" | "newest" | "oldest";
 
-const WALLPAPERS_PER_PAGE = 8;
+const WALLPAPERS_PER_PAGE = 20;
 const ALL_FOLDERS = "__all__";
 const ROOT_FOLDER = "__root__";
 
