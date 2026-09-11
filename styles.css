@@ -401,6 +401,17 @@ body.is-mobile > .vault-dashboard-wallpaper {
   font-size: var(--font-ui-small);
 }
 
+.veil-wallpaper-library-target-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin: var(--size-4-3) 0;
+}
+
+.veil-wallpaper-library-target-label {
+  flex: 0 0 auto;
+}
+
 .veil-wallpaper-library-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -421,7 +432,9 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 .veil-wallpaper-library-filter.is-active,
-.veil-wallpaper-library-filter[aria-pressed="true"] {
+.veil-wallpaper-library-filter[aria-pressed="true"],
+.veil-wallpaper-library-metadata-toggle.is-active,
+.veil-wallpaper-library-metadata-toggle[aria-pressed="true"] {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
@@ -432,8 +445,9 @@ body.is-mobile > .vault-dashboard-wallpaper {
 
 .veil-wallpaper-library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--size-4-3);
+  align-items: start;
 }
 
 .veil-wallpaper-library-card {
@@ -569,13 +583,24 @@ body.is-mobile > .vault-dashboard-wallpaper {
   text-align: center;
 }
 
-.veil-wallpaper-library-more {
+.veil-wallpaper-library-more,
+.veil-wallpaper-library-pagination {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: var(--size-4-2);
   margin-top: var(--size-4-4);
 }
 
+.veil-wallpaper-library-page-status {
+  min-width: 8em;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  text-align: center;
+}
+
 @media (max-width: 700px) {
+  .veil-wallpaper-library-target-row,
   .veil-wallpaper-library-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -586,7 +611,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
   }
 
   .veil-wallpaper-library-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }
 
