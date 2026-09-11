@@ -391,8 +391,8 @@ body.is-mobile > .vault-dashboard-wallpaper {
 
 /* Wallpaper library is rendered only on explicit user request through the command palette. */
 .veil-wallpaper-library-modal {
-  width: min(1100px, 92vw);
-  max-width: 92vw;
+  width: min(1540px, 96vw);
+  max-width: 96vw;
 }
 
 .veil-wallpaper-library-description,
@@ -413,22 +413,52 @@ body.is-mobile > .vault-dashboard-wallpaper {
 }
 
 .veil-wallpaper-library-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--size-4-2);
+  display: grid;
+  grid-template-columns: repeat(6, max-content);
   align-items: center;
+  justify-content: center;
+  gap: var(--size-4-2);
   margin: var(--size-4-3) 0;
 }
 
 .veil-wallpaper-library-search {
-  min-width: 180px;
-  flex: 1 1 320px;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
+  width: min(760px, 80vw);
+  min-width: 0;
+  height: 34px;
+}
+
+.veil-wallpaper-library-toolbar > select,
+.veil-wallpaper-library-toolbar > button,
+.veil-wallpaper-library-filters > button {
+  height: 32px;
+  min-height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--font-ui-small);
+}
+
+.veil-wallpaper-library-toolbar > button,
+.veil-wallpaper-library-filters > button {
+  padding-right: var(--size-4-2);
+  padding-left: var(--size-4-2);
 }
 
 .veil-wallpaper-library-filters {
   display: flex;
+  align-items: stretch;
   gap: var(--size-4-1);
   flex: 0 0 auto;
+}
+
+.veil-wallpaper-library-random {
+  min-width: 116px;
+}
+
+.veil-wallpaper-library-metadata-toggle {
+  min-width: 88px;
 }
 
 .veil-wallpaper-library-filter.is-active,
@@ -445,7 +475,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
 
 .veil-wallpaper-library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--size-4-3);
   align-items: start;
 }
@@ -592,6 +622,11 @@ body.is-mobile > .vault-dashboard-wallpaper {
   margin-top: var(--size-4-4);
 }
 
+.veil-wallpaper-library-pagination > button {
+  min-width: 84px;
+  height: 32px;
+}
+
 .veil-wallpaper-library-page-status {
   min-width: 8em;
   color: var(--text-muted);
@@ -599,9 +634,34 @@ body.is-mobile > .vault-dashboard-wallpaper {
   text-align: center;
 }
 
-@media (max-width: 700px) {
-  .veil-wallpaper-library-target-row,
+@media (max-width: 1250px) {
   .veil-wallpaper-library-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .veil-wallpaper-library-search {
+    order: 99;
+    flex: 0 0 min(760px, 92%);
+    width: min(760px, 92%);
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  .veil-wallpaper-library-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .veil-wallpaper-library-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .veil-wallpaper-library-target-row {
     align-items: stretch;
     flex-direction: column;
   }
@@ -611,7 +671,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
   }
 
   .veil-wallpaper-library-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
