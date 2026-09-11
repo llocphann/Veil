@@ -1,95 +1,57 @@
 # Scenes and Manual Overrides
 
-Scenes are the main way to create reusable complete Veil appearances.
+A **Scene** is a reusable complete Veil appearance.
 
 ## What a Scene stores
 
-A Scene stores all of these together:
+A Scene keeps these settings together:
 
-- wallpaper file;
-- wallpaper pool and Include subfolders;
+- wallpaper and pool;
 - display mode, focal point, and zoom;
-- wallpaper, pane-background, and pane-content opacity;
-- transition duration;
-- vignette;
-- blur and dim;
-- color overlay and blend mode;
-- effect preset and intensity;
-- video pause behavior;
-- reduced-motion behavior.
-
-Because the entire appearance is stored together, a routing rule can switch from a bright daytime setup to a dark cinematic setup without rebuilding each setting.
+- wallpaper/pane opacity;
+- transition;
+- vignette, blur, dim, overlay, and effect preset;
+- video and reduced-motion behavior.
 
 Veil supports up to **64 Scenes**.
 
-## Create a Scene
+## Scene actions
 
-Use **Scenes → Add scene from current appearance**.
+**Add scene from current appearance** — create a Scene from the current global setup.
 
-The new Scene copies the current global/default appearance at the moment it is created. Later global changes do not automatically update the Scene.
+**Duplicate scene** — copy a Scene into a new independent Scene.
 
-Give the Scene a clear name such as `Focus`, `Reading`, `Cinema`, or `Night` before using it in Routing.
+**Copy current global appearance** — replace the Scene's appearance with the current global one while keeping its name/identity.
 
-## Scene status
-
-A Scene needs a supported wallpaper file. The Scene list shows whether it is ready, uses a pool, or still needs a wallpaper.
-
-If a Scene has **Wallpaper pool** enabled, its selected wallpaper file acts as the pool anchor. See [Wallpaper, Library, and Pools](Wallpaper-Library-and-Pools.md).
-
-## Duplicate Scene
-
-**Duplicate scene** creates a new independent Scene immediately after the original. It receives a new internal ID but copies the complete wallpaper, pool, appearance, transition, and video configuration.
-
-Use Duplicate when you want a variation—for example, duplicate `Focus`, rename it `Focus Night`, then change only dim/overlay settings.
-
-## Copy current global appearance
-
-**Copy current global appearance** overwrites the Scene's complete appearance with the current global/default appearance while keeping the Scene's existing name and identity.
-
-This operation replaces the Scene's wallpaper, pool configuration, framing, opacity, effects, transition, and video behavior. Use it when you deliberately want the Scene to catch up with the global setup.
-
-## Delete Scene
-
-When you delete a Scene, routing rules that referenced it are not simply destroyed. Veil converts those rules to **inline wallpaper** rules using the deleted Scene's wallpaper path as a fallback.
-
-The complete Scene-specific appearance is gone, so those rules then use the global/default appearance around that wallpaper.
+**Delete scene** — removes the Scene. Rules that referenced it fall back to inline wallpaper behavior using the Scene's wallpaper path when possible.
 
 ## Scene vs inline wallpaper
 
-This distinction is important:
-
-| | Scene route | Inline wallpaper route |
+| | Scene route | Inline route |
 | --- | --- | --- |
 | Changes wallpaper | Yes | Yes |
-| Own framing/zoom | Yes | No — uses global |
-| Own opacity/effects | Yes | No — uses global |
+| Own framing/effects/opacity | Yes | No — uses global |
 | Own transition/video behavior | Yes | No — uses global |
-| Can use wallpaper pool | Yes | No |
-| Best use | Complete reusable atmosphere | Simple media-only replacement |
+| Wallpaper pool | Yes | No |
 
-If you only want one note to show another image but keep the same global look, use an inline rule. If the note should change the entire appearance, route it to a Scene.
+Use a **Scene** when the whole atmosphere should change. Use **Inline wallpaper** when only the media should change.
 
 ## Manual Scene override
 
-Use **Veil: Switch scene** from the Command Palette to temporarily force a Scene.
+Use **Veil: Switch scene** from the Command Palette.
 
-The switcher always includes **Follow context rules** plus every configured Scene.
+A manual Scene override:
 
-A manual Scene override has the highest wallpaper-routing priority. While it is active, note-specific and adaptive wallpaper routes remain configured but do not control the wallpaper appearance.
+- has the highest wallpaper-routing priority;
+- is session-only;
+- does not change saved Routing rules;
+- is cleared by choosing **Follow context rules**.
 
-The override is **session-only**: it is not written into Veil settings and is not included in exports. Choose **Follow context rules** to clear it immediately and return to automatic routing.
+Opacity exclusions still evaluate normally while a manual Scene is active.
 
-## Manual override and opacity exclusions
+## Recommended workflow
 
-The Scene override changes the resolved appearance, but opacity exclusions still evaluate the active note/system context independently. This means an opacity exclusion can still keep a pane fully opaque while a manually forced Scene is active.
-
-## Suggested workflow
-
-1. Finish the global/default appearance first.
-2. Create a Scene from it.
-3. Modify the Scene until it looks right.
-4. Add a routing rule and choose that Scene as **Appearance source**.
-5. Use **Routing → Active context** to verify which route is currently selected.
-6. Use **Switch scene** only for temporary overrides, not as a replacement for permanent Routing.
-
-Next: [Routing and Opacity Exclusions](Routing-and-Opacity-Exclusions.md).
+1. Finish the default appearance.
+2. Create and tune a Scene.
+3. Route notes/contexts to that Scene.
+4. Use **Routing → Active context** to verify which result is active.

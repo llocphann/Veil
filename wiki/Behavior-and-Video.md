@@ -1,68 +1,42 @@
 # Behavior and Video
 
-The **Behavior** tab controls transitions, video/motion handling, and quick actions.
+The **Behavior** tab controls wallpaper transitions, video/motion handling, and quick actions.
 
 ## Wallpaper transition
 
-**Wallpaper transition** sets the crossfade duration from 0 to 2000 ms.
+**Wallpaper transition** ranges from 0–2000 ms.
 
-- `0 ms` switches immediately.
-- Higher values fade between the old and new wallpaper.
+- `0 ms` — switch immediately.
+- Higher values — crossfade to the new wallpaper.
 
-Transitions apply when rules change, Scenes change, and wallpaper pools are shuffled.
+Veil keeps the previous working wallpaper visible while the incoming media loads. If the new source fails, the previous wallpaper stays visible.
 
-Veil uses a retained/double-buffered transition. The currently working wallpaper stays visible while the incoming image or video loads. The crossfade starts only after the new media is ready.
+## Video
 
-If the incoming media fails, Veil discards it and restores the previous working wallpaper instead of leaving an empty background. During rapid navigation, Veil also avoids replacing a working wallpaper with an intermediate source that never finishes loading.
+Video wallpapers loop, are muted, and have no controls.
 
-## Video playback
+For the best compatibility, prefer **MP4** or **WebM**. Other supported containers still depend on codecs available in Obsidian's desktop runtime.
 
-Video wallpapers loop, are muted, have no controls, and play inline inside the workspace background.
+### Pause when hidden
 
-For broad compatibility, prefer MP4 or WebM. MOV, M4V, and OGV support depends on codecs available in the local Obsidian desktop runtime.
+When enabled, Veil pauses video work for hidden windows and resumes when they become visible again.
 
-## Pause video when the app is hidden
+### Respect reduced motion
 
-When enabled, Veil pauses video decoding for a document/window that is hidden. This reduces unnecessary CPU/GPU usage when Obsidian or a pop-out window is not visible.
+When enabled, Veil follows `prefers-reduced-motion`:
 
-When the window becomes visible again, Veil attempts to resume playback.
+- video is paused;
+- animated effects stop;
+- wallpaper crossfades are disabled.
 
-## Respect reduced motion
-
-When enabled, Veil follows the operating system's `prefers-reduced-motion` request.
-
-Reduced-motion mode:
-
-- pauses video;
-- pauses motion-heavy effect animation;
-- disables wallpaper crossfades.
-
-Animated GIF files are different from video: Veil cannot reliably pause GIF animation.
-
-## Video autoplay problems
-
-If the video is valid but autoplay was interrupted or blocked, use **Reload wallpaper**. If it still fails, the most likely cause is codec/runtime compatibility; try MP4 or WebM with a common codec.
-
-Veil reports load/playback problems in the **Wallpaper status** row.
+Animated GIFs cannot be paused reliably by Veil.
 
 ## Quick actions
 
-### Reload wallpaper
+**Reload wallpaper** — request the current wallpaper again. Useful after replacing a file or retrying video playback.
 
-Forces the current wallpaper source to be requested again. Use it after modifying/replacing a media file, after a transient load error, or when retrying video playback.
+**Shuffle wallpaper pool** — choose another candidate from the currently active default/Scene pool. Inline wallpaper rules do not have a pool.
 
-### Shuffle wallpaper pool
+When wallpaper opacity is `0%`, Veil treats wallpaper motion as visually inactive and stops unnecessary motion work.
 
-Clears the current stable pool selection so Veil chooses another candidate. When more than one candidate exists, Veil tries not to immediately repeat the previous item.
-
-Shuffle only works when the currently resolved appearance is the default appearance or a Scene with its pool enabled. Inline wallpaper rules do not use a pool.
-
-## Motion can also stop at 0% wallpaper opacity
-
-When wallpaper opacity is 0%, Veil treats the wallpaper as visually inactive and stops video/motion work even if the media remains configured.
-
-## Per-Scene behavior
-
-Scenes store their own transition duration, pause-when-hidden setting, and reduced-motion setting. A Scene can therefore behave differently from the default appearance.
-
-See [Scenes and Manual Overrides](Scenes-and-Manual-Overrides.md).
+Scenes store their own transition and video/motion behavior, so a Scene can behave differently from the default appearance.

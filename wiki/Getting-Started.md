@@ -2,64 +2,50 @@
 
 ## Requirements
 
-Veil is desktop-only and requires Obsidian 1.13.7 or newer. It works with media stored inside the current vault.
+- Desktop Obsidian only.
+- Obsidian **1.13.7+**.
+- Wallpapers are stored inside the current vault.
 
-Supported image extensions: `avif`, `bmp`, `gif`, `jpeg`, `jpg`, `png`, `svg`, `webp`.
+Supported images: `avif`, `bmp`, `gif`, `jpeg`, `jpg`, `png`, `svg`, `webp`.
 
-Supported video extensions: `mp4`, `webm`, `ogv`, `m4v`, `mov`.
+Supported videos: `mp4`, `webm`, `ogv`, `m4v`, `mov`.
 
-A supported extension does not guarantee that every video codec will play. MP4 and WebM are the safest choices for broad compatibility with Obsidian's desktop runtime.
+A supported extension does not guarantee codec support. MP4 and WebM are the safest video choices.
 
 ## First setup
 
-Open **Settings → Community plugins → Veil**. In the **Wallpaper** tab, leave **Enable wallpaper** on and choose a file from the vault with **Wallpaper file**. Veil updates the workspace immediately.
+1. Open **Settings → Community plugins → Veil**.
+2. In **Wallpaper**, choose a vault file or open **Wallpaper library**.
+3. Use **Appearance** for framing, opacity, and effects.
+4. Use **Scenes** for reusable complete looks.
+5. Use **Routing** only when you want Veil to change automatically.
 
-If you prefer browsing visually, open **Wallpaper library** instead of selecting a file from the file picker.
+Wallhaven is optional: open **Wallpaper library → Wallhaven**, set filters, then press **Search**. Selected wallpapers are downloaded into the vault before Veil uses them.
 
-## Settings layout
+## Settings tabs
 
-Veil has five main tabs:
-
-| Tab | Purpose |
+| Tab | Use it for |
 | --- | --- |
-| **Wallpaper** | Enable Veil, choose media, open the Library, and configure a wallpaper pool. |
-| **Appearance** | Framing, zoom, opacity, vignette, blur, dim, color overlay, and visual presets. |
-| **Behavior** | Wallpaper transition, video/motion behavior, reload, and shuffle. |
-| **Scenes** | Create reusable complete appearances. |
-| **Routing** | Automatically select wallpapers or Scenes from note/system context and configure opacity exclusions. |
+| **Wallpaper** | Media, Wallpaper Library, and pools. |
+| **Appearance** | Framing, zoom, opacity, and effects. |
+| **Behavior** | Transitions, video/motion behavior, reload, and shuffle. |
+| **Scenes** | Reusable complete appearances. |
+| **Routing** | Automatic wallpaper/Scene selection and opacity exclusions. |
 
-**Data & recovery** and **About & support** appear below the main tabs.
+**Data & recovery** and **About & support** are shared sections below the tabs.
 
 ## Command Palette
 
-Veil adds four commands:
+- **Veil: Reload wallpaper** — reload the current source.
+- **Veil: Shuffle wallpaper pool** — choose another item from the active pool.
+- **Veil: Open wallpaper library** — open the visual browser.
+- **Veil: Switch scene** — temporarily force a Scene or return to **Follow context rules**.
 
-- **Veil: Reload wallpaper** — force the current media to load again. Useful after a file change or a blocked video autoplay attempt.
-- **Veil: Shuffle wallpaper pool** — select another item from the currently active default/Scene pool.
-- **Veil: Open wallpaper library** — open the visual media browser.
-- **Veil: Switch scene** — temporarily force one Scene, or choose **Follow context rules** to return to automatic routing.
+## Good first workflow
 
-## What happens when you navigate
+1. Finish one default appearance.
+2. Add a Scene only when you need a different complete look.
+3. Add Routing after the Scene works correctly.
+4. Check **Routing → Active context** when a rule behaves unexpectedly.
 
-Veil reacts to active-note changes, file opens, layout changes, relevant metadata changes, theme changes, and vault media changes. It does not continuously poll the vault.
-
-When a new wallpaper is requested, Veil keeps the previous working wallpaper visible until the new media is ready. If the new file fails to load, the last working wallpaper remains instead of leaving a blank background.
-
-## Main window and pop-out windows
-
-Veil applies to the main Obsidian window and desktop pop-out windows. Each window resolves its own active note and system context, so two windows can display different routed Scenes at the same time.
-
-## Vault-local paths only
-
-Wallpaper paths are vault-relative. Veil rejects URLs, absolute paths, protocols such as `https:`, and paths that escape the vault with `..`.
-
-When a selected wallpaper file or a folder used by a rule is renamed inside Obsidian, Veil updates its stored paths automatically. When media is deleted, matching Favorite/Recent entries are cleaned up.
-
-## Recommended first workflow
-
-1. Configure one default wallpaper and Appearance you like.
-2. Add a Scene only when you want a second complete look with different opacity/effects/behavior.
-3. Add Routing rules only after the Scene itself looks correct.
-4. Check **Routing → Active context** whenever a rule seems not to behave as expected.
-
-Continue with [Wallpaper, Library, and Pools](Wallpaper-Library-and-Pools.md) or [Scenes and Manual Overrides](Scenes-and-Manual-Overrides.md).
+Veil is event-driven: it reacts to relevant note, metadata, theme, layout, and media changes instead of continuously polling the vault.
