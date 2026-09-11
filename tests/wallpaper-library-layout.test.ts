@@ -33,15 +33,27 @@ void test("wallpaper library uses a twenty-item five-column desktop page", () =>
   );
 });
 
-void test("wallpaper search occupies a centered row below the controls", () => {
+void test("wallpaper controls use grouped left alignment with a separate search row", () => {
   assert.match(
     styles,
-    /\.veil-wallpaper-library-toolbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(6,\s*max-content\);/,
+    /\.veil-wallpaper-library-toolbar\s*\{[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*flex-start;/,
   );
   assert.match(
     styles,
-    /\.veil-wallpaper-library-search\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?grid-row:\s*2;[\s\S]*?justify-self:\s*center;/,
+    /\.veil-wallpaper-library-toolbar:has\(> \.veil-wallpaper-library-search\)::after\s*\{[\s\S]*?order:\s*10;[\s\S]*?flex:\s*0 0 100%;/,
   );
-  assert.match(styles, /\.veil-wallpaper-library-random\s*\{[\s\S]*?min-width:\s*116px;/);
-  assert.match(styles, /\.veil-wallpaper-library-metadata-toggle\s*\{[\s\S]*?min-width:\s*88px;/);
+  assert.match(
+    styles,
+    /\.veil-wallpaper-library-search\s*\{[\s\S]*?order:\s*20;[\s\S]*?margin-right:\s*auto;[\s\S]*?margin-left:\s*auto;/,
+  );
+  assert.match(
+    styles,
+    /\.veil-wallpaper-library-toolbar > select,[\s\S]*?\.veil-wallpaper-library-target\s*\{[\s\S]*?field-sizing:\s*content;/,
+  );
+  assert.match(
+    styles,
+    /\.veil-wallpaper-library-random\s*\{[\s\S]*?margin-left:\s*auto;/,
+  );
+  assert.doesNotMatch(styles, /\.veil-wallpaper-library-random\s*\{[^}]*min-width:/s);
+  assert.doesNotMatch(styles, /\.veil-wallpaper-library-metadata-toggle\s*\{[^}]*min-width:/s);
 });
