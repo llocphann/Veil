@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.1
+
+- Fix the Wallpaper Library toolbar spacing CSS to avoid Obsidian Community CSS lint reporting partial `multicolumn` support.
+
 ## 1.5.0
 
 - Add an optional SFW Wallhaven browser to Wallpaper Library with explicit search, category, minimum-resolution, ratio, and sorting controls.
