@@ -64,9 +64,23 @@ Veil connects to Wallhaven only when you use the optional Wallhaven browser in *
 
 The built-in Wallhaven browser is SFW-only and does not use or store a Wallhaven API key.
 
-## Support
+---
 
-[![Buy me a coffee](https://raw.githubusercontent.com/llocphann/Veil/main/assets/buy-me-a-coffee.svg)](https://www.buymeacoffee.com/llocphann)
+<div align="center">
+
+## ☕ Support Veil
+
+If Veil has made your Obsidian workspace more enjoyable, you can support its continued development here.
+
+<a href="https://www.buymeacoffee.com/llocphann">
+  <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=llocphann&button_colour=6f5bd3&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" alt="Buy Me a Coffee" height="48">
+</a>
+
+<sub>Your support helps me keep refining Veil, improving wallpaper workflows, routing, visual effects, and documentation.</sub>
+
+</div>
+
+---
 
 ## License
 
