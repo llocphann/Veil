@@ -34,7 +34,7 @@ void test("wallpaper definition module owns wallpaper controls and status markup
   assert.match(wallpaperSource, /name: "Resolved appearance"/);
 });
 
-void test("wallpaper pool hides file and library without clearing them and exposes folder before scope", () => {
+void test("wallpaper pool sits above file controls while preserving conditional pool settings", () => {
   assert.match(
     wallpaperSource,
     /name: "Wallpaper file"[\s\S]*?visible: \(\) => !settings\.wallpaperPoolEnabled/,
@@ -44,10 +44,15 @@ void test("wallpaper pool hides file and library without clearing them and expos
     /name: "Wallpaper library"[\s\S]*?visible: \(\) => !settings\.wallpaperPoolEnabled/,
   );
   const pool = wallpaperSource.indexOf('name: "Wallpaper pool"');
+  const file = wallpaperSource.indexOf('name: "Wallpaper file"');
+  const library = wallpaperSource.indexOf('name: "Wallpaper library"');
   const folder = wallpaperSource.indexOf('name: "Wallpaper folder"');
   const subfolders = wallpaperSource.indexOf('name: "Include subfolders"');
   const interval = wallpaperSource.indexOf('name: "Change interval"');
-  assert.ok(pool >= 0 && folder > pool && subfolders > folder && interval > subfolders);
+  assert.ok(
+    pool >= 0 && file > pool && library > file && folder > library &&
+    subfolders > folder && interval > subfolders,
+  );
   assert.match(wallpaperSource, /renderVaultFolderControl\(/);
   assert.match(
     wallpaperSource,
@@ -60,12 +65,13 @@ void test("wallpaper pool hides file and library without clearing them and expos
   assert.doesNotMatch(wallpaperSource, /wallpaperPath\s*[:=]\s*""/);
 });
 
-void test("scene pool controls follow the same folder then subfolder then interval order", () => {
+void test("scene pool also sits above file while keeping folder then subfolder then interval order", () => {
   const pool = sceneSource.indexOf('name: "Wallpaper pool"');
+  const file = sceneSource.indexOf('name: "Wallpaper file"');
   const folder = sceneSource.indexOf('name: "Wallpaper folder"');
   const subfolders = sceneSource.indexOf('name: "Include subfolders"');
   const interval = sceneSource.indexOf('name: "Change interval"');
-  assert.ok(pool >= 0 && folder > pool && subfolders > folder && interval > subfolders);
+  assert.ok(pool >= 0 && file > pool && folder > file && subfolders > folder && interval > subfolders);
   assert.match(
     sceneSource,
     /name: "Wallpaper file"[\s\S]*?visible: \(\) => !profile\.wallpaperPoolEnabled/,
