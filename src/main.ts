@@ -13,7 +13,6 @@ import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import {
   DEFAULT_SETTINGS,
-  mediaKind,
   normalizeSettings,
   type MediaKind,
   type VeilAppearance,
@@ -33,6 +32,7 @@ import {
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
 import { WallpaperPoolRuntime } from "./wallpaper-pool-runtime";
+import { WallpaperSourceResolver } from "./wallpaper-source-resolver";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -43,16 +43,6 @@ const PANE_CONTENT_OPACITY_VARIABLE = "--vault-dashboard-pane-content-opacity";
 const LEGACY_IMAGE_VARIABLE = "--vault-dashboard-banner-image";
 const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
 const TRANSITION_CLEANUP_BUFFER = 80;
-
-interface WallpaperSource {
-  path: string;
-  url: string;
-  kind: Exclude<MediaKind, "">;
-  label: string;
-  key: string;
-  contextLabel: string;
-  appearance: VeilAppearance;
-}
 
 interface DocumentState {
   key: string;
@@ -85,6 +75,12 @@ export default class VeilPlugin extends Plugin {
   private readonly documentContexts = new DocumentContextResolver(this.app);
   private readonly scenes = new SceneRuntime();
   private readonly wallpaperPools = new WallpaperPoolRuntime(this.app);
+  private readonly wallpaperSources = new WallpaperSourceResolver(
+    this.app,
+    this.scenes,
+    this.wallpaperPools,
+    () => this.settings,
+  );
   private readonly wallpaperLibrary = new WallpaperLibraryRuntime();
   private readonly settingsPersistence = new SettingsPersistence(
     () => this.settings,
@@ -525,9 +521,15 @@ export default class VeilPlugin extends Plugin {
     }
     const context = this.documentContexts.contextForDocument(document);
     const current = this.documents.get(document) || null;
-    const source = this.sourceForDocument(document, context);
+    const sourceResolution = this.wallpaperSources.resolve(context, this.sourceRevision);
+    const source = sourceResolution.source;
     if (!source) {
-      const resolved = this.scenes.resolve(this.settings, context);
+      this.setDocumentStatus(
+        document,
+        sourceResolution.statusMessage,
+        sourceResolution.statusTone,
+      );
+      const resolved = sourceResolution.resolved;
       const shouldRetain = shouldRetainWallpaperForUnavailableSource(
         resolved.path,
         Boolean(resolved.rule || resolved.profile),
@@ -546,6 +548,13 @@ export default class VeilPlugin extends Plugin {
       this.clearDocument(document);
       return;
     }
+    if (current?.key !== source.key) {
+      this.setDocumentStatus(
+        document,
+        `${source.contextLabel} · loading ${source.label.toLowerCase()}: ${source.path}`,
+      );
+    }
+
     let previous = current;
     if (previous?.key === source.key && previous.layer.isConnected) {
       this.applyOptions(document, previous, context, source.appearance);
@@ -829,82 +838,6 @@ export default class VeilPlugin extends Plugin {
 
   private clearAllDocuments(): void {
     for (const document of Array.from(this.documents.keys())) this.clearDocument(document);
-  }
-
-  private sourceForDocument(
-    document: Document,
-    context: NoteContext | null,
-  ): WallpaperSource | null {
-    const resolved = this.scenes.resolve(this.settings, context);
-    const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
-    const poolActive = (!resolved.rule || Boolean(resolved.profile))
-      && resolved.appearance.wallpaperPoolEnabled;
-    const path = poolActive
-      ? this.wallpaperPools.pathForAppearance(resolved.appearance, contextKey)
-      : resolved.path;
-    const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
-    const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
-    const kind = file instanceof TFile ? mediaKind(file) : "";
-    const manualProfileId = this.scenes.getManualProfileId();
-    const contextLabel = manualProfileId && resolved.profile
-      ? `Manual scene “${resolved.profile.name}”${poolActive ? " · pool" : ""}`
-      : resolved.profile
-        ? `Scene “${resolved.profile.name}”${poolActive ? " · pool" : ""}`
-        : resolved.rule
-          ? `Rule ${resolved.rule.matchType}: ${resolved.rule.matchValue}`
-          : `Default appearance${poolActive ? " · pool" : ""}`;
-    if (!path || !(file instanceof TFile) || !kind) {
-      const rulePrefix = resolved.rule ? `${contextLabel}: ` : "";
-      this.setDocumentStatus(
-        document,
-        !path
-          ? resolved.rule
-            ? resolved.profile
-              ? `${rulePrefix}choose a wallpaper file for this scene.`
-              : `${rulePrefix}choose a wallpaper file for this rule.`
-            : manualProfileId && resolved.profile
-              ? `Manual scene “${resolved.profile.name}”: choose a wallpaper file for this scene.`
-              : "Choose a wallpaper file to begin."
-          : invalidPath
-            ? "Use a vault-relative path, not a URL or a path outside the vault."
-            : !(file instanceof TFile)
-              ? `${rulePrefix}file not found in this vault: ${path}`
-              : `${rulePrefix}unsupported wallpaper format: ${file.extension}`,
-        path || resolved.rule ? "error" : "info",
-      );
-      return null;
-    }
-
-    const url = this.app.vault.getResourcePath(file);
-    const source: WallpaperSource = {
-      path: file.path,
-      url,
-      kind,
-      label:
-        kind === "video"
-          ? "Video"
-          : file.extension.toLowerCase() === "gif"
-            ? "Animated GIF"
-            : "Image",
-      key: [
-        file.path,
-        url,
-        file.stat.mtime,
-        file.stat.size,
-        contextKey,
-        manualProfileId ? `manual:${manualProfileId}` : "automatic",
-        this.sourceRevision,
-      ].join("|"),
-      contextLabel,
-      appearance: resolved.appearance,
-    };
-    if (this.documents.get(document)?.key !== source.key) {
-      this.setDocumentStatus(
-        document,
-        `${contextLabel} · loading ${source.label.toLowerCase()}: ${file.path}`,
-      );
-    }
-    return source;
   }
 
   private contextKey(ruleId: string, profileId: string): string {

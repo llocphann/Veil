@@ -15,6 +15,10 @@ const poolSource = readFileSync(
   new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
   "utf8",
 );
+const sourceResolverSource = readFileSync(
+  new URL("../src/wallpaper-source-resolver.ts", import.meta.url),
+  "utf8",
+);
 const librarySource = readFileSync(
   new URL("../src/wallpaper-library-runtime.ts", import.meta.url),
   "utf8",
@@ -57,6 +61,17 @@ void test("main delegates wallpaper pool runtime ownership", () => {
   assert.match(poolSource, /private readonly previousSelections/);
   assert.match(poolSource, /reconcileSettings\(/);
   assert.match(poolSource, /pathForAppearance\(/);
+});
+
+void test("main delegates wallpaper source resolution", () => {
+  assert.match(mainSource, /new WallpaperSourceResolver\(/);
+  assert.doesNotMatch(mainSource, /private sourceForDocument/);
+  assert.doesNotMatch(mainSource, /getAbstractFileByPath/);
+  assert.doesNotMatch(mainSource, /mediaKind\(/);
+  assert.match(sourceResolverSource, /getAbstractFileByPath\(path\)/);
+  assert.match(sourceResolverSource, /mediaKind\(file\)/);
+  assert.match(sourceResolverSource, /pathForAppearance\(resolved\.appearance, contextKey\)/);
+  assert.match(sourceResolverSource, /sourceRevision/);
 });
 
 void test("main delegates wallpaper library state ownership", () => {
