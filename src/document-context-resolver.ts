@@ -27,6 +27,20 @@ export class DocumentContextResolver {
     this.activeRootLeaves.clear();
   }
 
+  documentsAffectedByLayoutChange(): Document[] {
+    const affected: Document[] = [];
+    for (const document of this.workspaceDocuments()) {
+      const remembered = this.activeRootLeaves.get(document) || null;
+      if (this.isRootLeafForDocument(remembered, document)) continue;
+
+      if (remembered) this.activeRootLeaves.delete(document);
+      const replacement = this.findRootLeafForDocument(document);
+      if (replacement) this.activeRootLeaves.set(document, replacement);
+      if (remembered || replacement) affected.push(document);
+    }
+    return affected;
+  }
+
   contextForDocument(document: Document): NoteContext {
     const candidate = this.fileForDocument(document);
     const theme = document.body.classList.contains("theme-dark")
@@ -81,11 +95,15 @@ export class DocumentContextResolver {
     if (this.isRootLeafForDocument(remembered, document)) return remembered;
     if (remembered) this.activeRootLeaves.delete(document);
 
+    const replacement = this.findRootLeafForDocument(document);
+    if (replacement) this.activeRootLeaves.set(document, replacement);
+    return replacement;
+  }
+
+  private findRootLeafForDocument(document: Document): WorkspaceLeaf | null {
     const recent = this.app.workspace.getMostRecentLeaf();
-    if (recent && this.isRootLeafForDocument(recent, document)) {
-      this.activeRootLeaves.set(document, recent);
-      return recent;
-    }
+    if (recent && this.isRootLeafForDocument(recent, document)) return recent;
+
     const fallback: { leaf: WorkspaceLeaf | null } = { leaf: null };
     this.app.workspace.iterateAllLeaves((leaf) => {
       if (!fallback.leaf && this.isRootLeafForDocument(leaf, document)) fallback.leaf = leaf;
