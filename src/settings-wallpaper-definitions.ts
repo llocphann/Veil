@@ -39,13 +39,14 @@ export function createWallpaperDefinitions(
       },
       {
         name: "Wallpaper file",
-        desc: "Choose an image, GIF, or video from this vault. With a pool enabled, this file anchors the pool folder.",
+        desc: "Choose an image, GIF, or video from this vault.",
         control: {
           type: "file",
           key: "wallpaperPath",
           placeholder: "Media/Wallpapers/example.webp",
           filter: (file: TFile) => Boolean(mediaKind(file)),
         },
+        visible: () => !settings.wallpaperPoolEnabled,
       },
       {
         name: "Wallpaper library",
@@ -58,16 +59,40 @@ export function createWallpaperDefinitions(
               .onClick(actions.openWallpaperLibrary),
           );
         },
+        visible: () => !settings.wallpaperPoolEnabled,
       },
       {
         name: "Wallpaper pool",
-        desc: "Randomly choose supported media from the selected wallpaper's folder. The choice stays stable until shuffled or the appearance changes.",
+        desc: "Randomly choose supported media from a wallpaper folder.",
         control: { type: "toggle", key: "wallpaperPoolEnabled" },
       },
       {
+        name: "Wallpaper folder",
+        desc: "Choose the vault folder used by the wallpaper pool.",
+        control: {
+          type: "text",
+          key: "wallpaperPoolFolder",
+          placeholder: "Media/Wallpapers",
+        },
+        visible: () => settings.wallpaperPoolEnabled,
+      },
+      {
         name: "Include subfolders",
-        desc: "Also include supported media in descendant folders of the wallpaper folder.",
+        desc: "Also include supported media in descendant folders.",
         control: { type: "toggle", key: "wallpaperPoolIncludeSubfolders" },
+        visible: () => settings.wallpaperPoolEnabled,
+      },
+      {
+        name: "Change interval",
+        desc: "Automatically choose another pool wallpaper; 0 disables rotation.",
+        control: {
+          type: "slider",
+          key: "wallpaperPoolChangeInterval",
+          min: 0,
+          max: 1440,
+          step: 1,
+          displayFormat: (value) => value === 0 ? "Off" : `${value} min`,
+        },
         visible: () => settings.wallpaperPoolEnabled,
       },
       {
