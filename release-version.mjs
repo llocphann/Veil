@@ -18,6 +18,17 @@ function formatVersion(version) {
   return `${version.major}.${version.minor}.${version.patch}`;
 }
 
+export function latestPublishedVersion(values) {
+  let latest = null;
+  for (const value of values) {
+    const source = String(value || "").trim();
+    if (!/^\d+\.\d+\.\d+$/.test(source)) continue;
+    const parsed = parseVersion(source, "Published version");
+    if (!latest || compareVersions(parsed, latest) > 0) latest = parsed;
+  }
+  return latest ? formatVersion(latest) : "";
+}
+
 export function nextReleaseVersion(candidateValue, latestPublishedValue = "") {
   const candidate = parseVersion(candidateValue, "Candidate version");
   const latestValue = String(latestPublishedValue || "").trim();
@@ -30,7 +41,11 @@ export function nextReleaseVersion(candidateValue, latestPublishedValue = "") {
 
 if (process.argv[1]?.endsWith("release-version.mjs")) {
   try {
-    process.stdout.write(`${nextReleaseVersion(process.argv[2], process.argv[3])}\n`);
+    if (process.argv[2] === "--latest") {
+      process.stdout.write(`${latestPublishedVersion(process.argv.slice(3))}\n`);
+    } else {
+      process.stdout.write(`${nextReleaseVersion(process.argv[2], process.argv[3])}\n`);
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
