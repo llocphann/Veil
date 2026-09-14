@@ -4,7 +4,10 @@ import {
   TFile,
   normalizePath,
 } from "obsidian";
-import type { NoteContext } from "./context-rules";
+import {
+  contextRulesDependOnTheme,
+  type NoteContext,
+} from "./context-rules";
 import { DocumentApplyScheduler } from "./document-apply-scheduler";
 import { DocumentContextResolver } from "./document-context-resolver";
 import { migratePersistedVeilData } from "./persisted-data-schema";
@@ -177,7 +180,14 @@ export default class VeilPlugin extends Plugin {
         this.clearDocument(window.document);
       }),
     );
-    this.registerEvent(this.app.workspace.on("css-change", () => this.refreshWallpaper()));
+    this.registerEvent(this.app.workspace.on("css-change", () => {
+      if (!this.layoutReady || !this.settings.enabled) return;
+      if (!contextRulesDependOnTheme([
+        ...this.settings.wallpaperRules,
+        ...this.settings.opacityExclusions,
+      ])) return;
+      this.scheduleApplyToWorkspace();
+    }));
   }
 
   onunload(): void {
