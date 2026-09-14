@@ -4,24 +4,32 @@ import {
 } from "./context-rules";
 import type { ResolvedWallpaper } from "./profile-resolver";
 import type { VeilSettings } from "./settings";
+import { wallpaperRenderAppearanceSignature } from "./wallpaper-document-signature";
 
-function resolvedIdentity(resolved: ResolvedWallpaper): object {
+function resolvedSourceIdentity(resolved: ResolvedWallpaper): object {
+  const poolActive = (!resolved.rule || Boolean(resolved.profile))
+    && resolved.appearance.wallpaperPoolEnabled;
+  return {
+    path: resolved.path,
+    poolActive,
+    poolIncludeSubfolders: poolActive
+      ? resolved.appearance.wallpaperPoolIncludeSubfolders
+      : false,
+  };
+}
+
+function resolvedStatusIdentity(resolved: ResolvedWallpaper): object {
   return {
     rule: resolved.rule
       ? {
         id: resolved.rule.id,
-        enabled: resolved.rule.enabled,
         matchType: resolved.rule.matchType,
-        matchValue: resolved.rule.matchValue,
-        profileId: resolved.rule.profileId,
-        wallpaperPath: resolved.rule.wallpaperPath,
+        matchValue: resolved.profile ? "" : resolved.rule.matchValue,
       }
       : null,
     profile: resolved.profile
       ? { id: resolved.profile.id, name: resolved.profile.name }
       : null,
-    path: resolved.path,
-    appearance: resolved.appearance,
   };
 }
 
@@ -32,7 +40,9 @@ export function resolvedDocumentSettingsSignature(
 ): string {
   return JSON.stringify({
     enabled: settings.enabled,
-    resolved: resolvedIdentity(resolved),
+    source: resolvedSourceIdentity(resolved),
+    status: resolvedStatusIdentity(resolved),
+    render: wallpaperRenderAppearanceSignature(resolved.appearance),
     opacityExclusions: matchingOpacityExclusions(settings.opacityExclusions, context),
   });
 }
