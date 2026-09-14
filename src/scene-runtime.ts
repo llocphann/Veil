@@ -41,16 +41,18 @@ export class SceneRuntime {
   }
 
   resolveSnapshot(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
-    const automatic = resolveWallpaper(settings, context);
-    if (!this.manualProfileId) return automatic;
-    const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
-    if (!profile) return automatic;
-    return {
-      rule: null,
-      profile,
-      path: profile.wallpaperPath,
-      appearance: copyAppearance(profile),
-    };
+    if (this.manualProfileId) {
+      const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
+      if (profile) {
+        return {
+          rule: null,
+          profile,
+          path: profile.wallpaperPath,
+          appearance: copyAppearance(profile),
+        };
+      }
+    }
+    return resolveWallpaper(settings, context);
   }
 
   resolve(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
