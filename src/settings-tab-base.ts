@@ -8,6 +8,11 @@ import type {
 import type VeilPlugin from "./main";
 import { duplicateSceneProfile } from "./scene-profile-actions";
 import {
+  createActionsDefinitions,
+  createSupportDefinitions,
+  type SettingsActionDefinitionsActions,
+} from "./settings-action-definitions";
+import {
   createEffectsDefinitions,
   createVideoDefinitions,
 } from "./settings-appearance-definitions";
@@ -37,7 +42,6 @@ import {
 } from "./settings";
 import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-transfer";
 
-const FUNDING_URL = "https://www.buymeacoffee.com/llocphann";
 const MAX_IMPORT_BYTES = 1024 * 1024;
 const MAX_SCENES = 64;
 const MAX_CONTEXT_RULES = 96;
@@ -553,110 +557,24 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private actionsDefinitions(): SettingDefinitionItem<string> {
-    return {
-      type: "group",
-      heading: "Actions",
-      cls: "veil-settings-panel-actions",
-      items: [
-        {
-          name: "Open wallpaper library",
-          desc: "Browse supported media with Favorites and Recently Selected filters.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Open library")
-                .setIcon("images")
-                .onClick(() => this.plugin.openWallpaperLibrary()),
-            );
-          },
-        },
-        {
-          name: "Reload wallpaper",
-          desc: "Retry loading the current file or a video whose autoplay was blocked.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Reload")
-                .onClick(() => this.plugin.refreshWallpaper(true)),
-            );
-          },
-        },
-        {
-          name: "Shuffle wallpaper pool",
-          desc: "Choose another wallpaper for the active default appearance or scene, avoiding the previous choice when possible.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Shuffle")
-                .setIcon("shuffle")
-                .onClick(() => this.plugin.shuffleWallpaperPool()),
-            );
-          },
-        },
-        {
-          name: "Export settings",
-          desc: "Download a schema-versioned JSON backup containing settings, scenes, and rules. Media files and local library history are not embedded.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Export")
-                .setIcon("download")
-                .onClick(() => this.exportSettings()),
-            );
-          },
-        },
-        {
-          name: "Import settings",
-          desc: "Replace the portable configuration with a validated backup. Schema 1 exports migrate automatically; local Favorites and Recently Selected remain local.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Import")
-                .setIcon("upload")
-                .onClick(() => this.chooseImportFile()),
-            );
-          },
-        },
-        {
-          name: "Restore defaults",
-          desc: "Clear the wallpaper, scenes, and rules and restore default appearance values. Media files and local library metadata are not changed.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button.setButtonText("Restore").onClick(() => {
-                this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
-                void this.plugin.flushSettings().then(() => this.update());
-              }),
-            );
-          },
-        },
-      ],
-    };
+    return createActionsDefinitions(this.actionDefinitionActions());
   }
 
   private supportDefinitions(): SettingDefinitionItem<string> {
+    return createSupportDefinitions();
+  }
+
+  private actionDefinitionActions(): SettingsActionDefinitionsActions {
     return {
-      type: "group",
-      heading: "Support Veil",
-      cls: "veil-settings-panel-support",
-      items: [{
-        name: "Buy me a coffee",
-        desc: "If Veil is useful to you, you can support its continued development.",
-        searchable: false,
-        render: (setting) => {
-          const link = setting.controlEl.createEl("a", {
-            cls: "veil-support-link",
-            attr: {
-              href: FUNDING_URL,
-              target: "_blank",
-              rel: "noopener noreferrer",
-              "aria-label": "Buy me a coffee",
-            },
-          });
-          const icon = link.createSpan({ cls: "veil-support-link-icon" });
-          setIcon(icon, "coffee");
-          link.createSpan({ cls: "veil-support-link-label", text: "Buy me a coffee" });
-        },
-      }],
+      openWallpaperLibrary: () => this.plugin.openWallpaperLibrary(),
+      reloadWallpaper: () => this.plugin.refreshWallpaper(true),
+      shuffleWallpaperPool: () => this.plugin.shuffleWallpaperPool(),
+      exportSettings: () => this.exportSettings(),
+      importSettings: () => this.chooseImportFile(),
+      restoreDefaults: () => {
+        this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
+        void this.plugin.flushSettings().then(() => this.update());
+      },
     };
   }
 
