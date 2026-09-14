@@ -109,7 +109,11 @@ void test("render invalidation classification remains explicit", () => {
   assert.equal(globalControlRequiresRender("opacity"), false);
   assert.equal(profileControlRequiresRender("wallpaperPath"), true);
   assert.equal(profileControlRequiresRender("opacity"), false);
+  assert.equal(ruleControlRequiresRender("matchType"), true);
   assert.equal(ruleControlRequiresRender("profileId"), true);
+  assert.equal(ruleControlRequiresRender("enabled"), false);
+  assert.equal(ruleControlRequiresRender("excludePaneSurface"), false);
+  assert.equal(ruleControlRequiresRender("excludePaneContent"), false);
   assert.equal(ruleControlRequiresRender("matchValue"), false);
 });
 
