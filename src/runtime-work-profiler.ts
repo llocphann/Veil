@@ -4,7 +4,10 @@ export type RuntimeWorkKind =
   | "mediaAllocation"
   | "appearanceApply"
   | "libraryGridRender"
-  | "libraryCardPatch";
+  | "libraryCardPatch"
+  | "contextBuild"
+  | "sceneResolution"
+  | "sourceLookup";
 
 export type RuntimeWorkSnapshot = Readonly<Record<RuntimeWorkKind, number>>;
 
@@ -15,6 +18,9 @@ const WORK_KINDS: readonly RuntimeWorkKind[] = [
   "appearanceApply",
   "libraryGridRender",
   "libraryCardPatch",
+  "contextBuild",
+  "sceneResolution",
+  "sourceLookup",
 ];
 
 export class RuntimeWorkProfiler {
