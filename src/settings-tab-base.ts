@@ -1,4 +1,4 @@
-import { Notice, PluginSettingTab, normalizePath, setIcon } from "obsidian";
+import { Notice, PluginSettingTab, setIcon } from "obsidian";
 import type {
   App,
   SettingDefinition,
@@ -29,7 +29,6 @@ import {
 } from "./settings-collection-model";
 import {
   controlValue,
-  findRule,
   globalControlRequiresRender,
   parseProfileControlKey,
   parseRuleControlKey,
@@ -58,7 +57,7 @@ import {
 } from "./settings-wallpaper-definitions";
 import {
   DEFAULT_SETTINGS,
-  normalizeSettings,
+  type VeilSettings,
 } from "./settings";
 
 const MAX_SCENES = 64;
@@ -91,6 +90,8 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   setControlValue(key: string, value: unknown): void {
+    if (controlValue(this.plugin.settings, key) === value) return;
+
     const profileKey = parseProfileControlKey(key);
     if (profileKey) {
       const profiles = this.plugin.settings.profiles.map((profile) =>
@@ -106,21 +107,32 @@ export class WallpaperSettingsTab extends PluginSettingTab {
 
     const ruleKey = parseRuleControlKey(key);
     if (ruleKey) {
-      const rule = findRule(this.plugin.settings, ruleKey.kind, ruleKey.id);
-      if (!rule) return;
-      setRuleControlValue(rule, ruleKey.field, value);
-      this.plugin.updateSettings({
-        wallpaperRules: this.plugin.settings.wallpaperRules,
-        opacityExclusions: this.plugin.settings.opacityExclusions,
-      });
+      if (ruleKey.kind === "wallpaper") {
+        if (!this.plugin.settings.wallpaperRules.some((rule) => rule.id === ruleKey.id)) return;
+        const wallpaperRules = this.plugin.settings.wallpaperRules.map((rule) => {
+          if (rule.id !== ruleKey.id) return rule;
+          const next = { ...rule };
+          setRuleControlValue(next, ruleKey.field, value);
+          return next;
+        });
+        this.plugin.updateSettings({ wallpaperRules });
+      } else {
+        if (!this.plugin.settings.opacityExclusions.some((rule) => rule.id === ruleKey.id)) return;
+        const opacityExclusions = this.plugin.settings.opacityExclusions.map((rule) => {
+          if (rule.id !== ruleKey.id) return rule;
+          const next = { ...rule };
+          setRuleControlValue(next, ruleKey.field, value);
+          return next;
+        });
+        this.plugin.updateSettings({ opacityExclusions });
+      }
       if (ruleControlRequiresRender(ruleKey.field)) this.update();
       else this.refreshDomState();
       return;
     }
 
     if (!(key in DEFAULT_SETTINGS)) return;
-    const next = normalizeSettings({ ...this.plugin.settings, [key]: value }, normalizePath);
-    this.plugin.updateSettings(next);
+    this.plugin.updateSettings({ [key]: value } as Partial<VeilSettings>);
     if (globalControlRequiresRender(key)) this.update();
     else this.refreshDomState();
   }
