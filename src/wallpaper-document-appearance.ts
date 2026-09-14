@@ -6,6 +6,7 @@ import type {
   OpacityExclusionRule,
   VeilAppearance,
 } from "./settings";
+import { wallpaperDocumentApplicationSignature } from "./wallpaper-document-signature";
 import type { WallpaperDocumentState } from "./wallpaper-document-state";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -34,7 +35,17 @@ export function applyDocumentAppearance(options: DocumentAppearanceOptions): voi
     profileId,
     updateProfileId,
   } = options;
+  const applicationSignature = wallpaperDocumentApplicationSignature({
+    appearance,
+    context,
+    opacityExclusions,
+    profileId,
+    updateProfileId,
+    ready: state.ready,
+  });
   state.appearance = appearance;
+  if (state.applicationSignature === applicationSignature) return;
+  state.applicationSignature = applicationSignature;
 
   const filters: string[] = [];
   if (appearance.blurEnabled && appearance.blurIntensity > 0) {
