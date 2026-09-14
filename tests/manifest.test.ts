@@ -20,6 +20,7 @@ function settingsSource(): string {
     fs.readFileSync("src/settings-appearance-definitions.ts", "utf8"),
     fs.readFileSync("src/settings-scene-definitions.ts", "utf8"),
     fs.readFileSync("src/settings-routing-definitions.ts", "utf8"),
+    fs.readFileSync("src/settings-wallpaper-definitions.ts", "utf8"),
   ].join("\n");
 }
 
