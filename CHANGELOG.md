@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.7.0
+
+- Coalesce high-frequency appearance sliders to one Settings runtime update per animation frame while preserving immediate control feedback and the final persisted value.
+- Replace repeated workspace leaf scans with a live document registry shared by document application, metadata targeting, pool targeting, layout repair, and vault invalidation.
+- Cache document semantic context behind explicit file, metadata, layout, theme, rename, and window-lifecycle invalidation so no-op applies avoid repeated leaf and metadata work.
+- Cache static Scene and Routing resolution by Settings/context identity and manual-Scene revision while keeping time-, day-, and schedule-dependent routing uncached.
+- Cache wallpaper source/media lookup by path, file stat, and explicit source revision with bounded storage and scoped vault-event invalidation.
+- Extend development-only runtime work profiling with context-build, Scene-resolution, and source-lookup counters placed after their no-op/cache guards.
+- Move the performance gate to the exact released 1.6.0 baseline while retaining deterministic optimization contracts, production bundle verification, bundle-growth limits, and Settings-path benchmarks.
+- Preserve the complete 1.6 stability contract and existing Scene, Routing, Wallpaper Library, pool, appearance, video, transition, persistence, command, and multi-window behavior.
+
 ## 1.6.0
 
 - Rework Veil around smaller ownership-focused runtime and Settings modules without expanding the core feature surface.
