@@ -17,10 +17,16 @@ const applySchedulerSource = fs.readFileSync(
 );
 
 void test("metadata cache changes invalidate only documents using that file", () => {
-  assert.match(
-    source,
-    /metadataCache\.on\("changed", \(file\) => \{\s*if \(!this\.layoutReady\) return;\s*this\.scheduleApplyToDocuments\(this\.documentContexts\.documentsForFile\(file\)\);/,
-  );
+  const body = source.match(
+    /metadataCache\.on\("changed", \(file\) => \{([\s\S]*?)\n {6}\}\)/,
+  )?.[1] || "";
+  const lookupIndex = body.indexOf("this.documentContexts.documentsForFile(file)");
+  const invalidateIndex = body.indexOf("this.documentContexts.invalidateDocuments(documents)");
+  const scheduleIndex = body.indexOf("this.scheduleApplyToDocuments(documents)");
+  assert.match(body, /if \(!this\.layoutReady\) return/);
+  assert.ok(lookupIndex >= 0);
+  assert.ok(invalidateIndex > lookupIndex);
+  assert.ok(scheduleIndex > invalidateIndex);
   assert.doesNotMatch(
     source,
     /metadataCache\.on\("changed"[\s\S]*?isActiveFile\(file\)[\s\S]*?refreshWallpaper\(\)/,
@@ -39,15 +45,21 @@ void test("active note events use document-scoped scheduling", () => {
   );
 });
 
-void test("document context scope shares the cheap file lookup", () => {
+void test("document context scope reuses cached context before cheap file lookup", () => {
   assert.match(contextSource, /private fileForDocument\(document: Document\): TFile \| null/);
+  const contextBody = contextSource.match(
+    /contextForDocument\(document: Document\): NoteContext \{([\s\S]*?)\n {2}\}/,
+  )?.[1] || "";
+  const cacheIndex = contextBody.indexOf("const cached = this.contextCache.get(document);");
+  const returnIndex = contextBody.indexOf("if (cached) return cached;");
+  const lookupIndex = contextBody.indexOf("const candidate = this.fileForDocument(document);");
+  assert.ok(cacheIndex >= 0);
+  assert.ok(returnIndex > cacheIndex);
+  assert.ok(lookupIndex > returnIndex);
+
   assert.match(
     contextSource,
-    /contextForDocument\(document: Document\): NoteContext \{\s*const candidate = this\.fileForDocument\(document\);/,
-  );
-  assert.match(
-    contextSource,
-    /documentsForFile\(file: TFile\): Document\[\] \{[\s\S]*?this\.fileForDocument\(document\)\?\.path === file\.path/,
+    /documentsForFile\(file: TFile\): Document\[\] \{[\s\S]*?const cached = this\.contextCache\.get\(document\)[\s\S]*?if \(cached\) return cached\.path === file\.path[\s\S]*?this\.fileForDocument\(document\)\?\.path === file\.path/,
   );
   assert.match(
     contextSource,
