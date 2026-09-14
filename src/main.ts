@@ -38,6 +38,10 @@ import {
   syncWallpaperPlayback,
 } from "./wallpaper-media-lifecycle";
 import type { WallpaperDocumentState } from "./wallpaper-document-state";
+import {
+  markWallpaperMediaFailed,
+  markWallpaperMediaReady,
+} from "./wallpaper-media-phase";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
 import { WallpaperLibraryRuntime } from "./wallpaper-library-runtime";
 import {
@@ -579,6 +583,7 @@ export default class VeilPlugin extends Plugin {
       kind: source.kind,
       sourceLabel: source.label,
       contextLabel: source.contextLabel,
+      phase: "loading",
       layer,
       media,
       vignette,
@@ -603,7 +608,7 @@ export default class VeilPlugin extends Plugin {
       this.documents.get(document) === activeState;
     const ready = (): void => {
       if (!isCurrent() || activeState.ready) return;
-      activeState.ready = true;
+      markWallpaperMediaReady(activeState);
       layer.hidden = false;
       this.applyOptions(
         document,
@@ -613,16 +618,14 @@ export default class VeilPlugin extends Plugin {
       this.startCrossfade(document, activeState);
       this.setDocumentStatus(
         document,
-        `${activeState.contextLabel || source.contextLabel} · ${
-          activeState.sourceLabel || source.label
-        } loaded: ${activeState.path}`,
+        `${activeState.contextLabel} · ${activeState.sourceLabel} loaded: ${activeState.path}`,
         "success",
       );
     };
     listen(media, source.kind === "video" ? "loadeddata" : "load", ready);
     listen(media, "error", () => {
       if (!isCurrent()) return;
-      activeState.failed = true;
+      markWallpaperMediaFailed(activeState);
       layer.hidden = true;
       if (activeState.kind === "video") {
         (media as HTMLVideoElement).pause();
