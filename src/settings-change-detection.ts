@@ -9,7 +9,9 @@ import type {
 const APPEARANCE_KEYS = [
   "wallpaperPath",
   "wallpaperPoolEnabled",
+  "wallpaperPoolFolder",
   "wallpaperPoolIncludeSubfolders",
+  "wallpaperPoolChangeInterval",
   "displayMode",
   "wallpaperPositionX",
   "wallpaperPositionY",
