@@ -7,6 +7,7 @@ import {
 import type { NoteContext } from "./context-rules";
 import { DocumentApplyScheduler } from "./document-apply-scheduler";
 import { DocumentContextResolver } from "./document-context-resolver";
+import { migratePersistedVeilData } from "./persisted-data-schema";
 import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import { veilSettingsEqual } from "./settings-change-detection";
@@ -101,12 +102,10 @@ export default class VeilPlugin extends Plugin {
 
   async onload(): Promise<void> {
     try {
-      const storedData: unknown = await this.loadData();
+      const migration = migratePersistedVeilData(await this.loadData());
+      const storedData = migration.data;
       this.settings = normalizeSettings(storedData, normalizePath);
-      const libraryData = typeof storedData === "object" && storedData !== null
-        ? (storedData as Record<string, unknown>).wallpaperLibrary
-        : null;
-      this.wallpaperLibrary.load(libraryData);
+      this.wallpaperLibrary.load(storedData.wallpaperLibrary);
     } catch (error) {
       console.error("[veil] Could not load settings", error);
       new Notice("Veil settings could not be loaded. Using defaults.");
