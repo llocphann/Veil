@@ -1,6 +1,7 @@
 import { TFile, type App } from "obsidian";
 import type { NoteContext } from "./context-rules";
 import type { ResolvedWallpaper } from "./profile-resolver";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import { SceneRuntime } from "./scene-runtime";
 import {
   mediaKind,
@@ -129,6 +130,7 @@ export class WallpaperSourceResolver {
     ) {
       return cached;
     }
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("sourceLookup");
 
     const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
     const abstractFile = invalidPath || !path ? null : this.app.vault.getAbstractFileByPath(path);
