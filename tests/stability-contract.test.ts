@@ -24,7 +24,7 @@ const mediaLifecycle = readFileSync(
 );
 const styles = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
-void test("2.0 invariant 1: no-op document appearance returns before meaningful work", () => {
+void test("1.6 invariant 1: no-op document appearance returns before meaningful work", () => {
   const guard = appearance.indexOf(
     "if (state.applicationSignature === applicationSignature) return;",
   );
@@ -33,7 +33,7 @@ void test("2.0 invariant 1: no-op document appearance returns before meaningful 
   assert.ok(work > guard, "appearance work must remain behind the stable-signature guard");
 });
 
-void test("2.0 invariant 2: unchanged media returns before replacement allocation", () => {
+void test("1.6 invariant 2: unchanged media returns before replacement allocation", () => {
   const body = main.match(
     /private applyToDocument\(document: Document\): void \{([\s\S]*?)\n {2}private startCrossfade/,
   )?.[1] || "";
@@ -48,7 +48,7 @@ void test("2.0 invariant 2: unchanged media returns before replacement allocatio
   assert.doesNotMatch(reuseBranch, /\.load\(\)/);
 });
 
-void test("2.0 invariant 3: context and layout events stay document-scoped", () => {
+void test("1.6 invariant 3: context and layout events stay document-scoped", () => {
   const activeLeaf = main.match(
     /this\.registerEvent\(this\.app\.workspace\.on\("active-leaf-change"[\s\S]*?\n {4}\}\)\);/,
   )?.[0] || "";
@@ -75,7 +75,7 @@ void test("2.0 invariant 3: context and layout events stay document-scoped", () 
   assert.doesNotMatch(cssChange, /refreshWallpaper\(\)/);
 });
 
-void test("2.0 invariant 4: vault cache invalidation ignores unrelated file churn", () => {
+void test("1.6 invariant 4: vault cache invalidation ignores unrelated file churn", () => {
   assert.equal(shouldInvalidatePoolCandidates("create", "Notes/readme.md"), false);
   assert.equal(shouldInvalidatePoolCandidates("delete", "Notes/readme.md"), false);
   assert.equal(shouldInvalidatePoolCandidates("create", "Wallpapers/sky.webp"), true);
@@ -94,7 +94,7 @@ void test("2.0 invariant 4: vault cache invalidation ignores unrelated file chur
   );
 });
 
-void test("2.0 invariant 5: idle operation has no recurring polling or hidden visual motion", () => {
+void test("1.6 invariant 5: idle operation has no recurring polling or hidden visual motion", () => {
   assert.doesNotMatch(main, /setInterval\s*\(/);
   assert.doesNotMatch(scheduler, /setInterval\s*\(/);
   assert.doesNotMatch(mediaLifecycle, /setInterval\s*\(/);
@@ -123,7 +123,7 @@ void test("2.0 invariant 5: idle operation has no recurring polling or hidden vi
   );
 });
 
-void test("2.0 invariant 6: persisted data always has a deterministic migration path", () => {
+void test("1.6 invariant 6: persisted data always has a deterministic migration path", () => {
   const legacy = migratePersistedVeilData({ enabled: true });
   assert.equal(legacy.sourceVersion, 0);
   assert.equal(legacy.targetVersion, VEIL_PERSISTED_DATA_SCHEMA_VERSION);
