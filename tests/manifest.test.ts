@@ -69,6 +69,13 @@ void test("support button is branded and independent from theme button classes",
   assert.match(styles, /\.veil-support-link-label[\s\S]*white-space: nowrap;/);
 });
 
+void test("stylesheet avoids Community CSS lint warnings", () => {
+  const styles = fs.readFileSync("styles.css", "utf8");
+
+  assert.doesNotMatch(styles, /!important\b/);
+  assert.doesNotMatch(styles, /:has\(/);
+});
+
 void test("context routing and opacity exclusions are documented and exposed in settings", () => {
   const readme = fs.readFileSync("README.md", "utf8");
   const settings = fs.readFileSync("src/settings-tab.ts", "utf8");
