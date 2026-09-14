@@ -8,6 +8,7 @@ import type { NoteContext } from "./context-rules";
 import { DocumentApplyScheduler } from "./document-apply-scheduler";
 import { DocumentContextResolver } from "./document-context-resolver";
 import { migratePersistedVeilData } from "./persisted-data-schema";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import { veilSettingsEqual } from "./settings-change-detection";
@@ -134,6 +135,16 @@ export default class VeilPlugin extends Plugin {
       name: "Switch scene",
       callback: () => this.openSceneSwitcher(),
     });
+    if (__VEIL_DEV__) {
+      this.addCommand({
+        id: "debug-runtime-profile",
+        name: "Log and reset runtime work profile",
+        callback: () => {
+          console.debug("[veil] runtime work profile", runtimeWorkProfiler.snapshot());
+          runtimeWorkProfiler.reset();
+        },
+      });
+    }
 
     this.app.workspace.onLayoutReady(() => {
       if (this.unloaded) return;
@@ -444,6 +455,7 @@ export default class VeilPlugin extends Plugin {
 
   private applyToWorkspace(): void {
     if (this.unloaded) return;
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("workspaceApply");
     for (const document of this.workspaceDocuments()) this.applyScheduledDocument(document);
   }
 
@@ -486,6 +498,7 @@ export default class VeilPlugin extends Plugin {
       this.clearDocument(document);
       return;
     }
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("documentApply");
     const context = this.documentContexts.contextForDocument(document);
     const current = this.documents.get(document) || null;
     const sourceResolution = this.wallpaperSources.resolve(context, this.sourceRevision);
@@ -547,6 +560,7 @@ export default class VeilPlugin extends Plugin {
       this.settleState(previous);
     }
 
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("mediaAllocation");
     const layer = document.body.createDiv();
     layer.className = LAYER_CLASS;
     layer.hidden = true;
