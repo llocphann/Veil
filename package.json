@@ -17,6 +17,9 @@
     "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
     "lint": "eslint .",
     "test": "tsx --test tests/*.test.ts",
+    "test:perf": "tsx --test tests/stability-contract.test.ts tests/runtime-hotpath.test.ts tests/document-application-fastpath.test.ts tests/document-apply-scheduler.test.ts tests/media-identity-integration.test.ts tests/playback-fastpath-integration.test.ts tests/system-routing-scheduler.test.ts tests/vault-document-invalidation.test.ts tests/pool-shuffle-invalidation.test.ts tests/wallpaper-library-render-fastpath.test.ts tests/css-change-invalidation.test.ts tests/document-context-layout-invalidation.test.ts tests/idle-css-contract.test.ts tests/settings-change-detection.test.ts tests/settings-change-impact.test.ts tests/settings-document-invalidation.test.ts",
+    "bench:settings": "tsx tests/settings-change.bench.ts",
+    "perf": "node perf-check.mjs",
     "check": "npm run lint && npm run test && npm run build && node --check main.js && node verify-build.mjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
