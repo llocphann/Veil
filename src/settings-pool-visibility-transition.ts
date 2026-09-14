@@ -76,7 +76,13 @@ export class SettingsPoolVisibilityTransition {
     const exits = outgoing.map((row) => this.animateRow(row, false));
     void Promise.allSettled(exits.map((animation) => animation.finished)).then(() => {
       if (generation !== this.generation) return;
-      this.animations.clear();
+
+      // Exit animations use fill: forwards so the rows stay collapsed until
+      // the declarative Settings tree is rebuilt. Release those animation
+      // effects synchronously before refresh(): Obsidian may reuse Setting DOM
+      // nodes during update(), and carrying max-height: 0 / opacity: 0 into
+      // that lifecycle can leave unrelated rows visually hidden.
+      this.cancelAnimations();
       refresh();
       this.animateIncoming(generation);
     });
@@ -91,7 +97,10 @@ export class SettingsPoolVisibilityTransition {
     if (generation !== this.generation) return;
     for (const row of visiblePoolRows(this.root())) {
       const animation = this.animateRow(row, true);
-      void animation.finished.finally(() => this.animations.delete(animation));
+      void animation.finished.then(
+        () => this.animations.delete(animation),
+        () => this.animations.delete(animation),
+      );
     }
   }
 
