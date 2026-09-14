@@ -6,7 +6,6 @@ import {
 } from "obsidian";
 import {
   matchingOpacityExclusions,
-  nextSystemContextBoundary,
   type NoteContext,
 } from "./context-rules";
 import { DocumentContextResolver } from "./document-context-resolver";
@@ -22,6 +21,7 @@ import {
   type VeilSettings,
 } from "./settings";
 import { SettingsPersistence } from "./settings-persistence";
+import { SystemRoutingScheduler } from "./system-routing-scheduler";
 import {
   retainedOutgoingForPending,
   shouldRetainWallpaperForUnavailableSource,
@@ -49,8 +49,6 @@ const PANE_CONTENT_OPACITY_VARIABLE = "--vault-dashboard-pane-content-opacity";
 const LEGACY_IMAGE_VARIABLE = "--vault-dashboard-banner-image";
 const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
 const TRANSITION_CLEANUP_BUFFER = 80;
-const SYSTEM_ROUTING_BOUNDARY_BUFFER = 50;
-const MAX_TIMEOUT_DELAY = 2_147_483_647;
 
 interface WallpaperSource {
   path: string;
@@ -102,12 +100,16 @@ export default class VeilPlugin extends Plugin {
       new Notice("Veil changes could not be saved. Check vault permissions.");
     },
   );
+  private readonly systemRouting = new SystemRoutingScheduler(
+    () => this.settings,
+    () => !this.unloaded && this.layoutReady,
+    () => this.refreshWallpaper(),
+  );
   private manualProfileId = "";
   private settingTab: WallpaperSettingsTab | null = null;
   private unloaded = false;
   private layoutReady = false;
   private sourceRevision = 0;
-  private systemRoutingTimer: number | null = null;
   private refreshFrame: number | null = null;
 
   async onload(): Promise<void> {
@@ -152,7 +154,7 @@ export default class VeilPlugin extends Plugin {
       this.layoutReady = true;
       this.documentContexts.rememberActiveRootLeaf(this.app.workspace.getMostRecentLeaf());
       this.registerVaultEvents();
-      this.rescheduleSystemRouting();
+      this.systemRouting.reschedule();
       this.refreshWallpaper();
     });
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
@@ -185,8 +187,7 @@ export default class VeilPlugin extends Plugin {
     this.unloaded = true;
     if (this.refreshFrame !== null) window.cancelAnimationFrame(this.refreshFrame);
     this.refreshFrame = null;
-    if (this.systemRoutingTimer !== null) window.clearTimeout(this.systemRoutingTimer);
-    this.systemRoutingTimer = null;
+    this.systemRouting.clear();
     void this.flushSettings();
     this.clearAllDocuments();
     this.documentContexts.clear();
@@ -207,7 +208,7 @@ export default class VeilPlugin extends Plugin {
       this.manualProfileId = "";
     }
     this.wallpaperPools.reconcileSettings(previous, next, preservedPoolContexts);
-    this.rescheduleSystemRouting();
+    this.systemRouting.reschedule();
     this.refreshWallpaper();
     this.scheduleSave();
   }
@@ -351,31 +352,6 @@ export default class VeilPlugin extends Plugin {
     for (const path of paths) {
       this.wallpaperLibrary = rememberRecentWallpaper(this.wallpaperLibrary, path, normalizePath);
     }
-  }
-
-  private rescheduleSystemRouting(): void {
-    if (this.systemRoutingTimer !== null) {
-      window.clearTimeout(this.systemRoutingTimer);
-      this.systemRoutingTimer = null;
-    }
-    if (this.unloaded || !this.layoutReady || !this.settings.enabled) return;
-
-    const boundary = nextSystemContextBoundary([
-      ...this.settings.wallpaperRules,
-      ...this.settings.opacityExclusions,
-    ]);
-    if (boundary === null) return;
-
-    const delay = Math.max(
-      1,
-      Math.min(MAX_TIMEOUT_DELAY, boundary - Date.now() + SYSTEM_ROUTING_BOUNDARY_BUFFER),
-    );
-    this.systemRoutingTimer = window.setTimeout(() => {
-      this.systemRoutingTimer = null;
-      if (this.unloaded) return;
-      this.refreshWallpaper();
-      this.rescheduleSystemRouting();
-    }, delay);
   }
 
   private scheduleApplyToWorkspace(): void {

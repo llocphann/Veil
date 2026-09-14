@@ -8,7 +8,7 @@ void test("plugin unload cancels scheduled work and removes document state", () 
   const unload = source.match(/onunload\(\): void \{([\s\S]*?)\n {2}\}/)?.[1] || "";
 
   assert.match(unload, /cancelAnimationFrame\(this\.refreshFrame\)/);
-  assert.match(unload, /clearTimeout\(this\.systemRoutingTimer\)/);
+  assert.match(unload, /systemRouting\.clear\(\)/);
   assert.match(unload, /flushSettings\(\)/);
   assert.match(unload, /clearAllDocuments\(\)/);
   assert.match(unload, /documentContexts\.clear\(\)/);

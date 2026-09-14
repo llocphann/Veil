@@ -15,6 +15,10 @@ const persistenceSource = readFileSync(
   new URL("../src/settings-persistence.ts", import.meta.url),
   "utf8",
 );
+const routingSource = readFileSync(
+  new URL("../src/system-routing-scheduler.ts", import.meta.url),
+  "utf8",
+);
 
 void test("main delegates document context ownership", () => {
   assert.match(mainSource, /new DocumentContextResolver\(this\.app\)/);
@@ -46,4 +50,14 @@ void test("main delegates settings persistence ownership", () => {
   assert.match(persistenceSource, /private saveQueue/);
   assert.match(mainSource, /return this\.settingsPersistence\.flush\(\)/);
   assert.match(mainSource, /this\.settingsPersistence\.schedule\(\)/);
+});
+
+void test("main delegates system routing timer ownership", () => {
+  assert.match(mainSource, /new SystemRoutingScheduler\(/);
+  assert.doesNotMatch(mainSource, /systemRoutingTimer/);
+  assert.doesNotMatch(mainSource, /nextSystemContextBoundary/);
+  assert.match(routingSource, /private timer: number \| null/);
+  assert.match(routingSource, /nextSystemContextBoundary\(/);
+  assert.match(mainSource, /this\.systemRouting\.reschedule\(\)/);
+  assert.match(mainSource, /this\.systemRouting\.clear\(\)/);
 });
