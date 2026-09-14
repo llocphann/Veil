@@ -78,16 +78,18 @@ Runtime invalidation now uses document-scoped scheduling for context, Settings, 
 - Restrict multi-window updates to the documents whose resolved state actually changed.
 - Continue reducing metadata-cache and vault-event work on hot paths.
 
-### 1.8 — Media lifecycle and transition efficiency — in progress on `dev`
+### 1.8 — Media lifecycle and transition efficiency — complete on `dev`
 
-The next optimization boundary separates media identity from context, appearance, and playback identity so an unchanged image or video can remain allocated while the surrounding Scene or visual state changes.
+Media identity is now independent from routing, Scene, appearance, and playback identity. Unchanged media is reused without replacing `src`, calling `load()`, reallocating the layer, or restarting a crossfade; playback uses its own stable signature, lifecycle phases are explicit from loading through disposal, and stale media events are guarded against superseded document state.
 
 - Formalize media states from resolution and load through transition, active playback, and disposal.
 - Keep media identity separate from appearance and playback identity so visual changes do not reload unchanged images or videos.
 - Audit image, GIF, and video allocation, playback, cleanup, and stale-load behavior.
 - Ensure unchanged video sources do not restart when only visual settings change.
 
-### 1.9 — State, UI efficiency, and release hardening
+### 1.9 — State, UI efficiency, and release hardening — in progress on `dev`
+
+The current hardening pass is moving persisted state onto an explicit versioned migration pipeline before reducing Settings and Wallpaper Library render churn and adding work-count instrumentation.
 
 - Version the persisted settings schema and use explicit, deterministic migrations.
 - Reduce unnecessary Settings and Wallpaper Library rerenders and DOM churn.
