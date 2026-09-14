@@ -155,6 +155,7 @@ export function createWallpaperDefinitions(
       ),
       slider(
         "paneContentOpacity",
+        "Pane & content opacity",
         "Fade each outer pane as one group, including nested backgrounds, text, icons, and images.",
       ),
     ],
