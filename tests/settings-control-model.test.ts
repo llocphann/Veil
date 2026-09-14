@@ -131,3 +131,19 @@ void test("settings base delegates control-model ownership", () => {
   assert.doesNotMatch(source, /private setRuleValue/);
   assert.doesNotMatch(source, /DYNAMIC_GLOBAL_KEYS/);
 });
+
+void test("settings controls send minimal immutable patches", () => {
+  const source = fs.readFileSync(
+    new URL("../src/settings-tab-base.ts", import.meta.url),
+    "utf8",
+  );
+  assert.ok(
+    source.includes(
+      "this.plugin.updateSettings({ [key]: value } as Partial<VeilSettings>);",
+    ),
+  );
+  assert.doesNotMatch(source, /normalizeSettings\(\{ \.\.\.this\.plugin\.settings/);
+  assert.ok(source.includes("const next = { ...rule };"));
+  assert.ok(source.includes("this.plugin.settings.wallpaperRules.map((rule) =>"));
+  assert.ok(source.includes("this.plugin.settings.opacityExclusions.map((rule) =>"));
+});
