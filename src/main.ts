@@ -9,6 +9,7 @@ import { DocumentApplyScheduler } from "./document-apply-scheduler";
 import { DocumentContextResolver } from "./document-context-resolver";
 import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
+import { veilSettingsEqual } from "./settings-change-detection";
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
@@ -180,6 +181,7 @@ export default class VeilPlugin extends Plugin {
     if (this.unloaded) return;
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
+    if (veilSettingsEqual(previous, next)) return;
     if (rememberRecent) this.wallpaperLibrary.rememberSettingsChanges(previous, next);
     this.settings = next;
     this.scenes.reconcileSettings(next);
