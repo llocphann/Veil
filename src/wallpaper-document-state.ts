@@ -8,7 +8,7 @@ export interface WallpaperDocumentState {
   media: HTMLImageElement | HTMLVideoElement;
   vignette: HTMLDivElement;
   appearance: VeilAppearance;
-  applicationSignature: string;
+  applicationSignature?: string;
   ready: boolean;
   failed: boolean;
   disposed: boolean;
