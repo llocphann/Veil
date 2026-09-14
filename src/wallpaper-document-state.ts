@@ -4,6 +4,8 @@ export interface WallpaperDocumentState {
   key: string;
   path: string;
   kind: Exclude<MediaKind, "">;
+  sourceLabel: string;
+  contextLabel: string;
   layer: HTMLDivElement;
   media: HTMLImageElement | HTMLVideoElement;
   vignette: HTMLDivElement;
