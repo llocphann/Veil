@@ -72,6 +72,22 @@ void test("equivalent document inputs keep a stable application signature", () =
   );
 });
 
+void test("source-only appearance fields do not invalidate render work", () => {
+  const baseline = appearance({ wallpaperPath: "Wallpapers/a.webp" });
+  assert.equal(
+    signature({ appearance: baseline }),
+    signature({ appearance: { ...baseline, wallpaperPath: "Wallpapers/b.webp" } }),
+  );
+  assert.equal(
+    signature({ appearance: baseline }),
+    signature({ appearance: { ...baseline, wallpaperPoolEnabled: true } }),
+  );
+  assert.equal(
+    signature({ appearance: baseline }),
+    signature({ appearance: { ...baseline, wallpaperPoolIncludeSubfolders: true } }),
+  );
+});
+
 void test("appearance and matched opacity changes invalidate the signature", () => {
   assert.notEqual(
     signature({ appearance: appearance({ opacity: 20 }) }),
