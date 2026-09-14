@@ -22,6 +22,11 @@ import {
   type VeilSettings,
 } from "../src/settings";
 
+const settingsBaseSource = fs.readFileSync(
+  new URL("../src/settings-tab-base.ts", import.meta.url),
+  "utf8",
+);
+
 function settingsFixture(): VeilSettings {
   const settings: VeilSettings = {
     ...DEFAULT_SETTINGS,
@@ -171,30 +176,58 @@ void test("continuous patch returns null when every queued value is already curr
 });
 
 void test("settings base delegates control-model ownership", () => {
-  const source = fs.readFileSync(
-    new URL("../src/settings-tab-base.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(source, /controlValue\(this\.plugin\.settings, key\)/);
-  assert.match(source, /parseProfileControlKey\(key\)/);
-  assert.match(source, /parseRuleControlKey\(key\)/);
-  assert.match(source, /setRuleControlValue\(/);
-  assert.doesNotMatch(source, /private parseProfileKey/);
-  assert.doesNotMatch(source, /private parseRuleKey/);
-  assert.doesNotMatch(source, /private setRuleValue/);
-  assert.doesNotMatch(source, /DYNAMIC_GLOBAL_KEYS/);
+  assert.match(settingsBaseSource, /controlValue\(this\.plugin\.settings, key\)/);
+  assert.match(settingsBaseSource, /parseProfileControlKey\(key\)/);
+  assert.match(settingsBaseSource, /parseRuleControlKey\(key\)/);
+  assert.match(settingsBaseSource, /setRuleControlValue\(/);
+  assert.doesNotMatch(settingsBaseSource, /private parseProfileKey/);
+  assert.doesNotMatch(settingsBaseSource, /private parseRuleKey/);
+  assert.doesNotMatch(settingsBaseSource, /private setRuleValue/);
+  assert.doesNotMatch(settingsBaseSource, /DYNAMIC_GLOBAL_KEYS/);
 });
 
 void test("settings controls send minimal immutable patches", () => {
-  const source = fs.readFileSync(
-    new URL("../src/settings-tab-base.ts", import.meta.url),
-    "utf8",
-  );
   assert.ok(
-    source.includes("this.plugin.updateSettings({ [key]: value });"),
+    settingsBaseSource.includes("this.plugin.updateSettings({ [key]: value });"),
   );
-  assert.doesNotMatch(source, /normalizeSettings\(\{ \.\.\.this\.plugin\.settings/);
-  assert.ok(source.includes("const next = { ...rule };"));
-  assert.ok(source.includes("this.plugin.settings.wallpaperRules.map((rule) =>"));
-  assert.ok(source.includes("this.plugin.settings.opacityExclusions.map((rule) =>"));
+  assert.doesNotMatch(settingsBaseSource, /normalizeSettings\(\{ \.\.\.this\.plugin\.settings/);
+  assert.ok(settingsBaseSource.includes("const next = { ...rule };"));
+  assert.ok(settingsBaseSource.includes("this.plugin.settings.wallpaperRules.map((rule) =>"));
+  assert.ok(settingsBaseSource.includes("this.plugin.settings.opacityExclusions.map((rule) =>"));
+});
+
+void test("settings UI frame-coalesces only continuous controls", () => {
+  assert.match(settingsBaseSource, /new SettingsControlFrameQueue\(/);
+  assert.match(settingsBaseSource, /ownerDocument\.defaultView/);
+  assert.match(
+    settingsBaseSource,
+    /return this\.continuousControls\.value\([\s\S]*?controlValue\(this\.plugin\.settings, key\)/,
+  );
+
+  const setter = settingsBaseSource.match(
+    /setControlValue\(key: string, value: unknown\): void \{[\s\S]*?\n {2}\}/,
+  )?.[0] || "";
+  const queueIndex = setter.indexOf("if (controlCanFrameCoalesce(key))");
+  const flushIndex = setter.indexOf("this.continuousControls.flush();");
+  const applyIndex = setter.indexOf("this.applyControlValue(key, value);");
+  assert.ok(queueIndex >= 0);
+  assert.ok(flushIndex > queueIndex);
+  assert.ok(applyIndex > flushIndex);
+  assert.match(setter, /this\.continuousControls\.queue\(key, value\);/);
+});
+
+void test("one frame batch emits one settings update and hide flushes before persistence", () => {
+  const applyBody = settingsBaseSource.match(
+    /private applyContinuousControlValues\([\s\S]*?\n {2}\}/,
+  )?.[0] || "";
+  assert.match(applyBody, /continuousControlPatch\(this\.plugin\.settings, values\)/);
+  assert.equal(
+    (applyBody.match(/this\.plugin\.updateSettings\(patch\)/g) || []).length,
+    1,
+  );
+
+  const hideBody = settingsBaseSource.match(/hide\(\): void \{[\s\S]*?\n {2}\}/)?.[0] || "";
+  const flushIndex = hideBody.indexOf("this.flushControlUpdates();");
+  const persistIndex = hideBody.indexOf("this.plugin.flushSettings()");
+  assert.ok(flushIndex >= 0 && persistIndex > flushIndex);
 });
