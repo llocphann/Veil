@@ -87,9 +87,9 @@ Media identity is now independent from routing, Scene, appearance, and playback 
 - Audit image, GIF, and video allocation, playback, cleanup, and stale-load behavior.
 - Ensure unchanged video sources do not restart when only visual settings change.
 
-### 1.9 — State, UI efficiency, and release hardening — in progress on `dev`
+### 1.9 — State, UI efficiency, and release hardening — complete on `dev`
 
-The current hardening pass is moving persisted state onto an explicit versioned migration pipeline before reducing Settings and Wallpaper Library render churn and adding work-count instrumentation.
+Persisted plugin data now has an explicit deterministic migration pipeline. Settings routing toggles and Wallpaper Library interactions avoid full rerenders when local DOM-state refreshes are sufficient, regression tests lock work-count fast paths, development builds expose a local runtime work profiler that is excluded from production, and animated CSS effects are constrained by hidden-window and reduced-motion idle policies.
 
 - Version the persisted settings schema and use explicit, deterministic migrations.
 - Reduce unnecessary Settings and Wallpaper Library rerenders and DOM churn.
@@ -97,9 +97,9 @@ The current hardening pass is moving persisted state onto an explicit versioned 
 - Add development-only performance instrumentation without telemetry or analytics.
 - Audit CSS effects and compositing so an idle Veil remains effectively idle.
 
-### 2.0 — Stability contract
+### 2.0 — Stability contract — in progress on `dev`
 
-Veil 2.0 should preserve the product direction established in 1.x while making the runtime easier to reason about and cheaper to keep enabled. The release target is defined by these invariants:
+The final development phase converts the optimization work from 1.6–1.9 into explicit release invariants. Veil 2.0 should preserve the product direction established in 1.x while making the runtime easier to reason about and cheaper to keep enabled.
 
 1. A no-op context refresh performs no meaningful work.
 2. Appearance-only changes never reload unchanged media.
