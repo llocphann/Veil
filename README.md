@@ -56,9 +56,9 @@ Start with:
 - [Data, Privacy, and Recovery](wiki/Data-Privacy-and-Recovery.md)
 - [Troubleshooting and Performance](wiki/Troubleshooting-and-Performance.md)
 
-## Roadmap to 2.0
+## Roadmap to 2.0 — complete on `dev`
 
-Veil 2.0 is planned as a refinement release rather than a feature-expansion release. The current feature set already covers the main wallpaper workflow, so development from 1.6 onward will prioritize lower runtime cost, cleaner internal boundaries, deterministic state handling, and stronger regression guarantees.
+Veil 2.0 was developed as a refinement release rather than a feature-expansion release. The existing feature set already covered the main wallpaper workflow, so development from 1.6 through 2.0 focused on lower runtime cost, cleaner internal boundaries, deterministic state handling, and stronger regression guarantees.
 
 ### 1.6 — Architecture decomposition — complete on `dev`
 
@@ -97,9 +97,9 @@ Persisted plugin data now has an explicit deterministic migration pipeline. Sett
 - Add development-only performance instrumentation without telemetry or analytics.
 - Audit CSS effects and compositing so an idle Veil remains effectively idle.
 
-### 2.0 — Stability contract — in progress on `dev`
+### 2.0 — Stability contract — complete on `dev`
 
-The final development phase converts the optimization work from 1.6–1.9 into explicit release invariants. Veil 2.0 should preserve the product direction established in 1.x while making the runtime easier to reason about and cheaper to keep enabled.
+The 2.0 stability contract is now enforced by dedicated regression coverage. Runtime refreshes use stable no-op boundaries; active-leaf, file, layout, metadata, theme, Settings, and vault changes are scoped to affected documents or caches; unchanged media is reused across appearance changes; hidden visual effects pause; persisted data follows an explicit migration path; and release versioning derives from published release history instead of stale candidate metadata.
 
 1. A no-op context refresh performs no meaningful work.
 2. Appearance-only changes never reload unchanged media.
@@ -108,7 +108,7 @@ The final development phase converts the optimization work from 1.6–1.9 into e
 5. Idle operation has no unnecessary recurring timers, animation, DOM mutation, or vault scanning.
 6. Every persisted-data version has a deterministic migration path.
 
-Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL are intentionally outside this roadmap unless they become necessary for the core wallpaper experience.
+Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL remain intentionally outside the 2.0 scope unless they become necessary for the core wallpaper experience.
 
 ### Development branches
 
@@ -119,7 +119,7 @@ Veil uses an explicit three-stage promotion flow:
 - `dev` is the integration branch. Every push runs the full verification workflow, but it does not create a smoke-test bundle or publish a release.
 - `prerelease` is the manual smoke-test gate. Promoting a verified `dev` state here runs verification again and uploads a short-lived `main.js` / `manifest.json` / `styles.css` bundle for manual testing.
 - Smoke testing is performed manually before any promotion to `stable`; there is no automatic `dev` → `prerelease` or `prerelease` → `stable` branch promotion.
-- `stable` is the default and release branch. A manually promoted prerelease candidate is checked against the current `prerelease` source, verified again, patch-versioned when needed, tagged, attested, and published.
+- `stable` is the default and release branch. A manually promoted prerelease candidate is checked against the current `prerelease` source, verified again, versioned from published release history when needed, tagged, attested, and published.
 - Stable release source must match the smoke-tested `prerelease` tree, preventing direct untested changes on `stable` from becoming a release.
 
 ## Privacy
