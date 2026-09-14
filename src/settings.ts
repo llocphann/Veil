@@ -10,6 +10,31 @@ export type DisplayMode = keyof typeof DISPLAY_MODES;
 export type VignetteMode = "off" | "ellipse" | "circle";
 export type MediaKind = "image" | "video" | "";
 
+export const MATCH_TYPES = {
+  note: "Note name",
+  path: "Exact path",
+  folder: "Folder",
+  tag: "Tag",
+} as const;
+
+export type MatchType = keyof typeof MATCH_TYPES;
+
+export interface ContextRule {
+  id: string;
+  enabled: boolean;
+  matchType: MatchType;
+  matchValue: string;
+}
+
+export interface WallpaperRule extends ContextRule {
+  wallpaperPath: string;
+}
+
+export interface OpacityExclusionRule extends ContextRule {
+  excludePaneSurface: boolean;
+  excludePaneContent: boolean;
+}
+
 export interface VeilSettings {
   enabled: boolean;
   wallpaperPath: string;
@@ -26,6 +51,8 @@ export interface VeilSettings {
   dimIntensity: number;
   pauseWhenHidden: boolean;
   respectReducedMotion: boolean;
+  wallpaperRules: WallpaperRule[];
+  opacityExclusions: OpacityExclusionRule[];
 }
 
 export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
@@ -44,6 +71,8 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   dimIntensity: 30,
   pauseWhenHidden: true,
   respectReducedMotion: true,
+  wallpaperRules: [],
+  opacityExclusions: [],
 });
 
 type PathNormalizer = (path: string) => string;
@@ -81,6 +110,76 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isDisplayMode(value: unknown): value is DisplayMode {
   return typeof value === "string" && Object.keys(DISPLAY_MODES).includes(value);
+}
+
+function isMatchType(value: unknown): value is MatchType {
+  return typeof value === "string" && Object.keys(MATCH_TYPES).includes(value);
+}
+
+function stringValue(value: unknown, fallback = "", maximumLength = 500): string {
+  return typeof value === "string" ? value.trim().slice(0, maximumLength) : fallback;
+}
+
+function normalizeMatchValue(
+  value: unknown,
+  matchType: MatchType,
+  normalize: PathNormalizer,
+): string {
+  const raw = stringValue(value);
+  if (matchType === "tag") return raw.replace(/^#+/, "");
+  if (matchType === "note") return raw.replace(/\.md$/i, "");
+  return normalizeWallpaperPath(raw, normalize).replace(/\/$/, "");
+}
+
+function uniqueId(value: unknown, prefix: string, index: number, usedIds: Set<string>): string {
+  const fallback = `${prefix}-${index + 1}`;
+  const base = stringValue(value, fallback, 80) || fallback;
+  let id = base;
+  let suffix = 2;
+  while (usedIds.has(id)) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(id);
+  return id;
+}
+
+function normalizeWallpaperRules(value: unknown, normalize: PathNormalizer): WallpaperRule[] {
+  if (!Array.isArray(value)) return [];
+  const usedIds = new Set<string>();
+  return value.slice(0, 96).flatMap((candidate, index) => {
+    if (!isRecord(candidate)) return [];
+    const matchType = isMatchType(candidate.matchType) ? candidate.matchType : "path";
+    return [{
+      id: uniqueId(candidate.id, "wallpaper", index, usedIds),
+      enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : false,
+      matchType,
+      matchValue: normalizeMatchValue(candidate.matchValue, matchType, normalize),
+      wallpaperPath: normalizeWallpaperPath(candidate.wallpaperPath, normalize),
+    }];
+  });
+}
+
+function normalizeOpacityExclusions(
+  value: unknown,
+  normalize: PathNormalizer,
+): OpacityExclusionRule[] {
+  if (!Array.isArray(value)) return [];
+  const usedIds = new Set<string>();
+  return value.slice(0, 96).flatMap((candidate, index) => {
+    if (!isRecord(candidate)) return [];
+    const matchType = isMatchType(candidate.matchType) ? candidate.matchType : "path";
+    return [{
+      id: uniqueId(candidate.id, "opacity", index, usedIds),
+      enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : false,
+      matchType,
+      matchValue: normalizeMatchValue(candidate.matchValue, matchType, normalize),
+      excludePaneSurface:
+        typeof candidate.excludePaneSurface === "boolean" ? candidate.excludePaneSurface : true,
+      excludePaneContent:
+        typeof candidate.excludePaneContent === "boolean" ? candidate.excludePaneContent : true,
+    }];
+  });
 }
 
 export function normalizeSettings(
@@ -132,7 +231,39 @@ export function normalizeSettings(
     0,
     40,
   );
+  settings.wallpaperRules = normalizeWallpaperRules(stored.wallpaperRules, normalize);
+  settings.opacityExclusions = normalizeOpacityExclusions(stored.opacityExclusions, normalize);
   return settings;
+}
+
+function nextRuleId(prefix: string, existingIds: string[]): string {
+  const usedIds = new Set(existingIds);
+  let id = `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  while (usedIds.has(id)) id = `${id}-new`;
+  return id;
+}
+
+export function createWallpaperRule(existing: WallpaperRule[]): WallpaperRule {
+  return {
+    id: nextRuleId("wallpaper", existing.map((rule) => rule.id)),
+    enabled: false,
+    matchType: "path",
+    matchValue: "",
+    wallpaperPath: "",
+  };
+}
+
+export function createOpacityExclusionRule(
+  existing: OpacityExclusionRule[],
+): OpacityExclusionRule {
+  return {
+    id: nextRuleId("opacity", existing.map((rule) => rule.id)),
+    enabled: false,
+    matchType: "path",
+    matchValue: "",
+    excludePaneSurface: true,
+    excludePaneContent: true,
+  };
 }
 
 export function mediaKind(file: { extension?: unknown } | null): MediaKind {

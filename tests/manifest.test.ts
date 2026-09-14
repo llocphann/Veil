@@ -49,8 +49,34 @@ void test("release files and required repository documents exist", () => {
 
   const readme = fs.readFileSync("README.md", "utf8");
   assert.match(readme, /https:\/\/www\.buymeacoffee\.com\/llocphann/);
-  assert.match(readme, /assets\/buy-me-a-coffee\.svg/);
+  assert.match(
+    readme,
+    /https:\/\/raw\.githubusercontent\.com\/llocphann\/Veil\/main\/assets\/buy-me-a-coffee\.svg/,
+  );
   assert.match(readme, /\.obsidian\/plugins\/veil\//);
   assert.doesNotMatch(readme, /\.obsidian\/plugins\/vault-dashboard-background\//);
   assert.doesNotMatch(readme, /<script\b/i);
+});
+
+void test("support button is branded and independent from theme button classes", () => {
+  const source = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const styles = fs.readFileSync("styles.css", "utf8");
+
+  assert.match(source, /cls: "veil-support-link"/);
+  assert.doesNotMatch(source, /mod-cta veil-support-link/);
+  assert.match(source, /cls: "veil-support-link-label"/);
+  assert.match(styles, /--veil-support-background: #fd0;/);
+  assert.match(styles, /\.veil-support-link-label[\s\S]*white-space: nowrap;/);
+});
+
+void test("context routing and opacity exclusions are documented and exposed in settings", () => {
+  const readme = fs.readFileSync("README.md", "utf8");
+  const settings = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const runtime = fs.readFileSync("src/main.ts", "utf8");
+
+  assert.match(readme, /Wallpaper routes are evaluated from top to bottom/);
+  assert.match(readme, /Opacity exclusions are additive/);
+  assert.match(settings, /heading: "Wallpaper routing"/);
+  assert.match(settings, /heading: "Opacity exclusions"/);
+  assert.match(runtime, /metadataCache\.on\("changed"/);
 });

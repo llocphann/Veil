@@ -1,4 +1,16 @@
-import { Notice, Plugin, TFile, normalizePath } from "obsidian";
+import {
+  Notice,
+  Plugin,
+  TFile,
+  getAllTags,
+  normalizePath,
+  type WorkspaceLeaf,
+} from "obsidian";
+import {
+  matchingOpacityExclusions,
+  matchingWallpaperRule,
+  type NoteContext,
+} from "./context-rules";
 import {
   DEFAULT_SETTINGS,
   mediaKind,
@@ -47,7 +59,6 @@ export default class VeilPlugin extends Plugin {
   };
 
   private readonly documents = new Map<Document, DocumentState>();
-  private currentSource: WallpaperSource | null = null;
   private settingTab: WallpaperSettingsTab | null = null;
   private unloaded = false;
   private layoutReady = false;
@@ -79,9 +90,17 @@ export default class VeilPlugin extends Plugin {
       this.registerVaultEvents();
       this.refreshWallpaper();
     });
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshWallpaper()));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.refreshWallpaper()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshWallpaper()));
+    this.registerEvent(
+      this.app.metadataCache.on("changed", (file) => {
+        if (this.isActiveFile(file)) this.refreshWallpaper();
+      }),
+    );
     this.registerEvent(
       this.app.workspace.on("window-open", (_workspaceWindow, window) => {
-        this.applyToDocument(window.document);
+        if (this.layoutReady) this.applyToDocument(window.document);
       }),
     );
     this.registerEvent(
@@ -118,7 +137,7 @@ export default class VeilPlugin extends Plugin {
     if (!this.pendingSave) return this.saveQueue;
 
     this.pendingSave = false;
-    const snapshot = { ...this.settings };
+    const snapshot = normalizeSettings(this.settings, normalizePath);
     const task = this.saveQueue.then(() => this.saveData(snapshot));
     this.saveQueue = task.catch((error: unknown) => {
       console.error("[veil] Could not save settings", error);
@@ -130,51 +149,11 @@ export default class VeilPlugin extends Plugin {
   public refreshWallpaper(force = false): void {
     if (this.unloaded || !this.layoutReady) return;
     if (!this.settings.enabled) {
-      this.currentSource = null;
       this.clearAllDocuments();
       this.setStatus("Wallpaper is disabled.");
       return;
     }
-
-    const path = this.settings.wallpaperPath;
-    const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
-    const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
-    const kind = file instanceof TFile ? mediaKind(file) : "";
-    if (!path || !(file instanceof TFile) || !kind) {
-      this.currentSource = null;
-      this.clearAllDocuments();
-      this.setStatus(
-        !path
-          ? "Choose a wallpaper file to begin."
-          : invalidPath
-            ? "Use a vault-relative path, not a URL or a path outside the vault."
-            : !(file instanceof TFile)
-              ? `File not found in this vault: ${path}`
-              : `Unsupported wallpaper format: ${file.extension}`,
-        path ? "error" : "info",
-      );
-      return;
-    }
-
     if (force) this.sourceRevision += 1;
-    const url = this.app.vault.getResourcePath(file);
-    const nextSource: WallpaperSource = {
-      path: file.path,
-      url,
-      kind,
-      label:
-        kind === "video"
-          ? "Video"
-          : file.extension.toLowerCase() === "gif"
-            ? "Animated GIF"
-            : "Image",
-      key: [file.path, url, file.stat.mtime, file.stat.size, this.sourceRevision].join("|"),
-    };
-    const sourceChanged = this.currentSource?.key !== nextSource.key;
-    this.currentSource = nextSource;
-    if (sourceChanged) {
-      this.setStatus(`Loading ${nextSource.label.toLowerCase()}: ${file.path}`);
-    }
     this.applyToWorkspace();
   }
 
@@ -195,20 +174,55 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        const selected = this.settings.wallpaperPath;
-        if (selected === oldPath || selected.startsWith(`${oldPath}/`)) {
-          this.updateSettings({ wallpaperPath: file.path + selected.slice(oldPath.length) });
+        const rename = (value: string): string =>
+          value === oldPath || value.startsWith(`${oldPath}/`)
+            ? file.path + value.slice(oldPath.length)
+            : value;
+        const next = normalizeSettings(this.settings, normalizePath);
+        let changed = false;
+        const wallpaperPath = rename(next.wallpaperPath);
+        if (wallpaperPath !== next.wallpaperPath) {
+          next.wallpaperPath = wallpaperPath;
+          changed = true;
         }
+        for (const rule of next.wallpaperRules) {
+          const path = rename(rule.wallpaperPath);
+          if (path !== rule.wallpaperPath) {
+            rule.wallpaperPath = path;
+            changed = true;
+          }
+          if (rule.matchType === "path" || rule.matchType === "folder") {
+            const matchValue = rename(rule.matchValue);
+            if (matchValue !== rule.matchValue) {
+              rule.matchValue = matchValue;
+              changed = true;
+            }
+          }
+        }
+        for (const rule of next.opacityExclusions) {
+          if (rule.matchType !== "path" && rule.matchType !== "folder") continue;
+          const matchValue = rename(rule.matchValue);
+          if (matchValue !== rule.matchValue) {
+            rule.matchValue = matchValue;
+            changed = true;
+          }
+        }
+        if (changed) this.updateSettings(next);
+        else this.refreshWallpaper();
       }),
     );
   }
 
   private refreshIfWallpaper(path: string): void {
-    if (path === this.settings.wallpaperPath) this.refreshWallpaper(true);
+    const selectedPaths = [
+      this.settings.wallpaperPath,
+      ...this.settings.wallpaperRules.map((rule) => rule.wallpaperPath),
+    ];
+    if (selectedPaths.includes(path)) this.refreshWallpaper(true);
   }
 
   private applyToWorkspace(): void {
-    if (this.unloaded || !this.currentSource) return;
+    if (this.unloaded) return;
     const documents = new Set(this.documents.keys());
     documents.add(this.app.workspace.containerEl.ownerDocument);
     this.app.workspace.iterateAllLeaves((leaf) => {
@@ -220,7 +234,11 @@ export default class VeilPlugin extends Plugin {
     }
   }
 
-  private applyOptions(document: Document, state: DocumentState): void {
+  private applyOptions(
+    document: Document,
+    state: DocumentState,
+    context: NoteContext | null,
+  ): void {
     const filters: string[] = [];
     if (this.settings.blurEnabled && this.settings.blurIntensity > 0) {
       filters.push(`blur(${this.settings.blurIntensity}px)`);
@@ -245,15 +263,16 @@ export default class VeilPlugin extends Plugin {
 
     state.vignette.hidden =
       this.settings.vignetteMode === "off" || this.settings.vignetteIntensity === 0;
-    if (!state.failed) {
-      document.body.style.setProperty(PANE_OPACITY_VARIABLE, `${this.settings.paneOpacity}%`);
-    }
-    const fadePaneContent = !state.failed && this.settings.paneContentOpacity < 100;
+    const exclusions = matchingOpacityExclusions(this.settings.opacityExclusions, context);
+    const paneOpacity = exclusions.paneSurface ? 100 : this.settings.paneOpacity;
+    const paneContentOpacity = exclusions.paneContent ? 100 : this.settings.paneContentOpacity;
+    if (!state.failed) document.body.style.setProperty(PANE_OPACITY_VARIABLE, `${paneOpacity}%`);
+    const fadePaneContent = !state.failed && paneContentOpacity < 100;
     document.body.classList.toggle(PANE_CONTENT_CLASS, fadePaneContent);
     if (fadePaneContent) {
       document.body.style.setProperty(
         PANE_CONTENT_OPACITY_VARIABLE,
-        String(this.settings.paneContentOpacity / 100),
+        String(paneContentOpacity / 100),
       );
     } else {
       document.body.style.removeProperty(PANE_CONTENT_OPACITY_VARIABLE);
@@ -266,20 +285,26 @@ export default class VeilPlugin extends Plugin {
   private applyToDocument(document: Document): void {
     if (
       this.unloaded ||
-      !this.currentSource ||
+      !this.settings.enabled ||
       !document.body ||
       document.body.classList.contains("is-mobile")
     ) {
+      this.clearDocument(document);
+      return;
+    }
+    const context = this.contextForDocument(document);
+    const source = this.sourceForDocument(document, context);
+    if (!source) {
+      this.clearDocument(document);
       return;
     }
     let state = this.documents.get(document);
-    if (state?.key === this.currentSource.key && state.layer.isConnected) {
-      this.applyOptions(document, state);
+    if (state?.key === source.key && state.layer.isConnected) {
+      this.applyOptions(document, state, context);
       return;
     }
     if (state) this.clearDocument(document);
 
-    const source = this.currentSource;
     const layer = document.body.createDiv();
     layer.className = LAYER_CLASS;
     layer.hidden = true;
@@ -335,8 +360,8 @@ export default class VeilPlugin extends Plugin {
       if (!isCurrent()) return;
       activeState.ready = true;
       layer.hidden = false;
-      this.applyOptions(document, activeState);
-      this.setStatus(`${source.label} loaded: ${source.path}`, "success");
+      this.applyOptions(document, activeState, this.contextForDocument(document));
+      this.setDocumentStatus(document, `${source.label} loaded: ${source.path}`, "success");
     };
     listen(media, source.kind === "video" ? "loadeddata" : "load", ready);
     listen(media, "error", () => {
@@ -347,7 +372,8 @@ export default class VeilPlugin extends Plugin {
         (media as HTMLVideoElement).pause();
       }
       this.restoreDocumentStyles(document);
-      this.setStatus(
+      this.setDocumentStatus(
+        document,
         `Could not load ${source.path}${
           source.kind === "video"
             ? ". Check the video codec or try MP4/WebM."
@@ -365,7 +391,7 @@ export default class VeilPlugin extends Plugin {
 
     this.documents.set(document, activeState);
     document.body.prepend(layer);
-    this.applyOptions(document, activeState);
+    this.applyOptions(document, activeState, context);
     media.src = source.url;
     if (activeState.kind === "video") {
       (media as HTMLVideoElement).load();
@@ -441,5 +467,97 @@ export default class VeilPlugin extends Plugin {
 
   private clearAllDocuments(): void {
     for (const document of Array.from(this.documents.keys())) this.clearDocument(document);
+  }
+
+  private sourceForDocument(
+    document: Document,
+    context: NoteContext | null,
+  ): WallpaperSource | null {
+    const rule = matchingWallpaperRule(this.settings.wallpaperRules, context);
+    const path = rule ? rule.wallpaperPath : this.settings.wallpaperPath;
+    const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
+    const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
+    const kind = file instanceof TFile ? mediaKind(file) : "";
+    if (!path || !(file instanceof TFile) || !kind) {
+      const rulePrefix = rule ? "Matched wallpaper rule: " : "";
+      this.setDocumentStatus(
+        document,
+        !path
+          ? rule
+            ? `${rulePrefix}choose a wallpaper file for ${rule.matchValue || "this rule"}.`
+            : "Choose a wallpaper file to begin."
+          : invalidPath
+            ? "Use a vault-relative path, not a URL or a path outside the vault."
+            : !(file instanceof TFile)
+              ? `${rulePrefix}file not found in this vault: ${path}`
+              : `${rulePrefix}unsupported wallpaper format: ${file.extension}`,
+        path || rule ? "error" : "info",
+      );
+      return null;
+    }
+
+    const url = this.app.vault.getResourcePath(file);
+    const source: WallpaperSource = {
+      path: file.path,
+      url,
+      kind,
+      label:
+        kind === "video"
+          ? "Video"
+          : file.extension.toLowerCase() === "gif"
+            ? "Animated GIF"
+            : "Image",
+      key: [file.path, url, file.stat.mtime, file.stat.size, this.sourceRevision].join("|"),
+    };
+    if (this.documents.get(document)?.key !== source.key) {
+      this.setDocumentStatus(document, `Loading ${source.label.toLowerCase()}: ${file.path}`);
+    }
+    return source;
+  }
+
+  private contextForDocument(document: Document): NoteContext | null {
+    const leaf = this.leafForDocument(document);
+    const candidate: unknown = (leaf?.view as { file?: unknown } | undefined)?.file;
+    if (!(candidate instanceof TFile)) return null;
+    const cache = this.app.metadataCache.getFileCache(candidate);
+    return {
+      path: candidate.path,
+      name: candidate.name,
+      basename: candidate.basename,
+      tags: cache ? getAllTags(cache) || [] : [],
+    };
+  }
+
+  private leafForDocument(document: Document): WorkspaceLeaf | null {
+    const recent = this.app.workspace.getMostRecentLeaf();
+    if (this.isRootLeafForDocument(recent, document)) return recent;
+    let result: WorkspaceLeaf | null = null;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (!result && this.isRootLeafForDocument(leaf, document)) result = leaf;
+    });
+    return result;
+  }
+
+  private isRootLeafForDocument(leaf: WorkspaceLeaf | null, document: Document): boolean {
+    const container = leaf?.view?.containerEl;
+    return container?.ownerDocument === document
+      && Boolean(container.closest(".workspace-split.mod-root"));
+  }
+
+  private isActiveFile(file: TFile): boolean {
+    const documents = new Set<Document>([this.app.workspace.containerEl.ownerDocument]);
+    this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
+    for (const document of documents) {
+      if (this.contextForDocument(document)?.path === file.path) return true;
+    }
+    return false;
+  }
+
+  private setDocumentStatus(
+    document: Document,
+    message: string,
+    tone: StatusTone = "info",
+  ): void {
+    if (document === this.app.workspace.containerEl.ownerDocument) this.setStatus(message, tone);
   }
 }
