@@ -5,6 +5,7 @@ const SETTINGS_SECTIONS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
   { id: "appearance", label: "Appearance", icon: "palette" },
   { id: "automation", label: "Automation", icon: "workflow" },
+  { id: "data", label: "Data", icon: "database" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -151,8 +152,8 @@ function compact(
  *
  * The underlying settings implementation remains in settings-tab-base.ts so
  * routing, validation, import/export, and Scene behavior stay unchanged. The
- * tab bar exposes only the primary feature sections; portable data controls
- * and about/support are rendered as shared sections beneath every tab.
+ * tab bar exposes the primary feature and data sections while about/support
+ * remains a shared section beneath every tab.
  */
 export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
   private activeSection: SettingsSectionId = "wallpaper";
@@ -204,10 +205,10 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
       cloneDefinition(activeContext, "Active context", "veil-settings-panel-automation"),
       cloneDefinition(wallpaperRouting, "Wallpaper routing", "veil-settings-panel-automation"),
       cloneDefinition(opacityExclusions, "Opacity exclusions", "veil-settings-panel-automation"),
+      cloneDefinition(actions, "Data & recovery", "veil-settings-panel-data", dataActions),
     ]);
 
     const sharedSections = compact([
-      cloneDefinition(actions, "Data & recovery", "veil-settings-section-data", dataActions),
       cloneDefinition(support, "About & support", "veil-settings-section-about"),
     ]);
 
