@@ -1,4 +1,5 @@
 import { Modal, Notice, TFile, setIcon, type App } from "obsidian";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import { searchWallhaven as searchWallhavenApi } from "./wallhaven-client";
 import { importWallhavenWallpaper } from "./wallhaven-download";
 import {
@@ -523,6 +524,45 @@ export class WallpaperLibraryModal extends Modal {
     return files;
   }
 
+  private applyVaultSelection(targetId: string, path: string): void {
+    this.controller.selectWallpaper(targetId, path);
+    if (this.view === "recent") {
+      this.renderVaultGrid();
+      return;
+    }
+    this.updateVaultSelection(path);
+  }
+
+  private updateVaultSelection(selectedPath: string): void {
+    const grid = this.gridEl;
+    if (!grid) return;
+    const cards = grid.querySelectorAll<HTMLElement>(".veil-wallpaper-library-card[data-path]");
+    let patchCount = 0;
+    for (const card of Array.from(cards)) {
+      const selected = String(card.dataset.path === selectedPath);
+      if (card.dataset.selected === selected) continue;
+      card.dataset.selected = selected;
+      patchCount += 1;
+    }
+    if (__VEIL_DEV__ && patchCount > 0) {
+      runtimeWorkProfiler.record("libraryCardPatch", patchCount);
+    }
+  }
+
+  private updateFavoriteButton(
+    button: HTMLButtonElement,
+    file: TFile,
+    favorite: boolean,
+  ): void {
+    button.dataset.favorite = String(favorite);
+    button.setAttribute("aria-pressed", String(favorite));
+    button.setAttribute("title", favorite ? "Remove from favorites" : "Add to favorites");
+    button.setAttribute(
+      "aria-label",
+      favorite ? `Remove ${file.name} from favorites` : `Add ${file.name} to favorites`,
+    );
+  }
+
   private selectRandomVisible(): void {
     const target = this.activeTarget();
     const files = this.visibleFiles();
@@ -532,8 +572,7 @@ export class WallpaperLibraryModal extends Modal {
     const pageFiles = files.slice(start, start + WALLPAPERS_PER_PAGE);
     const selected = randomVisibleWallpaper(pageFiles, pageFiles.length, target.selectedPath);
     if (!selected) return;
-    this.controller.selectWallpaper(target.id, selected.path);
-    this.renderVaultGrid();
+    this.applyVaultSelection(target.id, selected.path);
   }
 
   private renderActiveGrid(): void {
@@ -548,6 +587,7 @@ export class WallpaperLibraryModal extends Modal {
     const pagination = this.paginationEl;
     if (!grid || !summary || !pagination) return;
 
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("libraryGridRender");
     grid.empty();
     pagination.empty();
     const target = this.activeTarget();
@@ -672,6 +712,7 @@ export class WallpaperLibraryModal extends Modal {
     const summary = this.summaryEl;
     const pagination = this.paginationEl;
     if (!grid || !summary || !pagination) return;
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("libraryGridRender");
     grid.empty();
     pagination.empty();
     const target = this.activeTarget();
@@ -829,6 +870,7 @@ export class WallpaperLibraryModal extends Modal {
     const kind = mediaKind(file);
     if (!kind) return;
     const card = grid.createDiv({ cls: "veil-wallpaper-library-card" });
+    card.dataset.path = file.path;
     card.dataset.selected = String(selected);
 
     const select = card.createEl("button", {
@@ -874,24 +916,24 @@ export class WallpaperLibraryModal extends Modal {
       select.createSpan({ cls: "veil-wallpaper-library-path", text: file.path });
     }
     select.addEventListener("click", () => {
-      this.controller.selectWallpaper(target.id, file.path);
-      this.renderVaultGrid();
+      this.applyVaultSelection(target.id, file.path);
     });
 
     const favoriteButton = card.createEl("button", {
       cls: "veil-wallpaper-library-favorite",
-      attr: {
-        type: "button",
-        title: favorite ? "Remove from favorites" : "Add to favorites",
-        "aria-label": favorite ? `Remove ${file.name} from favorites` : `Add ${file.name} to favorites`,
-        "aria-pressed": String(favorite),
-      },
+      attr: { type: "button" },
     });
-    favoriteButton.dataset.favorite = String(favorite);
+    this.updateFavoriteButton(favoriteButton, file, favorite);
     setIcon(favoriteButton, "star");
     favoriteButton.addEventListener("click", () => {
       this.controller.toggleFavorite(file.path);
-      this.renderVaultGrid();
+      if (this.view === "favorites") {
+        this.renderVaultGrid();
+        return;
+      }
+      const nextFavorite = this.controller.getState().favorites.includes(file.path);
+      this.updateFavoriteButton(favoriteButton, file, nextFavorite);
+      if (__VEIL_DEV__) runtimeWorkProfiler.record("libraryCardPatch");
     });
   }
 }

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.6.0
+
+- Rework Veil around smaller ownership-focused runtime and Settings modules without expanding the core feature surface.
+- Scope context, Settings, vault, pool, layout, metadata, and theme invalidation to only the documents or caches whose resolved output can change.
+- Separate media identity from appearance and playback state so unchanged image and video sources are reused without redundant reloads, allocations, or crossfades.
+- Add deterministic persisted-data schema migrations with explicit migration regression coverage.
+- Reduce Settings and Wallpaper Library DOM churn with local state refreshes and card-level patch fast paths instead of unnecessary full rerenders.
+- Add development-only runtime work profiling and regression gates for no-op work while keeping profiler commands and debug markers out of production bundles.
+- Harden idle behavior by pausing hidden animated effects, avoiding recurring polling, retaining routing timers only for real time boundaries, and limiting infinite CSS animation/compositing to active effects.
+- Establish the Veil 1.6 stability contract as a regression gate for no-op refreshes, unchanged media, scoped invalidation, vault cache churn, idle work, and deterministic migrations.
+- Harden release version derivation against stale candidate metadata by computing future release versions from the highest published semantic release.
+
 ## 1.5.3
 
 - Promote the smoke-tested prerelease state to the stable release channel.

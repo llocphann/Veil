@@ -16,6 +16,11 @@ function settingsSource(): string {
   return [
     fs.readFileSync("src/settings-tab.ts", "utf8"),
     fs.readFileSync("src/settings-tab-base.ts", "utf8"),
+    fs.readFileSync("src/settings-action-definitions.ts", "utf8"),
+    fs.readFileSync("src/settings-appearance-definitions.ts", "utf8"),
+    fs.readFileSync("src/settings-scene-definitions.ts", "utf8"),
+    fs.readFileSync("src/settings-routing-definitions.ts", "utf8"),
+    fs.readFileSync("src/settings-wallpaper-definitions.ts", "utf8"),
   ].join("\n");
 }
 
@@ -45,7 +50,6 @@ void test("release files and required repository documents exist", () => {
     "styles.css",
     "README.md",
     "LICENSE",
-    "assets/buy-me-a-coffee.svg",
   ]) {
     assert.equal(fs.existsSync(path), true, `${path} is required`);
   }
@@ -56,10 +60,9 @@ void test("release files and required repository documents exist", () => {
 
   const readme = fs.readFileSync("README.md", "utf8");
   assert.match(readme, /https:\/\/www\.buymeacoffee\.com\/llocphann/);
-  assert.match(
-    readme,
-    /https:\/\/raw\.githubusercontent\.com\/llocphann\/Veil\/stable\/assets\/buy-me-a-coffee\.svg/,
-  );
+  assert.match(readme, /https:\/\/img\.buymeacoffee\.com\/button-api\/\?/);
+  assert.match(readme, /slug=llocphann/);
+  assert.match(readme, /alt="Buy Me a Coffee"/);
   assert.match(readme, /\.obsidian\/plugins\/veil\//);
   assert.doesNotMatch(readme, /\.obsidian\/plugins\/vault-dashboard-background\//);
   assert.doesNotMatch(readme, /<script\b/i);

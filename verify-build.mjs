@@ -4,6 +4,10 @@ const BUNDLE_BUDGET = 512 * 1024;
 const STYLES_BUDGET = 256 * 1024;
 const MANIFEST_BUDGET = 64 * 1024;
 const GENERATED_BANNER = "/* Veil for Obsidian — generated from TypeScript source. */";
+const DEVELOPMENT_ONLY_MARKERS = [
+  "debug-runtime-profile",
+  "[veil] runtime work profile",
+];
 
 function requireFile(path, maximumBytes) {
   const stat = fs.statSync(path);
@@ -26,6 +30,11 @@ if (!bundle.startsWith(GENERATED_BANNER)) {
 }
 if (/sourceMappingURL\s*=/.test(bundle)) {
   throw new Error("Production main.js must not contain an inline or external source map reference.");
+}
+for (const marker of DEVELOPMENT_ONLY_MARKERS) {
+  if (bundle.includes(marker)) {
+    throw new Error(`Production main.js contains development-only profiler marker: ${marker}`);
+  }
 }
 if (manifest.id !== "veil" || manifest.name !== "Veil") {
   throw new Error("manifest.json does not identify the Veil plugin.");

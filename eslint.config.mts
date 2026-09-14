@@ -9,6 +9,8 @@ export default defineConfig(
     "esbuild.config.mjs",
     "verify-build.mjs",
     "version-bump.mjs",
+    "release-version.mjs",
+    "perf-check.mjs",
     "versions.json",
     "package.json",
     "package-lock.json",
@@ -18,6 +20,7 @@ export default defineConfig(
     languageOptions: {
       globals: {
         ...globals.browser,
+        __VEIL_DEV__: "readonly",
       },
       parserOptions: {
         projectService: {

@@ -177,6 +177,14 @@ export function contextRuleSyntaxValid(
   return false;
 }
 
+export function contextRulesDependOnTheme(rules: readonly ContextRule[]): boolean {
+  return rules.some((rule) => {
+    if (!rule.enabled || rule.matchType !== "property") return false;
+    const { key, expected } = propertyParts(rule.matchValue);
+    return key === "@theme" && (expected === "light" || expected === "dark");
+  });
+}
+
 function systemContextMatches(ruleValue: string, context: NoteContext | null): boolean | null {
   const { key, expected } = propertyParts(ruleValue);
   if (!key.startsWith("@")) return null;
