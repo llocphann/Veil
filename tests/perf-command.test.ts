@@ -13,8 +13,9 @@ void test("npm run perf is the single entry point", () => {
   assert.match(packageJson.scripts?.["bench:settings"] || "", /settings-change\.bench\.ts/);
 });
 
-void test("performance runner compares against the 1.5.3 stable baseline without mutating it", () => {
-  assert.match(runner, /BASELINE_VERSION = "1\.5\.3"/);
+void test("performance runner compares against the exact 1.6.0 stable baseline without mutating it", () => {
+  assert.match(runner, /BASELINE_VERSION = "1\.6\.0"/);
+  assert.match(runner, /BASELINE_SHA = "8576bcf7e2d1942d2ffec2a1f449d3d5cc1cef73"/);
   assert.match(runner, /origin\/stable/);
   assert.match(runner, /git", \["show"/);
   assert.match(runner, /git", \["worktree", "add", "--detach"/);
