@@ -11,7 +11,9 @@ Veil places a vault-local image, animated GIF, or video behind the Obsidian work
 - Choose fill, fit, center, stretch, or scale-down sizing.
 - Adjust wallpaper opacity independently from pane surfaces.
 - Optionally fade each pane and all of its descendants as one visual group.
-- Add elliptical or circular vignette, blur, and dim effects.
+- Recolor the active wallpaper with an adjustable color overlay and blend mode.
+- Add elliptical or circular vignette, blur, dim, retro film, glitch, or TV-noise effects.
+- Export and import a validated, versioned JSON backup of every Veil setting and rule.
 - Navigate compact tabbed settings for wallpaper, rules, effects, video, actions, and support.
 - Apply the wallpaper to the main window and desktop pop-out windows.
 - Pause video in hidden windows and respect the operating system's reduced-motion preference.
@@ -53,7 +55,26 @@ Rules can match:
 
 Wallpaper routes are evaluated from top to bottom, and the first enabled match replaces the fallback wallpaper. Opacity exclusions are additive: a matching rule can keep pane surfaces, pane content, or both at 100% opacity. All visual controls preview immediately. Veil stores only its settings in `data.json`; selected media remains in its original vault location.
 
+Use **Actions → Export settings** to download a portable JSON backup. Import replaces the current configuration after Veil verifies the file type and schema, normalizes every value, repairs duplicate rule IDs, and enforces rule-count and file-size limits. Wallpaper media files are referenced by vault-relative path and are not embedded in the export.
+
 For broad codec support, prefer WebM or MP4 video. Whether a particular MOV, M4V, or OGV file plays depends on the codecs available in the user's Obsidian desktop runtime.
+
+## Performance and stability
+
+Veil is event-driven: it does not poll the vault, and repeated workspace refreshes are coalesced into one animation frame. Video pauses in hidden windows, and imported settings cannot inject arbitrary CSS colors or point the wallpaper outside the vault.
+
+Effect cost depends on the media size, window resolution, and graphics hardware:
+
+| Feature | Typical cost | Notes |
+| --- | --- | --- |
+| Opacity, dim, color overlay, vignette | Low | Primarily composited by the GPU. Non-normal overlay blend modes add a small compositing cost. |
+| Retro film | Low–moderate | Uses a static media filter and scanline layer. |
+| Blur | Moderate–high GPU | Cost rises with blur radius, wallpaper resolution, and the number of open windows. |
+| Video or animated GIF | Moderate CPU/GPU | Video decoding depends on codec and resolution. GIF animation cannot be paused by Veil. |
+| Glitch and TV noise | High GPU | These presets animate continuously. Reduced-motion mode freezes their animation. |
+| Video + strong blur + animated preset | Highest | This combination may stutter on integrated graphics or battery-powered devices. |
+
+For the lightest setup, use a static image, keep blur low or off, and avoid animated presets. If animation is needed, keep **Pause video when the app is hidden** and **Respect reduced motion** enabled.
 
 ## Support
 

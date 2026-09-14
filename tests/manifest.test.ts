@@ -87,3 +87,13 @@ void test("context routing and opacity exclusions are documented and exposed in 
   assert.match(settings, /heading: "Opacity exclusions"/);
   assert.match(runtime, /metadataCache\.on\("changed"/);
 });
+
+void test("rule pages expose visible destructive controls and runtime work is event driven", () => {
+  const settings = fs.readFileSync("src/settings-tab.ts", "utf8");
+  const runtime = fs.readFileSync("src/main.ts", "utf8");
+
+  assert.match(settings, /name: "Delete wallpaper rule"/);
+  assert.match(settings, /name: "Delete opacity exclusion"/);
+  assert.match(settings, /\.setDestructive\(\)/);
+  assert.doesNotMatch(runtime, /setInterval\(|MutationObserver/);
+});

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.3.0
+
+- Add permanently visible delete buttons to wallpaper routes and opacity exclusions.
+- Add a configurable color overlay with safe blend modes.
+- Add retro film, glitch, and TV-noise presets with reduced-motion handling.
+- Add validated, schema-versioned JSON settings import and export.
+- Coalesce repeated wallpaper refreshes into one animation frame.
+- Document CPU/GPU costs and cap imported data for safer operation.
+
 ## 1.1.1
 
 - Replace broad CSS overrides with scoped, higher-specificity pane selectors.
