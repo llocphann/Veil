@@ -17,10 +17,15 @@ export function wallpaperPlaybackState(
   input: WallpaperPlaybackInput,
 ): WallpaperPlaybackState {
   const opacityVisible = input.opacity > 0;
-  const hiddenPaused = input.pauseWhenHidden && input.documentHidden;
+  const hiddenVideoPaused = input.pauseWhenHidden && input.documentHidden;
   const reducedMotionPaused = input.respectReducedMotion && input.reducedMotion;
-  const motionPaused = !opacityVisible || hiddenPaused || reducedMotionPaused;
-  const shouldPlayVideo = input.enabled && !motionPaused;
+
+  // CSS effects have no visible output in a hidden document, so they always
+  // pause there. Video playback remains governed by the explicit
+  // pauseWhenHidden setting and can continue when the user allows it.
+  const motionPaused = !opacityVisible || input.documentHidden || reducedMotionPaused;
+  const shouldPlayVideo =
+    input.enabled && opacityVisible && !hiddenVideoPaused && !reducedMotionPaused;
 
   return {
     motionPaused,
@@ -28,7 +33,8 @@ export function wallpaperPlaybackState(
     signature: [
       input.enabled ? "enabled" : "disabled",
       opacityVisible ? "visible" : "transparent",
-      hiddenPaused ? "hidden-paused" : "hidden-allowed",
+      input.documentHidden ? "document-hidden" : "document-visible",
+      hiddenVideoPaused ? "video-hidden-paused" : "video-hidden-allowed",
       reducedMotionPaused ? "reduced-paused" : "motion-allowed",
     ].join("|"),
   };
