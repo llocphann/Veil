@@ -56,6 +56,58 @@ Start with:
 - [Data, Privacy, and Recovery](wiki/Data-Privacy-and-Recovery.md)
 - [Troubleshooting and Performance](wiki/Troubleshooting-and-Performance.md)
 
+## Roadmap to 2.0
+
+Veil 2.0 is planned as a refinement release rather than a feature-expansion release. The current feature set already covers the main wallpaper workflow, so development from 1.6 onward will prioritize lower runtime cost, cleaner internal boundaries, deterministic state handling, and stronger regression guarantees.
+
+### 1.6 — Architecture decomposition
+
+- Reduce the amount of orchestration and state ownership concentrated in `main.ts`.
+- Split settings and Wallpaper Library responsibilities into smaller, independently testable modules.
+- Preserve existing behavior while clarifying ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
+- Avoid user-facing feature additions unless they are required to complete the refactor safely.
+
+### 1.7 — Runtime invalidation and no-op fast paths
+
+- Replace broad refresh work with explicit invalidation for context, source, appearance, playback, layout, and pool state.
+- Add stable runtime signatures so unchanged context or appearance produces no DOM or media work.
+- Restrict multi-window updates to the documents whose resolved state actually changed.
+- Continue reducing metadata-cache and vault-event work on hot paths.
+
+### 1.8 — Media lifecycle and transition efficiency
+
+- Formalize media states from resolution and load through transition, active playback, and disposal.
+- Keep media identity separate from appearance and playback identity so visual changes do not reload unchanged images or videos.
+- Audit image, GIF, and video allocation, playback, cleanup, and stale-load behavior.
+- Ensure unchanged video sources do not restart when only visual settings change.
+
+### 1.9 — State, UI efficiency, and release hardening
+
+- Version the persisted settings schema and use explicit, deterministic migrations.
+- Reduce unnecessary Settings and Wallpaper Library rerenders and DOM churn.
+- Add regression tests that measure unnecessary work, not only functional output.
+- Add development-only performance instrumentation without telemetry or analytics.
+- Audit CSS effects and compositing so an idle Veil remains effectively idle.
+
+### 2.0 — Stability contract
+
+Veil 2.0 should preserve the product direction established in 1.x while making the runtime easier to reason about and cheaper to keep enabled. The release target is defined by these invariants:
+
+1. A no-op context refresh performs no meaningful work.
+2. Appearance-only changes never reload unchanged media.
+3. A context change invalidates only affected windows and documents.
+4. Vault changes invalidate only relevant media and wallpaper-pool caches.
+5. Idle operation has no unnecessary recurring timers, animation, DOM mutation, or vault scanning.
+6. Every persisted-data version has a deterministic migration path.
+
+Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL are intentionally outside this roadmap unless they become necessary for the core wallpaper experience.
+
+### Development branches
+
+- `dev` is the integration branch for work moving toward the next release and must pass the full verification workflow.
+- `stable` contains release-ready source. Promotion to `stable` triggers the stable release pipeline, which verifies the source again, increments the patch version, synchronizes release metadata, tags the verified commit, and publishes the release artifacts.
+- `main` and `prerelease` remain available for compatibility with the existing repository history while the `dev` → `stable` flow is adopted.
+
 ## Privacy
 
 Veil reads vault-local wallpaper media and Obsidian metadata needed by your configured rules. Normal wallpaper playback does not require the network, and Veil does not collect telemetry or run analytics.
