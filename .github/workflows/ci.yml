@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - prerelease
+      - dev
+      - stable
   pull_request:
 
 permissions:
@@ -34,13 +36,24 @@ jobs:
         run: npm ci
 
       - name: Lint, test, and build
-        run: npm run check
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee veil-check.log
 
-      - name: Upload prerelease smoke-test bundle
-        if: github.event_name == 'push' && github.ref == 'refs/heads/prerelease'
+      - name: Upload verification log on failure
+        if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: veil-prerelease-${{ github.sha }}
+          name: veil-check-log-${{ github.sha }}
+          path: veil-check.log
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload development smoke-test bundle
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/prerelease' || github.ref == 'refs/heads/dev')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: veil-smoke-${{ github.ref_name }}-${{ github.sha }}
           path: |
             main.js
             manifest.json

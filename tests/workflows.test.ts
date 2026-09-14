@@ -6,6 +6,7 @@ import { parseDocument } from "yaml";
 const WORKFLOWS = [
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
+  ".github/workflows/stable-release.yml",
 ] as const;
 
 for (const path of WORKFLOWS) {
@@ -28,36 +29,43 @@ for (const path of WORKFLOWS) {
 void test("verification and release jobs have bounded runtimes", () => {
   const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   const release = fs.readFileSync(".github/workflows/release.yml", "utf8");
+  const stableRelease = fs.readFileSync(".github/workflows/stable-release.yml", "utf8");
   assert.equal(ci.split("timeout-minutes: 10").length - 1, 1);
   assert.equal(release.split("timeout-minutes: 10").length - 1, 2);
+  assert.equal(stableRelease.split("timeout-minutes: 10").length - 1, 2);
 });
 
-void test("prerelease CI cancels superseded verification runs", () => {
+void test("development CI cancels superseded verification runs", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(source, /concurrency:/);
   assert.match(source, /github\.event\.pull_request\.number \|\| github\.ref/);
   assert.match(source, /cancel-in-progress: true/);
+  assert.match(source, /- dev/);
+  assert.match(source, /- stable/);
 });
 
-void test("prerelease CI publishes a short-lived smoke-test bundle", () => {
+void test("development CI publishes a short-lived smoke-test bundle", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(source, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
   assert.match(source, /github\.ref == 'refs\/heads\/prerelease'/);
+  assert.match(source, /github\.ref == 'refs\/heads\/dev'/);
   assert.match(source, /retention-days: 7/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
     assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
   }
 });
 
-void test("release workflow verifies and publishes the required artifacts", () => {
+void test("release workflow verifies and publishes the required artifacts from stable", () => {
   const source = fs.readFileSync(".github/workflows/release.yml", "utf8");
   assert.match(source, /Verify release tag/);
   assert.match(source, /fetch-depth: 0/);
   assert.match(source, /Verify release source/);
-  assert.match(source, /merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/);
+  assert.match(source, /merge-base --is-ancestor "\$GITHUB_SHA" origin\/stable/);
   assert.match(source, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
   assert.match(source, /actions\/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131/);
   assert.match(source, /actions\/attest@1e69f48acb82d1966a394da916b4c1698aa569d6/);
+  assert.match(source, /gh release create/);
+  assert.doesNotMatch(source, /--draft/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
     assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
   }
@@ -91,4 +99,27 @@ void test("release publishing permissions are isolated from dependency execution
   assert.match(publishJob, /id-token: write/);
   assert.match(publishJob, /attestations: write/);
   assert.doesNotMatch(publishJob, /npm ci|Check out repository|Set up Node\.js/);
+});
+
+void test("stable promotion verifies source before the write-capable version job", () => {
+  const source = fs.readFileSync(".github/workflows/stable-release.yml", "utf8");
+  const verifyIndex = source.indexOf("  verify:\n");
+  const versionIndex = source.indexOf("  version:\n");
+  assert.ok(verifyIndex >= 0, "stable verification job is missing");
+  assert.ok(versionIndex > verifyIndex, "stable version job must follow verification");
+  assert.match(source, /branches:\n[ ]{6}- stable/);
+  assert.match(source, /github\.actor != 'github-actions\[bot\]'/);
+
+  const verifyJob = source.slice(verifyIndex, versionIndex);
+  const versionJob = source.slice(versionIndex);
+  assert.match(verifyJob, /permissions:\n[ ]{6}contents: read/);
+  assert.match(verifyJob, /npm ci/);
+  assert.match(verifyJob, /npm run check/);
+  assert.match(versionJob, /needs: verify/);
+  assert.match(versionJob, /permissions:\n[ ]{6}contents: write/);
+  assert.doesNotMatch(versionJob, /npm ci|npm run check/);
+  assert.match(versionJob, /npm version patch --no-git-tag-version --ignore-scripts/);
+  assert.match(versionJob, /node version-bump\.mjs/);
+  assert.match(versionJob, /git push origin HEAD:stable/);
+  assert.match(versionJob, /git push origin "\$\{VERSION\}"/);
 });
