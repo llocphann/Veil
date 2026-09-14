@@ -34,6 +34,7 @@ const DYNAMIC_PROFILE_FIELDS = new Set<string>([
   "name",
   "wallpaperPath",
   "wallpaperPoolEnabled",
+  "wallpaperPoolFolder",
   "vignetteMode",
   "blurEnabled",
   "dimEnabled",
@@ -42,6 +43,7 @@ const DYNAMIC_PROFILE_FIELDS = new Set<string>([
 ]);
 
 const CONTINUOUS_APPEARANCE_FIELDS = new Set<string>([
+  "wallpaperPoolChangeInterval",
   "wallpaperPositionX",
   "wallpaperPositionY",
   "wallpaperZoom",
