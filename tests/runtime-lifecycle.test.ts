@@ -5,6 +5,7 @@ import test from "node:test";
 const source = fs.readFileSync("src/main.ts", "utf8");
 const lifecycleSource = fs.readFileSync("src/wallpaper-media-lifecycle.ts", "utf8");
 const applySchedulerSource = fs.readFileSync("src/document-apply-scheduler.ts", "utf8");
+const vaultInvalidationSource = fs.readFileSync("src/vault-document-invalidation.ts", "utf8");
 
 void test("plugin unload cancels scheduled work and removes document state", () => {
   const unload = source.match(/onunload\(\): void \{([\s\S]*?)\n {2}\}/)?.[1] || "";
@@ -44,15 +45,23 @@ void test("closing a pop-out drops its leaf cache and wallpaper layer", () => {
   );
 });
 
-void test("folder rename refreshes loaded descendant wallpaper paths", () => {
+void test("vault invalidation covers exact and descendant loaded or resolved paths", () => {
   assert.match(
-    source,
-    /state\.path === oldPath \|\| state\.path\.startsWith\(`\$\{oldPath\}\/`\)/,
+    vaultInvalidationSource,
+    /candidate === changedPath \|\| candidate\.startsWith\(`\$\{changedPath\}\/`\)/,
   );
+  assert.match(vaultInvalidationSource, /vaultPathTouches\(loadedPath, changedPath\)/);
+  assert.match(vaultInvalidationSource, /vaultPathTouches\(resolvedPath, changedPath\)/);
 });
 
-void test("folder changes refresh configured and loaded descendant wallpaper paths", () => {
-  assert.ok(source.includes("candidate === path || candidate.startsWith(`${path}/`)"));
-  assert.ok(source.includes("some((state) => touches(state.path))"));
-  assert.ok(source.includes("selectedPaths.some(touches) || loadedPath"));
+void test("vault events schedule only affected documents without global force refresh", () => {
+  const vaultEvents = source.match(
+    /private registerVaultEvents\(\): void \{([\s\S]*?)\n {2}\}\n\n {2}private applyToWorkspace/,
+  )?.[1] || "";
+
+  assert.match(vaultEvents, /refreshDocumentsAffectedByVaultPath\(file\.path\)/);
+  assert.match(vaultEvents, /documentsAffectedByVaultPath\(oldPath\)/);
+  assert.match(vaultEvents, /scheduleApplyToDocuments\(renamedDocuments\)/);
+  assert.doesNotMatch(vaultEvents, /refreshWallpaper\(true\)/);
+  assert.doesNotMatch(vaultEvents, /sourceRevision/);
 });
