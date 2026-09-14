@@ -11,15 +11,35 @@ const poolSource = fs.readFileSync(
   new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
   "utf8",
 );
+const applySchedulerSource = fs.readFileSync(
+  new URL("../src/document-apply-scheduler.ts", import.meta.url),
+  "utf8",
+);
 
-void test("metadata cache changes skip active-file work before layout is ready", () => {
+void test("metadata cache changes invalidate only documents using that file", () => {
   assert.match(
     source,
-    /metadataCache\.on\("changed", \(file\) => \{\s*if \(!this\.layoutReady\) return;\s*if \(this\.documentContexts\.isActiveFile\(file\)\)/,
+    /metadataCache\.on\("changed", \(file\) => \{\s*if \(!this\.layoutReady\) return;\s*this\.scheduleApplyToDocuments\(this\.documentContexts\.documentsForFile\(file\)\);/,
+  );
+  assert.doesNotMatch(
+    source,
+    /metadataCache\.on\("changed"[\s\S]*?isActiveFile\(file\)[\s\S]*?refreshWallpaper\(\)/,
   );
 });
 
-void test("note contexts and active-file checks share the cheap file lookup", () => {
+void test("active note events use document-scoped scheduling", () => {
+  assert.match(
+    source,
+    /active-leaf-change[\s\S]*?rememberActiveRootLeaf\(leaf\)[\s\S]*?scheduleApplyToDocuments\(\[document\]\)/,
+  );
+  assert.match(source, /file-open", \(\) => this\.refreshMostRecentDocument\(\)/);
+  assert.match(
+    source,
+    /refreshMostRecentDocument\(\)[\s\S]*?scheduleApplyToDocuments\(\[document\]\)/,
+  );
+});
+
+void test("document context scope shares the cheap file lookup", () => {
   assert.match(contextSource, /private fileForDocument\(document: Document\): TFile \| null/);
   assert.match(
     contextSource,
@@ -27,13 +47,29 @@ void test("note contexts and active-file checks share the cheap file lookup", ()
   );
   assert.match(
     contextSource,
-    /if \(this\.fileForDocument\(document\)\?\.path === file\.path\) return true;/,
+    /documentsForFile\(file: TFile\): Document\[\] \{[\s\S]*?this\.fileForDocument\(document\)\?\.path === file\.path/,
   );
-  const activeFileBody = contextSource.match(
-    /isActiveFile\(file: TFile\): boolean \{([\s\S]*?)\n {2}\}/,
+  assert.match(
+    contextSource,
+    /isActiveFile\(file: TFile\): boolean \{\s*return this\.documentsForFile\(file\)\.length > 0;/,
+  );
+  const documentsForFileBody = contextSource.match(
+    /documentsForFile\(file: TFile\): Document\[\] \{([\s\S]*?)\n {2}\}/,
   )?.[1] || "";
-  assert.doesNotMatch(activeFileBody, /contextForDocument/);
-  assert.doesNotMatch(activeFileBody, /metadataCache/);
+  assert.doesNotMatch(documentsForFileBody, /contextForDocument/);
+  assert.doesNotMatch(documentsForFileBody, /metadataCache/);
+});
+
+void test("broad document apply scheduling dominates targeted requests", () => {
+  assert.match(applySchedulerSource, /private applyAllRequested = false/);
+  assert.match(
+    applySchedulerSource,
+    /scheduleAll\(\): void \{[\s\S]*?this\.applyAllRequested = true;[\s\S]*?this\.pendingDocuments\.clear\(\);/,
+  );
+  assert.match(
+    applySchedulerSource,
+    /scheduleDocuments\(documents: Iterable<Document>\): void \{\s*if \(!this\.isActive\(\) \|\| this\.applyAllRequested\) return;/,
+  );
 });
 
 void test("settings changes retain unrelated wallpaper pool candidate caches", () => {
