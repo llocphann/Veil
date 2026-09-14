@@ -1,4 +1,4 @@
-import type { SettingDefinitionItem, TFile } from "obsidian";
+import type { App, SettingDefinitionItem, TFile } from "obsidian";
 import {
   DISPLAY_MODES,
   mediaKind,
@@ -8,15 +8,18 @@ import type {
   RangeSliderFactory,
   SliderFactory,
 } from "./settings-appearance-definitions";
+import { renderVaultFolderControl } from "./settings-folder-picker";
 
 export interface WallpaperDefinitionActions {
   openWallpaperLibrary: () => void;
+  setControlValue: (key: string, value: unknown) => void;
   bindWallpaperStatus: (descEl: HTMLElement, settingEl: HTMLElement) => () => void;
   activeContextSummary: () => string;
   bindActiveContext: (descEl: HTMLElement) => () => void;
 }
 
 export function createWallpaperDefinitions(
+  app: App,
   settings: VeilSettings,
   actions: WallpaperDefinitionActions,
   slider: SliderFactory,
@@ -69,11 +72,12 @@ export function createWallpaperDefinitions(
       {
         name: "Wallpaper folder",
         desc: "Choose the vault folder used by the wallpaper pool.",
-        control: {
-          type: "text",
-          key: "wallpaperPoolFolder",
-          placeholder: "Media/Wallpapers",
-        },
+        render: (setting) => renderVaultFolderControl(
+          app,
+          setting,
+          settings.wallpaperPoolFolder,
+          (path) => actions.setControlValue("wallpaperPoolFolder", path),
+        ),
         visible: () => settings.wallpaperPoolEnabled,
       },
       {
