@@ -1,4 +1,5 @@
 import { Modal, Notice, TFile, setIcon, type App } from "obsidian";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import { searchWallhaven as searchWallhavenApi } from "./wallhaven-client";
 import { importWallhavenWallpaper } from "./wallhaven-download";
 import {
@@ -536,8 +537,15 @@ export class WallpaperLibraryModal extends Modal {
     const grid = this.gridEl;
     if (!grid) return;
     const cards = grid.querySelectorAll<HTMLElement>(".veil-wallpaper-library-card[data-path]");
+    let patchCount = 0;
     for (const card of Array.from(cards)) {
-      card.dataset.selected = String(card.dataset.path === selectedPath);
+      const selected = String(card.dataset.path === selectedPath);
+      if (card.dataset.selected === selected) continue;
+      card.dataset.selected = selected;
+      patchCount += 1;
+    }
+    if (__VEIL_DEV__ && patchCount > 0) {
+      runtimeWorkProfiler.record("libraryCardPatch", patchCount);
     }
   }
 
@@ -579,6 +587,7 @@ export class WallpaperLibraryModal extends Modal {
     const pagination = this.paginationEl;
     if (!grid || !summary || !pagination) return;
 
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("libraryGridRender");
     grid.empty();
     pagination.empty();
     const target = this.activeTarget();
@@ -703,6 +712,7 @@ export class WallpaperLibraryModal extends Modal {
     const summary = this.summaryEl;
     const pagination = this.paginationEl;
     if (!grid || !summary || !pagination) return;
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("libraryGridRender");
     grid.empty();
     pagination.empty();
     const target = this.activeTarget();
@@ -923,6 +933,7 @@ export class WallpaperLibraryModal extends Modal {
       }
       const nextFavorite = this.controller.getState().favorites.includes(file.path);
       this.updateFavoriteButton(favoriteButton, file, nextFavorite);
+      if (__VEIL_DEV__) runtimeWorkProfiler.record("libraryCardPatch");
     });
   }
 }
