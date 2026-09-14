@@ -1,5 +1,6 @@
 import type { NoteContext } from "./context-rules";
 import { resolveWallpaper, type ResolvedWallpaper } from "./profile-resolver";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import {
   copyAppearance,
   type VeilProfile,
@@ -98,6 +99,7 @@ export class SceneRuntime {
   }
 
   private resolveUncached(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("sceneResolution");
     if (this.manualProfileId) {
       const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
       if (profile) {
