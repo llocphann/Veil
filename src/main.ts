@@ -25,6 +25,7 @@ import {
   shouldRetainWallpaperForUnavailableSource,
   workingWallpaperFallback,
 } from "./transition-lifecycle";
+import { vaultChangeAffectsDocument } from "./vault-document-invalidation";
 import { rewriteSettingsForVaultRename } from "./vault-settings-rename";
 import {
   applyDocumentAppearance,
@@ -343,6 +344,26 @@ export default class VeilPlugin extends Plugin {
     return affected;
   }
 
+  private documentsAffectedByVaultPath(path: string): Set<Document> {
+    const affected = new Set<Document>();
+    if (!this.settings.enabled) return affected;
+    for (const document of this.workspaceDocuments()) {
+      if (document.defaultView?.closed) continue;
+      const context = this.documentContexts.contextForDocument(document);
+      const resolved = this.scenes.resolveSnapshot(this.settings, context);
+      const loadedPath = this.documents.get(document)?.path || "";
+      if (vaultChangeAffectsDocument(path, loadedPath, resolved.path)) {
+        affected.add(document);
+      }
+    }
+    return affected;
+  }
+
+  private refreshDocumentsAffectedByVaultPath(path: string): void {
+    const affected = this.documentsAffectedByVaultPath(path);
+    if (affected.size) this.scheduleApplyToDocuments(affected);
+  }
+
   private setStatus(message: string, tone: StatusTone = "info"): void {
     this.status = { message, tone };
     this.settingTab?.updateStatus();
@@ -357,11 +378,13 @@ export default class VeilPlugin extends Plugin {
           "",
           !(file instanceof TFile),
         );
-        this.refreshIfWallpaper(file.path);
+        this.refreshDocumentsAffectedByVaultPath(file.path);
       }),
     );
     this.registerEvent(
-      this.app.vault.on("modify", (file) => this.refreshIfWallpaper(file.path)),
+      this.app.vault.on("modify", (file) =>
+        this.refreshDocumentsAffectedByVaultPath(file.path),
+      ),
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
@@ -372,19 +395,17 @@ export default class VeilPlugin extends Plugin {
           !(file instanceof TFile),
         );
         if (this.wallpaperLibrary.prune(file.path)) this.scheduleSave();
-        this.refreshIfWallpaper(file.path);
+        this.refreshDocumentsAffectedByVaultPath(file.path);
       }),
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        const renamedDocuments = this.documentsAffectedByVaultPath(oldPath);
         this.wallpaperPools.invalidateVaultEvent(
           "rename",
           file.path,
           oldPath,
           !(file instanceof TFile),
-        );
-        const selectedPoolPathRenamed = Array.from(this.documents.values()).some(
-          (state) => state.path === oldPath || state.path.startsWith(`${oldPath}/`),
         );
         const rename = rewriteSettingsForVaultRename(this.settings, oldPath, file.path);
         const libraryChanged = this.wallpaperLibrary.rewritePaths(rename.rewritePath);
@@ -395,24 +416,10 @@ export default class VeilPlugin extends Plugin {
         );
 
         if (rename.changed) this.updateSettings(rename.settings, false, preservedPoolContexts);
-        else {
-          if (libraryChanged) this.scheduleSave();
-          this.refreshWallpaper(selectedPoolPathRenamed);
-        }
+        else if (libraryChanged) this.scheduleSave();
+        if (renamedDocuments.size) this.scheduleApplyToDocuments(renamedDocuments);
       }),
     );
-  }
-
-  private refreshIfWallpaper(path: string): void {
-    const selectedPaths = [
-      this.settings.wallpaperPath,
-      ...this.settings.profiles.map((profile) => profile.wallpaperPath),
-      ...this.settings.wallpaperRules.map((rule) => rule.wallpaperPath),
-    ];
-    const touches = (candidate: string): boolean =>
-      candidate === path || candidate.startsWith(`${path}/`);
-    const loadedPath = Array.from(this.documents.values()).some((state) => touches(state.path));
-    if (selectedPaths.some(touches) || loadedPath) this.refreshWallpaper(true);
   }
 
   private applyToWorkspace(): void {
