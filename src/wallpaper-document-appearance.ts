@@ -19,7 +19,7 @@ export interface DocumentAppearanceOptions {
   state: WallpaperDocumentState;
   context: NoteContext | null;
   appearance: VeilAppearance;
-  opacityExclusions: readonly OpacityExclusionRule[];
+  opacityExclusions: OpacityExclusionRule[];
   profileId: string | null;
   updateProfileId: boolean;
 }
