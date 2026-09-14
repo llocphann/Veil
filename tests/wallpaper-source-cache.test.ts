@@ -43,7 +43,7 @@ void test("source revision and path are part of cache reuse boundaries", () => {
     /private mediaLookup\([\s\S]*?\n {2}private cachedLookupStillCurrent\(/,
   )?.[0] || "";
   assert.match(body, /cached\.revision === sourceRevision/);
-  assert.match(body, /private readonly mediaLookupCache = new Map<string, CachedMediaLookup>/);
+  assert.match(source, /private readonly mediaLookupCache = new Map<string, CachedMediaLookup>/);
   assert.match(source, /path: file\.path,[\s\S]*?revision: sourceRevision/);
 });
 
@@ -75,5 +75,5 @@ void test("source lookup cache remains bounded", () => {
     /private rememberLookup\([\s\S]*?\n {2}private invalidateVaultEvent\(/,
   )?.[0] || "";
   assert.match(body, /this\.mediaLookupCache\.size >= MAX_SOURCE_LOOKUPS/);
-  assert.match(body, /this\.mediaLookupCache\.delete\(oldest\)/);
+  assert.match(body, /if \(!oldest\.done\) this\.mediaLookupCache\.delete\(oldest\.value\)/);
 });
