@@ -8,6 +8,7 @@ import {
   type VeilAppearance,
   type VeilSettings,
 } from "./settings";
+import { wallpaperMediaIdentityKey } from "./wallpaper-media-identity";
 import { WallpaperPoolRuntime } from "./wallpaper-pool-runtime";
 
 export interface WallpaperSource {
@@ -91,15 +92,13 @@ export class WallpaperSourceResolver {
             : file.extension.toLowerCase() === "gif"
               ? "Animated GIF"
               : "Image",
-        key: [
-          file.path,
+        key: wallpaperMediaIdentityKey({
+          path: file.path,
           url,
-          file.stat.mtime,
-          file.stat.size,
-          contextKey,
-          manualProfileId ? `manual:${manualProfileId}` : "automatic",
-          sourceRevision,
-        ].join("|"),
+          modifiedAt: file.stat.mtime,
+          size: file.stat.size,
+          revision: sourceRevision,
+        }),
         contextLabel,
         appearance: resolved.appearance,
       },
