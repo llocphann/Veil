@@ -94,36 +94,65 @@ export function applyDocumentAppearance(options: DocumentAppearanceOptions): voi
     }
   }
 
-  state.layer.dataset.colorOverlay = String(
+  const colorOverlay = String(
     appearance.colorOverlayEnabled && appearance.colorOverlayOpacity > 0,
   );
-  state.layer.dataset.effect = appearance.effectIntensity > 0
-    ? appearance.effectPreset
-    : "none";
-  state.layer.dataset.reduceMotion = String(appearance.respectReducedMotion);
+  if (state.layer.dataset.colorOverlay !== colorOverlay) {
+    state.layer.dataset.colorOverlay = colorOverlay;
+  }
+  const effect = appearance.effectIntensity > 0 ? appearance.effectPreset : "none";
+  if (state.layer.dataset.effect !== effect) state.layer.dataset.effect = effect;
+  const reduceMotion = String(appearance.respectReducedMotion);
+  if (state.layer.dataset.reduceMotion !== reduceMotion) {
+    state.layer.dataset.reduceMotion = reduceMotion;
+  }
   if (updateProfileId) {
-    if (profileId) state.layer.dataset.profileId = profileId;
-    else delete state.layer.dataset.profileId;
+    if (profileId) {
+      if (state.layer.dataset.profileId !== profileId) {
+        state.layer.dataset.profileId = profileId;
+      }
+    } else if (state.layer.dataset.profileId !== undefined) {
+      delete state.layer.dataset.profileId;
+    }
   }
 
-  state.vignette.hidden =
+  const vignetteHidden =
     appearance.vignetteMode === "off" || appearance.vignetteIntensity === 0;
+  if (state.vignette.hidden !== vignetteHidden) state.vignette.hidden = vignetteHidden;
   const exclusions = matchingOpacityExclusions(opacityExclusions, context);
   const paneOpacity = exclusions.paneSurface ? 100 : appearance.paneOpacity;
   const paneContentOpacity = exclusions.paneContent ? 100 : appearance.paneContentOpacity;
-  if (!state.failed) document.body.style.setProperty(PANE_OPACITY_VARIABLE, `${paneOpacity}%`);
+  const paneOpacityValue = `${paneOpacity}%`;
+  if (
+    !state.failed
+    && document.body.style.getPropertyValue(PANE_OPACITY_VARIABLE) !== paneOpacityValue
+  ) {
+    document.body.style.setProperty(PANE_OPACITY_VARIABLE, paneOpacityValue);
+  }
   const fadePaneContent = !state.failed && paneContentOpacity < 100;
-  document.body.classList.toggle(PANE_CONTENT_CLASS, fadePaneContent);
+  if (document.body.classList.contains(PANE_CONTENT_CLASS) !== fadePaneContent) {
+    document.body.classList.toggle(PANE_CONTENT_CLASS, fadePaneContent);
+  }
+  const paneContentOpacityValue = String(paneContentOpacity / 100);
   if (fadePaneContent) {
-    document.body.style.setProperty(
-      PANE_CONTENT_OPACITY_VARIABLE,
-      String(paneContentOpacity / 100),
-    );
-  } else {
+    if (
+      document.body.style.getPropertyValue(PANE_CONTENT_OPACITY_VARIABLE)
+      !== paneContentOpacityValue
+    ) {
+      document.body.style.setProperty(
+        PANE_CONTENT_OPACITY_VARIABLE,
+        paneContentOpacityValue,
+      );
+    }
+  } else if (document.body.style.getPropertyValue(PANE_CONTENT_OPACITY_VARIABLE)) {
     document.body.style.removeProperty(PANE_CONTENT_OPACITY_VARIABLE);
   }
-  document.body.style.removeProperty(LEGACY_IMAGE_VARIABLE);
-  if (state.ready && !state.failed) document.body.classList.add(BODY_CLASS);
+  if (document.body.style.getPropertyValue(LEGACY_IMAGE_VARIABLE)) {
+    document.body.style.removeProperty(LEGACY_IMAGE_VARIABLE);
+  }
+  if (state.ready && !state.failed && !document.body.classList.contains(BODY_CLASS)) {
+    document.body.classList.add(BODY_CLASS);
+  }
 }
 
 export function restoreDocumentAppearance(document: Document): void {
