@@ -171,7 +171,9 @@ export default class VeilPlugin extends Plugin {
     this.registerEvent(
       this.app.metadataCache.on("changed", (file) => {
         if (!this.layoutReady) return;
-        this.scheduleApplyToDocuments(this.documentContexts.documentsForFile(file));
+        const documents = this.documentContexts.documentsForFile(file);
+        this.documentContexts.invalidateDocuments(documents);
+        this.scheduleApplyToDocuments(documents);
       }),
     );
     this.registerEvent(
@@ -187,6 +189,7 @@ export default class VeilPlugin extends Plugin {
       }),
     );
     this.registerEvent(this.app.workspace.on("css-change", () => {
+      this.documentContexts.invalidateAllContexts();
       if (!this.layoutReady || !this.settings.enabled) return;
       if (!contextRulesDependOnTheme([
         ...this.settings.wallpaperRules,
@@ -445,6 +448,7 @@ export default class VeilPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         const renamedDocuments = this.documentsAffectedByVaultPath(oldPath);
+        this.documentContexts.invalidateAllContexts();
         this.wallpaperPools.invalidateVaultEvent(
           "rename",
           file.path,
