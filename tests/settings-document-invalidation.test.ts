@@ -143,6 +143,44 @@ void test("profile-backed rules ignore legacy fallback wallpaper changes", () =>
   );
 });
 
+void test("routing changes that keep the same resolved scene stay idle", () => {
+  const previous = settings();
+  const profile = scene(previous);
+  previous.profiles = [profile];
+  previous.wallpaperRules = [{
+    id: "rule-a",
+    enabled: true,
+    matchType: "path",
+    matchValue: context.path,
+    profileId: profile.id,
+    wallpaperPath: "",
+  }];
+  const next: VeilSettings = {
+    ...previous,
+    wallpaperRules: [{
+      id: "rule-b",
+      enabled: true,
+      matchType: "folder",
+      matchValue: "Notes",
+      profileId: profile.id,
+      wallpaperPath: "",
+    }],
+  };
+
+  assert.equal(resolveWallpaper(previous, context).profile?.id, profile.id);
+  assert.equal(resolveWallpaper(next, context).profile?.id, profile.id);
+  assert.equal(
+    resolvedDocumentSettingsChanged(
+      previous,
+      next,
+      context,
+      resolveWallpaper(previous, context),
+      resolveWallpaper(next, context),
+    ),
+    false,
+  );
+});
+
 void test("unmatched opacity rule changes do not invalidate the document", () => {
   const previous = settings();
   const next: VeilSettings = {
