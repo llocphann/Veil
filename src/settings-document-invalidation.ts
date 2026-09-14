@@ -19,17 +19,20 @@ function resolvedSourceIdentity(resolved: ResolvedWallpaper): object {
 }
 
 function resolvedStatusIdentity(resolved: ResolvedWallpaper): object {
+  if (resolved.profile) {
+    return {
+      profile: { id: resolved.profile.id, name: resolved.profile.name },
+    };
+  }
   return {
     rule: resolved.rule
       ? {
         id: resolved.rule.id,
         matchType: resolved.rule.matchType,
-        matchValue: resolved.profile ? "" : resolved.rule.matchValue,
+        matchValue: resolved.rule.matchValue,
       }
       : null,
-    profile: resolved.profile
-      ? { id: resolved.profile.id, name: resolved.profile.name }
-      : null,
+    profile: null,
   };
 }
 
