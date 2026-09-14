@@ -7,6 +7,10 @@ const contextSource = readFileSync(
   new URL("../src/document-context-resolver.ts", import.meta.url),
   "utf8",
 );
+const sceneSource = readFileSync(
+  new URL("../src/scene-runtime.ts", import.meta.url),
+  "utf8",
+);
 const poolSource = readFileSync(
   new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
   "utf8",
@@ -30,6 +34,17 @@ void test("main delegates document context ownership", () => {
   assert.match(contextSource, /private readonly activeRootLeaves/);
   assert.match(contextSource, /contextForDocument\(document: Document\)/);
   assert.match(contextSource, /isActiveFile\(file: TFile\)/);
+});
+
+void test("main delegates scene override ownership", () => {
+  assert.match(mainSource, /new SceneRuntime\(\)/);
+  assert.doesNotMatch(mainSource, /manualProfileId/);
+  assert.doesNotMatch(mainSource, /resolveWallpaper/);
+  assert.doesNotMatch(mainSource, /copyAppearance/);
+  assert.match(sceneSource, /private manualProfileId = ""/);
+  assert.match(sceneSource, /setManualProfile\(/);
+  assert.match(sceneSource, /resolve\(settings: VeilSettings, context: NoteContext \| null\)/);
+  assert.match(sceneSource, /summary\(settings: VeilSettings, context: NoteContext \| null\)/);
 });
 
 void test("main delegates wallpaper pool runtime ownership", () => {
