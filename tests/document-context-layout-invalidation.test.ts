@@ -6,6 +6,10 @@ const source = readFileSync(
   new URL("../src/document-context-resolver.ts", import.meta.url),
   "utf8",
 );
+const mainSource = readFileSync(
+  new URL("../src/main.ts", import.meta.url),
+  "utf8",
+);
 
 void test("workspace documents are discovered once and then kept in a live registry", () => {
   const initializeBody = source.match(
@@ -49,6 +53,27 @@ void test("file lookup and layout invalidation reuse the registry without rebuil
   )?.[1] || "";
   assert.match(layoutBody, /for \(const document of this\.workspaceDocumentRegistry\)/);
   assert.doesNotMatch(layoutBody, /iterateAllLeaves/);
+});
+
+void test("main runtime initializes and maintains the registry for pop-out windows", () => {
+  assert.match(
+    mainSource,
+    /onLayoutReady\([\s\S]*?this\.documentContexts\.initializeDocuments\(\)/,
+  );
+  assert.match(
+    mainSource,
+    /window-open[\s\S]*?this\.documentContexts\.rememberDocument\(window\.document\)/,
+  );
+  assert.match(
+    mainSource,
+    /window-close[\s\S]*?this\.documentContexts\.forgetDocument\(window\.document\)/,
+  );
+
+  const workspaceBody = mainSource.match(
+    /private workspaceDocuments\(\): ReadonlySet<Document> \{([\s\S]*?)\n {2}\}/,
+  )?.[1] || "";
+  assert.match(workspaceBody, /return this\.documentContexts\.workspaceDocuments\(\)/);
+  assert.doesNotMatch(mainSource, /iterateAllLeaves/);
 });
 
 void test("layout invalidation keeps valid remembered roots as a no-op", () => {
