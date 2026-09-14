@@ -7,12 +7,19 @@ import {
   wallpaperPoolConfigurationChanges,
 } from "./wallpaper-pool-config";
 
-type PoolVaultEvent = "create" | "delete" | "rename";
+export type WallpaperPoolVaultEvent = "create" | "delete" | "rename";
+type VaultEventListener = (
+  event: WallpaperPoolVaultEvent,
+  path: string,
+  oldPath: string,
+  isFolder: boolean,
+) => void;
 
 export class WallpaperPoolRuntime {
   private readonly candidates = new Map<string, string[]>();
   private readonly selections = new Map<string, string>();
   private readonly previousSelections = new Map<string, string>();
+  private readonly vaultEventListeners = new Set<VaultEventListener>();
 
   constructor(private readonly app: App) {}
 
@@ -20,6 +27,12 @@ export class WallpaperPoolRuntime {
     this.candidates.clear();
     this.selections.clear();
     this.previousSelections.clear();
+    this.vaultEventListeners.clear();
+  }
+
+  onVaultEvent(listener: VaultEventListener): () => void {
+    this.vaultEventListeners.add(listener);
+    return () => this.vaultEventListeners.delete(listener);
   }
 
   reconcileSettings(
@@ -45,11 +58,14 @@ export class WallpaperPoolRuntime {
   }
 
   invalidateVaultEvent(
-    event: PoolVaultEvent,
+    event: WallpaperPoolVaultEvent,
     path: string,
     oldPath = "",
     isFolder = false,
   ): void {
+    for (const listener of this.vaultEventListeners) {
+      listener(event, path, oldPath, isFolder);
+    }
     invalidatePoolCandidatesForVaultEvent(
       this.candidates,
       event,
