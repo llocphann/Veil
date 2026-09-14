@@ -5,6 +5,7 @@ import {
   normalizePath,
 } from "obsidian";
 import type { NoteContext } from "./context-rules";
+import { DocumentApplyScheduler } from "./document-apply-scheduler";
 import { DocumentContextResolver } from "./document-context-resolver";
 import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
@@ -75,6 +76,11 @@ export default class VeilPlugin extends Plugin {
       new Notice("Veil changes could not be saved. Check vault permissions.");
     },
   );
+  private readonly documentApply = new DocumentApplyScheduler(
+    () => !this.unloaded && this.layoutReady,
+    () => this.applyToWorkspace(),
+    (document) => this.applyScheduledDocument(document),
+  );
   private readonly systemRouting = new SystemRoutingScheduler(
     () => this.settings,
     () => !this.unloaded && this.layoutReady,
@@ -84,7 +90,6 @@ export default class VeilPlugin extends Plugin {
   private unloaded = false;
   private layoutReady = false;
   private sourceRevision = 0;
-  private refreshFrame: number | null = null;
 
   async onload(): Promise<void> {
     try {
@@ -132,15 +137,15 @@ export default class VeilPlugin extends Plugin {
       this.refreshWallpaper();
     });
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
-      this.documentContexts.rememberActiveRootLeaf(leaf);
-      this.refreshWallpaper();
+      const document = this.documentContexts.rememberActiveRootLeaf(leaf);
+      if (document) this.scheduleApplyToDocuments([document]);
     }));
-    this.registerEvent(this.app.workspace.on("file-open", () => this.refreshWallpaper()));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.refreshMostRecentDocument()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshWallpaper()));
     this.registerEvent(
       this.app.metadataCache.on("changed", (file) => {
         if (!this.layoutReady) return;
-        if (this.documentContexts.isActiveFile(file)) this.refreshWallpaper();
+        this.scheduleApplyToDocuments(this.documentContexts.documentsForFile(file));
       }),
     );
     this.registerEvent(
@@ -159,8 +164,7 @@ export default class VeilPlugin extends Plugin {
 
   onunload(): void {
     this.unloaded = true;
-    if (this.refreshFrame !== null) window.cancelAnimationFrame(this.refreshFrame);
-    this.refreshFrame = null;
+    this.documentApply.cancel();
     this.systemRouting.clear();
     void this.flushSettings();
     this.clearAllDocuments();
@@ -192,8 +196,7 @@ export default class VeilPlugin extends Plugin {
   public refreshWallpaper(force = false): void {
     if (this.unloaded || !this.layoutReady) return;
     if (!this.settings.enabled) {
-      if (this.refreshFrame !== null) window.cancelAnimationFrame(this.refreshFrame);
-      this.refreshFrame = null;
+      this.documentApply.cancel();
       this.clearAllDocuments();
       this.setStatus("Wallpaper is disabled.");
       return;
@@ -271,11 +274,20 @@ export default class VeilPlugin extends Plugin {
   }
 
   private scheduleApplyToWorkspace(): void {
-    if (this.refreshFrame !== null || this.unloaded) return;
-    this.refreshFrame = window.requestAnimationFrame(() => {
-      this.refreshFrame = null;
-      this.applyToWorkspace();
-    });
+    this.documentApply.scheduleAll();
+  }
+
+  private scheduleApplyToDocuments(documents: Iterable<Document>): void {
+    this.documentApply.scheduleDocuments(documents);
+  }
+
+  private refreshMostRecentDocument(): void {
+    if (this.unloaded || !this.layoutReady) return;
+    const document = this.documentContexts.rememberActiveRootLeaf(
+      this.app.workspace.getMostRecentLeaf(),
+    );
+    if (document) this.scheduleApplyToDocuments([document]);
+    else this.refreshWallpaper();
   }
 
   private setStatus(message: string, tone: StatusTone = "info"): void {
@@ -357,14 +369,16 @@ export default class VeilPlugin extends Plugin {
     this.app.workspace.iterateAllLeaves((leaf) => {
       documents.add(leaf.view.containerEl.ownerDocument);
     });
-    for (const document of documents) {
-      if (document.defaultView?.closed) {
-        this.documentContexts.forgetDocument(document);
-        this.clearDocument(document);
-      } else {
-        this.applyToDocument(document);
-      }
+    for (const document of documents) this.applyScheduledDocument(document);
+  }
+
+  private applyScheduledDocument(document: Document): void {
+    if (document.defaultView?.closed) {
+      this.documentContexts.forgetDocument(document);
+      this.clearDocument(document);
+      return;
     }
+    this.applyToDocument(document);
   }
 
   private applyOptions(
