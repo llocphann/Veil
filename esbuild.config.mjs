@@ -26,6 +26,9 @@ const context = await esbuild.context({
     "@lezer/lr",
     ...builtinModules,
   ],
+  define: {
+    __VEIL_DEV__: JSON.stringify(!production),
+  },
   format: "cjs",
   target: "es2021",
   logLevel: "info",
