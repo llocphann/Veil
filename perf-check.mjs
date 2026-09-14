@@ -13,8 +13,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const BASELINE_VERSION = "1.5.3";
-const BASELINE_SHA = "9d7594a35955a3841c25d70aae67c832a028cc85";
+const BASELINE_VERSION = "1.6.0";
+const BASELINE_SHA = "8576bcf7e2d1942d2ffec2a1f449d3d5cc1cef73";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const nodeCommand = process.execPath;
 
