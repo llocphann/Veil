@@ -11,6 +11,10 @@ const poolSource = readFileSync(
   new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
   "utf8",
 );
+const persistenceSource = readFileSync(
+  new URL("../src/settings-persistence.ts", import.meta.url),
+  "utf8",
+);
 
 void test("main delegates document context ownership", () => {
   assert.match(mainSource, /new DocumentContextResolver\(this\.app\)/);
@@ -30,4 +34,16 @@ void test("main delegates wallpaper pool runtime ownership", () => {
   assert.match(poolSource, /private readonly previousSelections/);
   assert.match(poolSource, /reconcileSettings\(/);
   assert.match(poolSource, /pathForAppearance\(/);
+});
+
+void test("main delegates settings persistence ownership", () => {
+  assert.match(mainSource, /new SettingsPersistence\(/);
+  assert.doesNotMatch(mainSource, /saveTimer/);
+  assert.doesNotMatch(mainSource, /pendingSave/);
+  assert.doesNotMatch(mainSource, /saveQueue/);
+  assert.match(persistenceSource, /private saveTimer/);
+  assert.match(persistenceSource, /private pendingSave/);
+  assert.match(persistenceSource, /private saveQueue/);
+  assert.match(mainSource, /return this\.settingsPersistence\.flush\(\)/);
+  assert.match(mainSource, /this\.settingsPersistence\.schedule\(\)/);
 });

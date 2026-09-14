@@ -21,6 +21,7 @@ import {
   type VeilAppearance,
   type VeilSettings,
 } from "./settings";
+import { SettingsPersistence } from "./settings-persistence";
 import {
   retainedOutgoingForPending,
   shouldRetainWallpaperForUnavailableSource,
@@ -92,15 +93,21 @@ export default class VeilPlugin extends Plugin {
   private readonly documentContexts = new DocumentContextResolver(this.app);
   private readonly wallpaperPools = new WallpaperPoolRuntime(this.app);
   private wallpaperLibrary: WallpaperLibraryState = { favorites: [], recent: [] };
+  private readonly settingsPersistence = new SettingsPersistence(
+    () => this.settings,
+    () => this.wallpaperLibrary,
+    (data) => this.saveData(data),
+    (error) => {
+      console.error("[veil] Could not save settings", error);
+      new Notice("Veil changes could not be saved. Check vault permissions.");
+    },
+  );
   private manualProfileId = "";
   private settingTab: WallpaperSettingsTab | null = null;
   private unloaded = false;
   private layoutReady = false;
   private sourceRevision = 0;
-  private saveTimer: number | null = null;
   private systemRoutingTimer: number | null = null;
-  private pendingSave = false;
-  private saveQueue: Promise<void> = Promise.resolve();
   private refreshFrame: number | null = null;
 
   async onload(): Promise<void> {
@@ -206,27 +213,7 @@ export default class VeilPlugin extends Plugin {
   }
 
   public flushSettings(): Promise<void> {
-    if (this.saveTimer !== null) {
-      window.clearTimeout(this.saveTimer);
-      this.saveTimer = null;
-    }
-    if (!this.pendingSave) return this.saveQueue;
-
-    this.pendingSave = false;
-    const snapshot = normalizeSettings(this.settings, normalizePath);
-    const librarySnapshot: WallpaperLibraryState = {
-      favorites: [...this.wallpaperLibrary.favorites],
-      recent: [...this.wallpaperLibrary.recent],
-    };
-    const task = this.saveQueue.then(() => this.saveData({
-      ...snapshot,
-      wallpaperLibrary: librarySnapshot,
-    }));
-    this.saveQueue = task.catch((error: unknown) => {
-      console.error("[veil] Could not save settings", error);
-      new Notice("Veil changes could not be saved. Check vault permissions.");
-    });
-    return this.saveQueue;
+    return this.settingsPersistence.flush();
   }
 
   public refreshWallpaper(force = false): void {
@@ -338,12 +325,7 @@ export default class VeilPlugin extends Plugin {
 
   private scheduleSave(): void {
     if (this.unloaded) return;
-    this.pendingSave = true;
-    if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
-    this.saveTimer = window.setTimeout(() => {
-      this.saveTimer = null;
-      void this.flushSettings();
-    }, 200);
+    this.settingsPersistence.schedule();
   }
 
   private rememberChangedWallpaperPaths(previous: VeilSettings, next: VeilSettings): void {
