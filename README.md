@@ -69,16 +69,18 @@ Architecture decomposition is complete on the development branch. The main runti
 - Preserve existing behavior while clarifying ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
 - Avoid user-facing feature additions unless they are required to complete the refactor safely.
 
-### 1.7 — Runtime invalidation and no-op fast paths — in progress on `dev`
+### 1.7 — Runtime invalidation and no-op fast paths — complete on `dev`
 
-Current development already skips unchanged document appearance DOM work, avoids redundant playback mutations, and retains an existing system-routing timer when its absolute boundary has not changed.
+Runtime invalidation now uses document-scoped scheduling for context, Settings, vault, and pool changes. Stable render signatures suppress unchanged DOM/playback work, no-op settings return before subsystem work, routing timers retain unchanged boundaries, and multi-window updates are limited to documents whose resolved output is affected.
 
 - Replace broad refresh work with explicit invalidation for context, source, appearance, playback, layout, and pool state.
 - Add stable runtime signatures so unchanged context or appearance produces no DOM or media work.
 - Restrict multi-window updates to the documents whose resolved state actually changed.
 - Continue reducing metadata-cache and vault-event work on hot paths.
 
-### 1.8 — Media lifecycle and transition efficiency
+### 1.8 — Media lifecycle and transition efficiency — in progress on `dev`
+
+The next optimization boundary separates media identity from context, appearance, and playback identity so an unchanged image or video can remain allocated while the surrounding Scene or visual state changes.
 
 - Formalize media states from resolution and load through transition, active playback, and disposal.
 - Keep media identity separate from appearance and playback identity so visual changes do not reload unchanged images or videos.
