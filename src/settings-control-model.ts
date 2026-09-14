@@ -178,17 +178,18 @@ export function continuousControlPatch(
 
     const profileKey = parseProfileControlKey(key);
     if (profileKey) {
-      const sourceProfiles = profiles || settings.profiles;
-      const index = sourceProfiles.findIndex((profile) => profile.id === profileKey.id);
+      const index: number = settings.profiles.findIndex(
+        (profile: VeilProfile): boolean => profile.id === profileKey.id,
+      );
       if (index < 0) continue;
-      const current = sourceProfiles[index];
+      const current: VeilProfile | undefined = profiles?.[index] ?? settings.profiles[index];
       if (!current) continue;
       if ((current as unknown as Record<string, unknown>)[profileKey.field] === value) continue;
 
-      if (!profiles) profiles = [...settings.profiles];
-      const source = profiles[index];
+      if (!profiles) profiles = settings.profiles.slice();
+      const source: VeilProfile | undefined = profiles[index];
       if (!source) continue;
-      const next = clonedProfileIndexes.has(index) ? source : { ...source };
+      const next: VeilProfile = clonedProfileIndexes.has(index) ? source : { ...source };
       Object.assign(next, { [profileKey.field]: value });
       profiles[index] = next;
       clonedProfileIndexes.add(index);
