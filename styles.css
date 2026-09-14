@@ -424,8 +424,7 @@ body.is-mobile > .vault-dashboard-wallpaper {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
-  column-gap: var(--size-4-2);
-  row-gap: var(--size-4-2);
+  gap: var(--size-4-2);
   margin: var(--size-4-3) 0;
 }
 
