@@ -38,34 +38,9 @@ void test("appearance changes stay idle while Veil remains disabled", () => {
 void test("scene name changes reconcile scenes without invalidating pool or timer", () => {
   const previous = settings();
   previous.profiles = [{
+    ...previous,
     id: "scene-a",
     name: "A",
-    wallpaperPath: "Wallpapers/a.webp",
-    wallpaperPoolEnabled: false,
-    wallpaperPoolIncludeSubfolders: false,
-    displayMode: previous.displayMode,
-    wallpaperPositionX: previous.wallpaperPositionX,
-    wallpaperPositionY: previous.wallpaperPositionY,
-    wallpaperZoom: previous.wallpaperZoom,
-    transitionDuration: previous.transitionDuration,
-    opacity: previous.opacity,
-    paneOpacity: previous.paneOpacity,
-    paneContentOpacity: previous.paneContentOpacity,
-    vignetteMode: previous.vignetteMode,
-    vignetteIntensity: previous.vignetteIntensity,
-    vignetteRadius: previous.vignetteRadius,
-    blurEnabled: previous.blurEnabled,
-    blurIntensity: previous.blurIntensity,
-    dimEnabled: previous.dimEnabled,
-    dimIntensity: previous.dimIntensity,
-    colorOverlayEnabled: previous.colorOverlayEnabled,
-    colorOverlayColor: previous.colorOverlayColor,
-    colorOverlayOpacity: previous.colorOverlayOpacity,
-    colorOverlayBlendMode: previous.colorOverlayBlendMode,
-    effectPreset: previous.effectPreset,
-    effectIntensity: previous.effectIntensity,
-    pauseWhenHidden: previous.pauseWhenHidden,
-    respectReducedMotion: previous.respectReducedMotion,
   }];
   const next = {
     ...previous,
@@ -92,6 +67,23 @@ void test("pool configuration changes invalidate only the pool runtime plus docu
   assert.equal(impact.routingSchedule, false);
 });
 
+void test("pool folder and interval changes are explicit pool runtime changes", () => {
+  const previous = { ...settings(), wallpaperPoolEnabled: true };
+  const folder = classifySettingsChange(previous, {
+    ...previous,
+    wallpaperPoolFolder: "Wallpapers/Focus",
+  });
+  const interval = classifySettingsChange(previous, {
+    ...previous,
+    wallpaperPoolChangeInterval: 15,
+  });
+
+  assert.equal(folder.poolRuntime, true);
+  assert.equal(interval.poolRuntime, true);
+  assert.equal(folder.libraryRecent, false);
+  assert.equal(interval.libraryRecent, false);
+});
+
 void test("routing changes reschedule system routing but opacity rules do not touch pools", () => {
   const previous = settings();
   const next: VeilSettings = {
@@ -114,12 +106,12 @@ void test("routing changes reschedule system routing but opacity rules do not to
   assert.equal(impact.documentResolution, true);
 });
 
-void test("wallpaper path changes are tracked for recent history", () => {
+void test("wallpaper path changes are tracked for recent history but not pool topology", () => {
   const previous = settings();
   const next = { ...previous, wallpaperPath: "Wallpapers/new.webp" };
   const impact = classifySettingsChange(previous, next);
 
   assert.equal(impact.libraryRecent, true);
-  assert.equal(impact.poolRuntime, true);
+  assert.equal(impact.poolRuntime, false);
   assert.equal(impact.documentResolution, true);
 });
