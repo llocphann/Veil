@@ -12,11 +12,29 @@ export type ManualSceneChange =
   | { kind: "cleared" }
   | { kind: "selected"; profile: VeilProfile };
 
+interface CachedSceneResolution {
+  revision: number;
+  resolved: ResolvedWallpaper;
+}
+
 export class SceneRuntime {
   private manualProfileId = "";
+  private resolutionRevision = 0;
+  private readonly contextResolutionCache = new WeakMap<
+    VeilSettings,
+    WeakMap<NoteContext, CachedSceneResolution>
+  >();
+  private readonly workspaceResolutionCache = new WeakMap<
+    VeilSettings,
+    CachedSceneResolution
+  >();
 
   getManualProfileId(): string {
     return this.manualProfileId;
+  }
+
+  invalidateResolution(): void {
+    this.resolutionRevision += 1;
   }
 
   reconcileSettings(settings: VeilSettings): void {
@@ -25,6 +43,7 @@ export class SceneRuntime {
       && !settings.profiles.some((profile) => profile.id === this.manualProfileId)
     ) {
       this.manualProfileId = "";
+      this.invalidateResolution();
     }
   }
 
@@ -35,6 +54,7 @@ export class SceneRuntime {
     if (this.manualProfileId === profileId) return { kind: "unchanged" };
 
     this.manualProfileId = profileId;
+    this.invalidateResolution();
     if (!profileId) return { kind: "cleared" };
     const profile = settings.profiles.find((candidate) => candidate.id === profileId);
     return profile ? { kind: "selected", profile } : { kind: "missing" };
@@ -56,12 +76,26 @@ export class SceneRuntime {
   }
 
   resolve(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
+    this.reconcileSettings(settings);
+    const cached = context
+      ? this.contextResolutionCache.get(settings)?.get(context)
+      : this.workspaceResolutionCache.get(settings);
+    if (cached?.revision === this.resolutionRevision) return cached.resolved;
+
     const resolved = this.resolveSnapshot(settings, context);
-    if (
-      this.manualProfileId
-      && !settings.profiles.some((profile) => profile.id === this.manualProfileId)
-    ) {
-      this.manualProfileId = "";
+    const entry: CachedSceneResolution = {
+      revision: this.resolutionRevision,
+      resolved,
+    };
+    if (context) {
+      let cache = this.contextResolutionCache.get(settings);
+      if (!cache) {
+        cache = new WeakMap<NoteContext, CachedSceneResolution>();
+        this.contextResolutionCache.set(settings, cache);
+      }
+      cache.set(context, entry);
+    } else {
+      this.workspaceResolutionCache.set(settings, entry);
     }
     return resolved;
   }
