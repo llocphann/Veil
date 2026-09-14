@@ -19,6 +19,14 @@ const sourceResolverSource = readFileSync(
   new URL("../src/wallpaper-source-resolver.ts", import.meta.url),
   "utf8",
 );
+const documentStateSource = readFileSync(
+  new URL("../src/wallpaper-document-state.ts", import.meta.url),
+  "utf8",
+);
+const documentAppearanceSource = readFileSync(
+  new URL("../src/wallpaper-document-appearance.ts", import.meta.url),
+  "utf8",
+);
 const librarySource = readFileSync(
   new URL("../src/wallpaper-library-runtime.ts", import.meta.url),
   "utf8",
@@ -76,6 +84,19 @@ void test("main delegates wallpaper source resolution", () => {
   assert.match(sourceResolverSource, /mediaKind\(file\)/);
   assert.match(sourceResolverSource, /pathForAppearance\(resolved\.appearance, contextKey\)/);
   assert.match(sourceResolverSource, /sourceRevision/);
+});
+
+void test("main delegates wallpaper document state and appearance styling", () => {
+  assert.doesNotMatch(mainSource, /interface DocumentState/);
+  assert.match(mainSource, /type DocumentState = WallpaperDocumentState/);
+  assert.match(documentStateSource, /export interface WallpaperDocumentState/);
+  assert.match(mainSource, /applyDocumentAppearance\(\{/);
+  assert.match(mainSource, /restoreDocumentAppearance\(document\)/);
+  assert.doesNotMatch(mainSource, /--vdb-overlay-opacity/);
+  assert.doesNotMatch(mainSource, /--vault-dashboard-pane-opacity/);
+  assert.match(documentAppearanceSource, /--vdb-overlay-opacity/);
+  assert.match(documentAppearanceSource, /--vault-dashboard-pane-opacity/);
+  assert.match(documentAppearanceSource, /matchingOpacityExclusions\(opacityExclusions, context\)/);
 });
 
 void test("main delegates wallpaper library state ownership", () => {

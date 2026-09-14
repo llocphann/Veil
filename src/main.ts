@@ -4,17 +4,13 @@ import {
   TFile,
   normalizePath,
 } from "obsidian";
-import {
-  matchingOpacityExclusions,
-  type NoteContext,
-} from "./context-rules";
+import type { NoteContext } from "./context-rules";
 import { DocumentContextResolver } from "./document-context-resolver";
 import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
-  type MediaKind,
   type VeilAppearance,
   type VeilSettings,
 } from "./settings";
@@ -26,6 +22,11 @@ import {
   workingWallpaperFallback,
 } from "./transition-lifecycle";
 import { rewriteSettingsForVaultRename } from "./vault-settings-rename";
+import {
+  applyDocumentAppearance,
+  restoreDocumentAppearance,
+} from "./wallpaper-document-appearance";
+import type { WallpaperDocumentState } from "./wallpaper-document-state";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
 import { WallpaperLibraryRuntime } from "./wallpaper-library-runtime";
 import {
@@ -36,33 +37,11 @@ import { WallpaperPoolRuntime } from "./wallpaper-pool-runtime";
 import { WallpaperSourceResolver } from "./wallpaper-source-resolver";
 import { WallpaperSettingsTab } from "./settings-tab";
 
-const BODY_CLASS = "vault-dashboard-background";
 const LAYER_CLASS = "vault-dashboard-wallpaper";
-const PANE_OPACITY_VARIABLE = "--vault-dashboard-pane-opacity";
-const PANE_CONTENT_CLASS = "vault-dashboard-fade-pane-content";
-const PANE_CONTENT_OPACITY_VARIABLE = "--vault-dashboard-pane-content-opacity";
-const LEGACY_IMAGE_VARIABLE = "--vault-dashboard-banner-image";
 const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
 const TRANSITION_CLEANUP_BUFFER = 80;
 
-interface DocumentState {
-  key: string;
-  path: string;
-  kind: Exclude<MediaKind, "">;
-  layer: HTMLDivElement;
-  media: HTMLImageElement | HTMLVideoElement;
-  vignette: HTMLDivElement;
-  appearance: VeilAppearance;
-  ready: boolean;
-  failed: boolean;
-  disposed: boolean;
-  playPromise: Promise<void> | null;
-  transitionTimer: number | null;
-  outgoing: DocumentState | null;
-  cleanups: Array<() => void>;
-  motionQuery?: MediaQueryList;
-}
-
+type DocumentState = WallpaperDocumentState;
 type StatusTone = "info" | "success" | "error";
 
 export default class VeilPlugin extends Plugin {
@@ -392,81 +371,15 @@ export default class VeilPlugin extends Plugin {
   ): void {
     const resolved = appearanceOverride ? null : this.scenes.resolve(this.settings, context);
     const appearance = appearanceOverride || resolved?.appearance || state.appearance;
-    state.appearance = appearance;
-    const filters: string[] = [];
-    if (appearance.blurEnabled && appearance.blurIntensity > 0) {
-      filters.push(`blur(${appearance.blurIntensity}px)`);
-    }
-    if (appearance.dimEnabled && appearance.dimIntensity > 0) {
-      filters.push(`brightness(${1 - appearance.dimIntensity / 100})`);
-    }
-    const effectStrength = appearance.effectIntensity / 100;
-    if (appearance.effectPreset === "retro" && effectStrength > 0) {
-      filters.push(
-        `sepia(${(effectStrength * 0.72).toFixed(2)})`,
-        `saturate(${(1 + effectStrength * 0.5).toFixed(2)})`,
-        `contrast(${(1 + effectStrength * 0.14).toFixed(2)})`,
-      );
-    }
-    const effectBleed = appearance.effectPreset === "glitch" ? 8 : 0;
-    const mediaScale = appearance.wallpaperZoom / 100;
-    const variables: Record<string, string> = {
-      "--vdb-opacity": String(appearance.opacity / 100),
-      "--vdb-fit": appearance.displayMode,
-      "--vdb-position-x": `${appearance.wallpaperPositionX}%`,
-      "--vdb-position-y": `${appearance.wallpaperPositionY}%`,
-      "--vdb-media-scale": String(mediaScale),
-      "--vdb-glitch-scale": String(mediaScale * 1.01),
-      "--vdb-transition-duration": `${appearance.transitionDuration}ms`,
-      "--vdb-filter": filters.length ? filters.join(" ") : "none",
-      "--vdb-blur-bleed": `${
-        (appearance.blurEnabled ? appearance.blurIntensity * 2 : 0) + effectBleed
-      }px`,
-      "--vdb-vignette-shape": appearance.vignetteMode === "circle" ? "circle" : "ellipse",
-      "--vdb-vignette-intensity": String(appearance.vignetteIntensity / 100),
-      "--vdb-vignette-radius": `${appearance.vignetteRadius}%`,
-      "--vdb-overlay-color": appearance.colorOverlayColor,
-      "--vdb-overlay-opacity": String(appearance.colorOverlayOpacity / 100),
-      "--vdb-overlay-blend-mode": appearance.colorOverlayBlendMode,
-      "--vdb-effect-opacity": String(0.08 + effectStrength * 0.42),
-      "--vdb-effect-shift": `${Math.max(1, Math.round(effectStrength * 7))}px`,
-      "--vdb-effect-speed": `${Math.max(90, Math.round(420 - effectStrength * 300))}ms`,
-    };
-    for (const [name, value] of Object.entries(variables)) {
-      if (state.layer.style.getPropertyValue(name) !== value) {
-        state.layer.style.setProperty(name, value);
-      }
-    }
-
-    state.layer.dataset.colorOverlay = String(
-      appearance.colorOverlayEnabled && appearance.colorOverlayOpacity > 0,
-    );
-    state.layer.dataset.effect = appearance.effectIntensity > 0
-      ? appearance.effectPreset
-      : "none";
-    state.layer.dataset.reduceMotion = String(appearance.respectReducedMotion);
-    const profile = resolved?.profile || null;
-    if (profile) state.layer.dataset.profileId = profile.id;
-    else if (!appearanceOverride) delete state.layer.dataset.profileId;
-
-    state.vignette.hidden =
-      appearance.vignetteMode === "off" || appearance.vignetteIntensity === 0;
-    const exclusions = matchingOpacityExclusions(this.settings.opacityExclusions, context);
-    const paneOpacity = exclusions.paneSurface ? 100 : appearance.paneOpacity;
-    const paneContentOpacity = exclusions.paneContent ? 100 : appearance.paneContentOpacity;
-    if (!state.failed) document.body.style.setProperty(PANE_OPACITY_VARIABLE, `${paneOpacity}%`);
-    const fadePaneContent = !state.failed && paneContentOpacity < 100;
-    document.body.classList.toggle(PANE_CONTENT_CLASS, fadePaneContent);
-    if (fadePaneContent) {
-      document.body.style.setProperty(
-        PANE_CONTENT_OPACITY_VARIABLE,
-        String(paneContentOpacity / 100),
-      );
-    } else {
-      document.body.style.removeProperty(PANE_CONTENT_OPACITY_VARIABLE);
-    }
-    document.body.style.removeProperty(LEGACY_IMAGE_VARIABLE);
-    if (state.ready && !state.failed) document.body.classList.add(BODY_CLASS);
+    applyDocumentAppearance({
+      document,
+      state,
+      context,
+      appearance,
+      opacityExclusions: this.settings.opacityExclusions,
+      profileId: resolved?.profile?.id || null,
+      updateProfileId: !appearanceOverride,
+    });
     this.syncPlaybackAndMotion(document, state);
   }
 
@@ -791,10 +704,7 @@ export default class VeilPlugin extends Plugin {
   }
 
   private restoreDocumentStyles(document: Document): void {
-    document.body?.classList.remove(BODY_CLASS, PANE_CONTENT_CLASS);
-    document.body?.style.removeProperty(PANE_OPACITY_VARIABLE);
-    document.body?.style.removeProperty(PANE_CONTENT_OPACITY_VARIABLE);
-    document.body?.style.removeProperty(LEGACY_IMAGE_VARIABLE);
+    restoreDocumentAppearance(document);
   }
 
   private clearAllDocuments(): void {
