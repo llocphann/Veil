@@ -138,9 +138,7 @@ void test("settings controls send minimal immutable patches", () => {
     "utf8",
   );
   assert.ok(
-    source.includes(
-      "this.plugin.updateSettings({ [key]: value } as Partial<VeilSettings>);",
-    ),
+    source.includes("this.plugin.updateSettings({ [key]: value });"),
   );
   assert.doesNotMatch(source, /normalizeSettings\(\{ \.\.\.this\.plugin\.settings/);
   assert.ok(source.includes("const next = { ...rule };"));
