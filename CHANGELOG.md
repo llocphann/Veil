@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.4.0
+
+- Add reusable **Scenes** that save wallpaper, framing, opacity, effects, transitions, and video behavior together.
+- Let routing rules switch complete Scenes or keep the legacy inline-wallpaper behavior from 1.3.
+- Add frontmatter property routing and adaptive `@theme`, `@time`, `@day`, and `@schedule` fallbacks, including overnight schedules.
+- Add a session-only Scene switcher with **Follow context rules** to return to automatic routing.
+- Add wallpaper pools for the default appearance and Scenes, with optional subfolders, stable selections, and manual shuffle.
+- Add a visual Wallpaper Library with search, Favorites, Recently Selected, filters, sorting, target selection, and **Random visible**.
+- Add horizontal and vertical focal points, 100–200% zoom, and configurable wallpaper crossfades.
+- Keep the last working wallpaper visible during rapid navigation or when a configured source is temporarily unavailable.
+- Improve multi-window and pop-out handling so each window resolves its own note and system context correctly.
+- Reorganize Settings into **Wallpaper → Appearance → Behavior → Scenes → Routing**, with shared Data and About sections below the tabs.
+- Shorten Settings descriptions for faster scanning and fix Wallpaper Library thumbnails being compressed by theme/button styles.
+- Upgrade settings export/import to schema 2 while automatically migrating Veil 1.3 schema 1 backups.
+- Add validation and visible limits for Scenes, routing rules, opacity exclusions, and imported collections.
+- Harden release, CI, lifecycle cleanup, dependency-script approval, bundle verification, and local-only privacy checks.
+
 ## 1.3.0
 
 - Add permanently visible delete buttons to wallpaper routes and opacity exclusions.

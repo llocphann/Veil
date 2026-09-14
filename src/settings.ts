@@ -34,6 +34,7 @@ export const MATCH_TYPES = {
   path: "Exact path",
   folder: "Folder",
   tag: "Tag",
+  property: "Frontmatter property",
 } as const;
 
 export type MatchType = keyof typeof MATCH_TYPES;
@@ -45,19 +46,21 @@ export interface ContextRule {
   matchValue: string;
 }
 
-export interface WallpaperRule extends ContextRule {
+/**
+ * A reusable scene. All appearance/playback values live together so a context
+ * rule can switch the complete atmosphere rather than only the media path.
+ */
+export interface VeilProfile {
+  id: string;
+  name: string;
   wallpaperPath: string;
-}
-
-export interface OpacityExclusionRule extends ContextRule {
-  excludePaneSurface: boolean;
-  excludePaneContent: boolean;
-}
-
-export interface VeilSettings {
-  enabled: boolean;
-  wallpaperPath: string;
+  wallpaperPoolEnabled: boolean;
+  wallpaperPoolIncludeSubfolders: boolean;
   displayMode: DisplayMode;
+  wallpaperPositionX: number;
+  wallpaperPositionY: number;
+  wallpaperZoom: number;
+  transitionDuration: number;
   opacity: number;
   paneOpacity: number;
   paneContentOpacity: number;
@@ -76,14 +79,68 @@ export interface VeilSettings {
   effectIntensity: number;
   pauseWhenHidden: boolean;
   respectReducedMotion: boolean;
+}
+
+export interface WallpaperRule extends ContextRule {
+  /**
+   * Empty means the rule keeps the 1.3 inline-wallpaper behavior. When set,
+   * profileId takes precedence and wallpaperPath is retained as a safe legacy
+   * fallback for imports/downgrades.
+   */
+  profileId: string;
+  wallpaperPath: string;
+}
+
+export interface OpacityExclusionRule extends ContextRule {
+  excludePaneSurface: boolean;
+  excludePaneContent: boolean;
+}
+
+export interface VeilSettings {
+  enabled: boolean;
+  wallpaperPath: string;
+  wallpaperPoolEnabled: boolean;
+  wallpaperPoolIncludeSubfolders: boolean;
+  displayMode: DisplayMode;
+  wallpaperPositionX: number;
+  wallpaperPositionY: number;
+  wallpaperZoom: number;
+  transitionDuration: number;
+  opacity: number;
+  paneOpacity: number;
+  paneContentOpacity: number;
+  vignetteMode: VignetteMode;
+  vignetteIntensity: number;
+  vignetteRadius: number;
+  blurEnabled: boolean;
+  blurIntensity: number;
+  dimEnabled: boolean;
+  dimIntensity: number;
+  colorOverlayEnabled: boolean;
+  colorOverlayColor: string;
+  colorOverlayOpacity: number;
+  colorOverlayBlendMode: ColorOverlayBlendMode;
+  effectPreset: EffectPreset;
+  effectIntensity: number;
+  pauseWhenHidden: boolean;
+  respectReducedMotion: boolean;
+  profiles: VeilProfile[];
   wallpaperRules: WallpaperRule[];
   opacityExclusions: OpacityExclusionRule[];
 }
 
+export type VeilAppearance = Omit<VeilProfile, "id" | "name">;
+
 export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   enabled: true,
   wallpaperPath: "",
+  wallpaperPoolEnabled: false,
+  wallpaperPoolIncludeSubfolders: false,
   displayMode: "cover",
+  wallpaperPositionX: 50,
+  wallpaperPositionY: 50,
+  wallpaperZoom: 100,
+  transitionDuration: 320,
   opacity: 15,
   paneOpacity: 70,
   paneContentOpacity: 100,
@@ -102,9 +159,39 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   effectIntensity: 35,
   pauseWhenHidden: true,
   respectReducedMotion: true,
+  profiles: [],
   wallpaperRules: [],
   opacityExclusions: [],
 });
+
+const APPEARANCE_KEYS = [
+  "wallpaperPath",
+  "wallpaperPoolEnabled",
+  "wallpaperPoolIncludeSubfolders",
+  "displayMode",
+  "wallpaperPositionX",
+  "wallpaperPositionY",
+  "wallpaperZoom",
+  "transitionDuration",
+  "opacity",
+  "paneOpacity",
+  "paneContentOpacity",
+  "vignetteMode",
+  "vignetteIntensity",
+  "vignetteRadius",
+  "blurEnabled",
+  "blurIntensity",
+  "dimEnabled",
+  "dimIntensity",
+  "colorOverlayEnabled",
+  "colorOverlayColor",
+  "colorOverlayOpacity",
+  "colorOverlayBlendMode",
+  "effectPreset",
+  "effectIntensity",
+  "pauseWhenHidden",
+  "respectReducedMotion",
+] as const satisfies readonly (keyof VeilAppearance)[];
 
 type PathNormalizer = (path: string) => string;
 
@@ -173,6 +260,7 @@ function normalizeMatchValue(
   const raw = stringValue(value);
   if (matchType === "tag") return raw.replace(/^#+/, "");
   if (matchType === "note") return raw.replace(/\.md$/i, "");
+  if (matchType === "property") return raw;
   return normalizeWallpaperPath(raw, normalize).replace(/\/$/, "");
 }
 
@@ -189,6 +277,105 @@ function uniqueId(value: unknown, prefix: string, index: number, usedIds: Set<st
   return id;
 }
 
+function normalizeAppearance(
+  value: Record<string, unknown>,
+  fallback: VeilAppearance,
+  normalize: PathNormalizer,
+): VeilAppearance {
+  const appearance: VeilAppearance = { ...fallback };
+
+  if (typeof value.wallpaperPath === "string") {
+    appearance.wallpaperPath = normalizeWallpaperPath(value.wallpaperPath, normalize);
+  }
+  if (isDisplayMode(value.displayMode)) appearance.displayMode = value.displayMode;
+  if (
+    value.vignetteMode === "off" ||
+    value.vignetteMode === "ellipse" ||
+    value.vignetteMode === "circle"
+  ) {
+    appearance.vignetteMode = value.vignetteMode;
+  }
+  if (isColorOverlayBlendMode(value.colorOverlayBlendMode)) {
+    appearance.colorOverlayBlendMode = value.colorOverlayBlendMode;
+  }
+  if (isEffectPreset(value.effectPreset)) appearance.effectPreset = value.effectPreset;
+  appearance.colorOverlayColor = colorValue(
+    value.colorOverlayColor,
+    fallback.colorOverlayColor,
+  );
+
+  for (const key of [
+    "wallpaperPoolEnabled",
+    "wallpaperPoolIncludeSubfolders",
+    "blurEnabled",
+    "dimEnabled",
+    "colorOverlayEnabled",
+    "pauseWhenHidden",
+    "respectReducedMotion",
+  ] as const) {
+    if (typeof value[key] === "boolean") appearance[key] = value[key];
+  }
+
+  for (const key of [
+    "wallpaperPositionX",
+    "wallpaperPositionY",
+    "opacity",
+    "paneOpacity",
+    "paneContentOpacity",
+    "vignetteIntensity",
+    "vignetteRadius",
+    "dimIntensity",
+    "colorOverlayOpacity",
+    "effectIntensity",
+  ] as const) {
+    appearance[key] = boundedNumber(value[key], fallback[key], 0, 100);
+  }
+  appearance.wallpaperZoom = boundedNumber(value.wallpaperZoom, fallback.wallpaperZoom, 100, 200);
+  appearance.transitionDuration = boundedNumber(
+    value.transitionDuration,
+    fallback.transitionDuration,
+    0,
+    2000,
+  );
+  appearance.blurIntensity = boundedNumber(value.blurIntensity, fallback.blurIntensity, 0, 40);
+  return appearance;
+}
+
+export function copyAppearance(source: VeilAppearance): VeilAppearance {
+  const appearance = {} as VeilAppearance;
+  for (const key of APPEARANCE_KEYS) {
+    // The key list is constrained to VeilAppearance above.
+    (appearance as Record<keyof VeilAppearance, VeilAppearance[keyof VeilAppearance]>)[key] =
+      source[key];
+  }
+  return appearance;
+}
+
+export function appearanceFromSettings(settings: VeilSettings): VeilAppearance {
+  return copyAppearance(settings);
+}
+
+function defaultAppearance(): VeilAppearance {
+  const settings = DEFAULT_SETTINGS as VeilSettings;
+  return appearanceFromSettings(settings);
+}
+
+function normalizeProfiles(value: unknown, normalize: PathNormalizer): VeilProfile[] {
+  if (!Array.isArray(value)) return [];
+  const usedIds = new Set<string>();
+  const fallback = defaultAppearance();
+  return value.slice(0, 64).flatMap((candidate, index) => {
+    if (!isRecord(candidate)) return [];
+    const id = uniqueId(candidate.id, "profile", index, usedIds);
+    const appearance = normalizeAppearance(candidate, fallback, normalize);
+    return [{
+      id,
+      name: stringValue(candidate.name, `Scene ${index + 1}`, 80) || `Scene ${index + 1}`,
+      ...appearance,
+    }];
+  });
+}
+
 function normalizeWallpaperRules(value: unknown, normalize: PathNormalizer): WallpaperRule[] {
   if (!Array.isArray(value)) return [];
   const usedIds = new Set<string>();
@@ -200,6 +387,7 @@ function normalizeWallpaperRules(value: unknown, normalize: PathNormalizer): Wal
       enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : false,
       matchType,
       matchValue: normalizeMatchValue(candidate.matchValue, matchType, normalize),
+      profileId: stringValue(candidate.profileId, "", 80),
       wallpaperPath: normalizeWallpaperPath(candidate.wallpaperPath, normalize),
     }];
   });
@@ -232,63 +420,20 @@ export function normalizeSettings(
   normalize: PathNormalizer = fallbackNormalizePath,
 ): VeilSettings {
   const stored = isRecord(value) ? value : {};
-  const settings: VeilSettings = { ...DEFAULT_SETTINGS };
+  const fallbackAppearance = defaultAppearance();
+  const normalizedAppearance = normalizeAppearance(stored, fallbackAppearance, normalize);
+  const settings: VeilSettings = {
+    enabled: typeof stored.enabled === "boolean" ? stored.enabled : DEFAULT_SETTINGS.enabled,
+    ...normalizedAppearance,
+    profiles: normalizeProfiles(stored.profiles, normalize),
+    wallpaperRules: normalizeWallpaperRules(stored.wallpaperRules, normalize),
+    opacityExclusions: normalizeOpacityExclusions(stored.opacityExclusions, normalize),
+  };
 
-  const booleanKeys = [
-    "enabled",
-    "blurEnabled",
-    "dimEnabled",
-    "colorOverlayEnabled",
-    "pauseWhenHidden",
-    "respectReducedMotion",
-  ] as const;
-  for (const key of booleanKeys) {
-    if (typeof stored[key] === "boolean") settings[key] = stored[key];
+  const profileIds = new Set(settings.profiles.map((profile) => profile.id));
+  for (const rule of settings.wallpaperRules) {
+    if (rule.profileId && !profileIds.has(rule.profileId)) rule.profileId = "";
   }
-
-  if (typeof stored.wallpaperPath === "string") {
-    settings.wallpaperPath = normalizeWallpaperPath(stored.wallpaperPath, normalize);
-  }
-  if (isDisplayMode(stored.displayMode)) {
-    settings.displayMode = stored.displayMode;
-  }
-  if (
-    stored.vignetteMode === "off" ||
-    stored.vignetteMode === "ellipse" ||
-    stored.vignetteMode === "circle"
-  ) {
-    settings.vignetteMode = stored.vignetteMode;
-  }
-  if (isColorOverlayBlendMode(stored.colorOverlayBlendMode)) {
-    settings.colorOverlayBlendMode = stored.colorOverlayBlendMode;
-  }
-  if (isEffectPreset(stored.effectPreset)) settings.effectPreset = stored.effectPreset;
-  settings.colorOverlayColor = colorValue(
-    stored.colorOverlayColor,
-    DEFAULT_SETTINGS.colorOverlayColor,
-  );
-
-  const percentageKeys = [
-    "opacity",
-    "paneOpacity",
-    "paneContentOpacity",
-    "vignetteIntensity",
-    "vignetteRadius",
-    "dimIntensity",
-    "colorOverlayOpacity",
-    "effectIntensity",
-  ] as const;
-  for (const key of percentageKeys) {
-    settings[key] = boundedNumber(stored[key], DEFAULT_SETTINGS[key], 0, 100);
-  }
-  settings.blurIntensity = boundedNumber(
-    stored.blurIntensity,
-    DEFAULT_SETTINGS.blurIntensity,
-    0,
-    40,
-  );
-  settings.wallpaperRules = normalizeWallpaperRules(stored.wallpaperRules, normalize);
-  settings.opacityExclusions = normalizeOpacityExclusions(stored.opacityExclusions, normalize);
   return settings;
 }
 
@@ -305,6 +450,7 @@ export function createWallpaperRule(existing: WallpaperRule[]): WallpaperRule {
     enabled: false,
     matchType: "path",
     matchValue: "",
+    profileId: "",
     wallpaperPath: "",
   };
 }
@@ -319,6 +465,17 @@ export function createOpacityExclusionRule(
     matchValue: "",
     excludePaneSurface: true,
     excludePaneContent: true,
+  };
+}
+
+export function createProfile(
+  existing: VeilProfile[],
+  source: VeilSettings,
+): VeilProfile {
+  return {
+    id: nextRuleId("profile", existing.map((profile) => profile.id)),
+    name: `Scene ${existing.length + 1}`,
+    ...appearanceFromSettings(source),
   };
 }
 
