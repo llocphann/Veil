@@ -46,6 +46,8 @@ export function classifySettingsChange(
   const libraryRecent = previous.wallpaperPath !== next.wallpaperPath
     || !equalValue(profileWallpaperPaths(previous), profileWallpaperPaths(next))
     || !equalValue(ruleWallpaperPaths(previous), ruleWallpaperPaths(next));
+  const visibleDocumentChange =
+    globalAppearance || profiles || wallpaperRules || opacityExclusions;
 
   return {
     enabled,
@@ -57,7 +59,6 @@ export function classifySettingsChange(
     sceneRuntime: profiles,
     poolRuntime: wallpaperPoolConfigurationChanged(previous, next),
     routingSchedule: enabled || wallpaperRules || opacityExclusions,
-    documentResolution:
-      enabled || globalAppearance || profiles || wallpaperRules || opacityExclusions,
+    documentResolution: enabled || (next.enabled && visibleDocumentChange),
   };
 }
