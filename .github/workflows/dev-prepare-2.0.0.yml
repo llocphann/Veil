@@ -1,0 +1,49 @@
+name: Prepare Veil 2.0.0 metadata
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - ".github/workflows/dev-prepare-2.0.0.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out dev candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: dev
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Synchronize 2.0.0 metadata
+        run: |
+          npm version 2.0.0 --no-git-tag-version --ignore-scripts --allow-same-version
+          node version-bump.mjs
+
+      - name: Commit candidate metadata to dev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add package.json package-lock.json manifest.json versions.json
+          if git diff --cached --quiet; then
+            echo "2.0.0 metadata is already synchronized."
+            exit 0
+          fi
+          git commit -m "chore: prepare 2.0.0 release metadata"
+          git push origin HEAD:dev
