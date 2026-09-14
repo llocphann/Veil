@@ -25,6 +25,7 @@ import {
   shouldRetainWallpaperForUnavailableSource,
   workingWallpaperFallback,
 } from "./transition-lifecycle";
+import { rewriteSettingsForVaultRename } from "./vault-settings-rename";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
 import { WallpaperLibraryRuntime } from "./wallpaper-library-runtime";
 import {
@@ -337,55 +338,15 @@ export default class VeilPlugin extends Plugin {
         const selectedPoolPathRenamed = Array.from(this.documents.values()).some(
           (state) => state.path === oldPath || state.path.startsWith(`${oldPath}/`),
         );
-        const rename = (value: string): string =>
-          value === oldPath || value.startsWith(`${oldPath}/`)
-            ? file.path + value.slice(oldPath.length)
-            : value;
-        const next = normalizeSettings(this.settings, normalizePath);
-        let changed = false;
-        const wallpaperPath = rename(next.wallpaperPath);
-        if (wallpaperPath !== next.wallpaperPath) {
-          next.wallpaperPath = wallpaperPath;
-          changed = true;
-        }
-        for (const profile of next.profiles) {
-          const path = rename(profile.wallpaperPath);
-          if (path !== profile.wallpaperPath) {
-            profile.wallpaperPath = path;
-            changed = true;
-          }
-        }
-        for (const rule of next.wallpaperRules) {
-          const path = rename(rule.wallpaperPath);
-          if (path !== rule.wallpaperPath) {
-            rule.wallpaperPath = path;
-            changed = true;
-          }
-          if (rule.matchType === "path" || rule.matchType === "folder") {
-            const matchValue = rename(rule.matchValue);
-            if (matchValue !== rule.matchValue) {
-              rule.matchValue = matchValue;
-              changed = true;
-            }
-          }
-        }
-        for (const rule of next.opacityExclusions) {
-          if (rule.matchType !== "path" && rule.matchType !== "folder") continue;
-          const matchValue = rename(rule.matchValue);
-          if (matchValue !== rule.matchValue) {
-            rule.matchValue = matchValue;
-            changed = true;
-          }
-        }
-
-        const libraryChanged = this.wallpaperLibrary.rewritePaths(rename);
+        const rename = rewriteSettingsForVaultRename(this.settings, oldPath, file.path);
+        const libraryChanged = this.wallpaperLibrary.rewritePaths(rename.rewritePath);
         const preservedPoolContexts = this.wallpaperPools.rewriteSelectionsForRename(
           this.settings,
-          next,
-          rename,
+          rename.settings,
+          rename.rewritePath,
         );
 
-        if (changed) this.updateSettings(next, false, preservedPoolContexts);
+        if (rename.changed) this.updateSettings(rename.settings, false, preservedPoolContexts);
         else {
           if (libraryChanged) this.scheduleSave();
           this.refreshWallpaper(selectedPoolPathRenamed);

@@ -31,6 +31,10 @@ const routingSource = readFileSync(
   new URL("../src/system-routing-scheduler.ts", import.meta.url),
   "utf8",
 );
+const vaultRenameSource = readFileSync(
+  new URL("../src/vault-settings-rename.ts", import.meta.url),
+  "utf8",
+);
 
 void test("main delegates document context ownership", () => {
   assert.match(mainSource, /new DocumentContextResolver\(this\.app\)/);
@@ -106,4 +110,12 @@ void test("main delegates system routing timer ownership", () => {
   assert.match(routingSource, /nextSystemContextBoundary\(/);
   assert.match(mainSource, /this\.systemRouting\.reschedule\(\)/);
   assert.match(mainSource, /this\.systemRouting\.clear\(\)/);
+});
+
+void test("main delegates vault rename settings rewrites", () => {
+  assert.match(mainSource, /rewriteSettingsForVaultRename\(this\.settings, oldPath, file\.path\)/);
+  assert.doesNotMatch(mainSource, /const wallpaperPath = .*oldPath/);
+  assert.match(vaultRenameSource, /for \(const profile of next\.profiles\)/);
+  assert.match(vaultRenameSource, /for \(const rule of next\.wallpaperRules\)/);
+  assert.match(vaultRenameSource, /for \(const rule of next\.opacityExclusions\)/);
 });
