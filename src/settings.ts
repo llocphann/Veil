@@ -55,7 +55,10 @@ export interface VeilProfile {
   name: string;
   wallpaperPath: string;
   wallpaperPoolEnabled: boolean;
+  wallpaperPoolFolder: string;
   wallpaperPoolIncludeSubfolders: boolean;
+  /** Automatic pool rotation interval in minutes, from 5 through 120. */
+  wallpaperPoolChangeInterval: number;
   displayMode: DisplayMode;
   wallpaperPositionX: number;
   wallpaperPositionY: number;
@@ -100,7 +103,10 @@ export interface VeilSettings {
   enabled: boolean;
   wallpaperPath: string;
   wallpaperPoolEnabled: boolean;
+  wallpaperPoolFolder: string;
   wallpaperPoolIncludeSubfolders: boolean;
+  /** Automatic pool rotation interval in minutes, from 5 through 120. */
+  wallpaperPoolChangeInterval: number;
   displayMode: DisplayMode;
   wallpaperPositionX: number;
   wallpaperPositionY: number;
@@ -135,7 +141,9 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   enabled: true,
   wallpaperPath: "",
   wallpaperPoolEnabled: false,
+  wallpaperPoolFolder: "",
   wallpaperPoolIncludeSubfolders: false,
+  wallpaperPoolChangeInterval: 30,
   displayMode: "cover",
   wallpaperPositionX: 50,
   wallpaperPositionY: 50,
@@ -167,7 +175,9 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
 const APPEARANCE_KEYS = [
   "wallpaperPath",
   "wallpaperPoolEnabled",
+  "wallpaperPoolFolder",
   "wallpaperPoolIncludeSubfolders",
+  "wallpaperPoolChangeInterval",
   "displayMode",
   "wallpaperPositionX",
   "wallpaperPositionY",
@@ -212,6 +222,13 @@ export function boundedNumber(
     : fallback;
 }
 
+function normalizeWallpaperPoolChangeInterval(value: unknown, fallback: number): number {
+  if (value === null || value === "" || typeof value === "boolean") return fallback;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return Math.round(Math.max(5, Math.min(120, number)));
+}
+
 export function normalizeWallpaperPath(
   value: unknown,
   normalize: PathNormalizer = fallbackNormalizePath,
@@ -220,6 +237,19 @@ export function normalizeWallpaperPath(
   const wikiLink = path.match(/^!?\[\[([\s\S]*)\]\]$/);
   if (wikiLink) path = wikiLink[1].split("|")[0].trim();
   return normalize(path.replaceAll("\\", "/").replace(/^\.\//, ""));
+}
+
+export function normalizeWallpaperPoolFolder(
+  value: unknown,
+  normalize: PathNormalizer = fallbackNormalizePath,
+): string {
+  const path = normalizeWallpaperPath(value, normalize).replace(/^\/+|\/+$/g, "");
+  return path === "." ? "" : path;
+}
+
+export function wallpaperFolderFromPath(path: string): string {
+  const separator = path.lastIndexOf("/");
+  return separator >= 0 ? path.slice(0, separator) : "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -287,6 +317,16 @@ function normalizeAppearance(
   if (typeof value.wallpaperPath === "string") {
     appearance.wallpaperPath = normalizeWallpaperPath(value.wallpaperPath, normalize);
   }
+  if (typeof value.wallpaperPoolFolder === "string") {
+    appearance.wallpaperPoolFolder = normalizeWallpaperPoolFolder(
+      value.wallpaperPoolFolder,
+      normalize,
+    );
+  } else if (typeof value.wallpaperPath === "string") {
+    // Backward compatibility: pre-1.7 pools used wallpaperPath as the folder
+    // anchor. Derive the new explicit folder without changing the saved file.
+    appearance.wallpaperPoolFolder = wallpaperFolderFromPath(appearance.wallpaperPath);
+  }
   if (isDisplayMode(value.displayMode)) appearance.displayMode = value.displayMode;
   if (
     value.vignetteMode === "off" ||
@@ -330,6 +370,10 @@ function normalizeAppearance(
   ] as const) {
     appearance[key] = boundedNumber(value[key], fallback[key], 0, 100);
   }
+  appearance.wallpaperPoolChangeInterval = normalizeWallpaperPoolChangeInterval(
+    value.wallpaperPoolChangeInterval,
+    fallback.wallpaperPoolChangeInterval,
+  );
   appearance.wallpaperZoom = boundedNumber(value.wallpaperZoom, fallback.wallpaperZoom, 100, 200);
   appearance.transitionDuration = boundedNumber(
     value.transitionDuration,

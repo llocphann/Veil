@@ -34,6 +34,7 @@ const DYNAMIC_PROFILE_FIELDS = new Set<string>([
   "name",
   "wallpaperPath",
   "wallpaperPoolEnabled",
+  "wallpaperPoolFolder",
   "vignetteMode",
   "blurEnabled",
   "dimEnabled",
@@ -41,8 +42,25 @@ const DYNAMIC_PROFILE_FIELDS = new Set<string>([
   "effectPreset",
 ]);
 
+const CONTINUOUS_APPEARANCE_FIELDS = new Set<string>([
+  "wallpaperPoolChangeInterval",
+  "wallpaperPositionX",
+  "wallpaperPositionY",
+  "wallpaperZoom",
+  "transitionDuration",
+  "opacity",
+  "paneOpacity",
+  "paneContentOpacity",
+  "vignetteIntensity",
+  "vignetteRadius",
+  "blurIntensity",
+  "dimIntensity",
+  "colorOverlayOpacity",
+  "effectIntensity",
+]);
+
 // Only rule fields that change the definition tree require a full settings
-// rebuild. Enabled/exclusion toggles mutate the existing rule object, so
+// rebuild. Enabled/exclusion toggles use immutable rule replacements, so
 // refreshDomState() can update page status/display state without recreating
 // every routing control.
 const DYNAMIC_RULE_FIELDS = new Set<string>([
@@ -139,6 +157,56 @@ export function setRuleControlValue(
   if (field === "wallpaperPath" && "wallpaperPath" in rule) {
     rule.wallpaperPath = typeof value === "string" ? value : "";
   }
+}
+
+export function controlCanFrameCoalesce(key: string): boolean {
+  const profileKey = parseProfileControlKey(key);
+  if (profileKey) return CONTINUOUS_APPEARANCE_FIELDS.has(profileKey.field);
+  if (parseRuleControlKey(key)) return false;
+  return CONTINUOUS_APPEARANCE_FIELDS.has(key);
+}
+
+export function continuousControlPatch(
+  settings: VeilSettings,
+  values: ReadonlyMap<string, unknown>,
+): Partial<VeilSettings> | null {
+  const patch: Partial<VeilSettings> = {};
+  let profiles: VeilProfile[] | null = null;
+  const clonedProfileIndexes = new Set<number>();
+  let changed = false;
+
+  for (const [key, value] of values) {
+    if (!controlCanFrameCoalesce(key)) continue;
+
+    const profileKey = parseProfileControlKey(key);
+    if (profileKey) {
+      const index: number = settings.profiles.findIndex(
+        (profile: VeilProfile): boolean => profile.id === profileKey.id,
+      );
+      if (index < 0) continue;
+      const current: VeilProfile | undefined = profiles?.[index] ?? settings.profiles[index];
+      if (!current) continue;
+      if ((current as unknown as Record<string, unknown>)[profileKey.field] === value) continue;
+
+      if (!profiles) profiles = settings.profiles.slice();
+      const source: VeilProfile | undefined = profiles[index];
+      if (!source) continue;
+      const next: VeilProfile = clonedProfileIndexes.has(index) ? source : { ...source };
+      Object.assign(next, { [profileKey.field]: value });
+      profiles[index] = next;
+      clonedProfileIndexes.add(index);
+      changed = true;
+      continue;
+    }
+
+    if (!(key in DEFAULT_SETTINGS)) continue;
+    if (settings[key as keyof VeilSettings] === value) continue;
+    Object.assign(patch, { [key]: value });
+    changed = true;
+  }
+
+  if (profiles) patch.profiles = profiles;
+  return changed ? patch : null;
 }
 
 export function globalControlRequiresRender(key: string): boolean {

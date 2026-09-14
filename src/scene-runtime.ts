@@ -1,5 +1,6 @@
 import type { NoteContext } from "./context-rules";
 import { resolveWallpaper, type ResolvedWallpaper } from "./profile-resolver";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import {
   copyAppearance,
   type VeilProfile,
@@ -12,11 +13,31 @@ export type ManualSceneChange =
   | { kind: "cleared" }
   | { kind: "selected"; profile: VeilProfile };
 
+interface CachedSceneResolution {
+  revision: number;
+  resolved: ResolvedWallpaper;
+}
+
+const DYNAMIC_SYSTEM_RULE = /^\s*@(time|day|schedule)\s*=/i;
+
 export class SceneRuntime {
   private manualProfileId = "";
+  private resolutionRevision = 0;
+  private readonly contextResolutionCache = new WeakMap<
+    VeilSettings,
+    WeakMap<NoteContext, CachedSceneResolution>
+  >();
+  private readonly workspaceResolutionCache = new WeakMap<
+    VeilSettings,
+    CachedSceneResolution
+  >();
 
   getManualProfileId(): string {
     return this.manualProfileId;
+  }
+
+  invalidateResolution(): void {
+    this.resolutionRevision += 1;
   }
 
   reconcileSettings(settings: VeilSettings): void {
@@ -25,6 +46,7 @@ export class SceneRuntime {
       && !settings.profiles.some((profile) => profile.id === this.manualProfileId)
     ) {
       this.manualProfileId = "";
+      this.invalidateResolution();
     }
   }
 
@@ -35,34 +57,25 @@ export class SceneRuntime {
     if (this.manualProfileId === profileId) return { kind: "unchanged" };
 
     this.manualProfileId = profileId;
+    this.invalidateResolution();
     if (!profileId) return { kind: "cleared" };
     const profile = settings.profiles.find((candidate) => candidate.id === profileId);
     return profile ? { kind: "selected", profile } : { kind: "missing" };
   }
 
   resolveSnapshot(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
-    if (this.manualProfileId) {
-      const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
-      if (profile) {
-        return {
-          rule: null,
-          profile,
-          path: profile.wallpaperPath,
-          appearance: copyAppearance(profile),
-        };
-      }
-    }
-    return resolveWallpaper(settings, context);
+    const cached = this.cachedResolution(settings, context);
+    if (cached) return cached;
+    return this.resolveUncached(settings, context);
   }
 
   resolve(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
-    const resolved = this.resolveSnapshot(settings, context);
-    if (
-      this.manualProfileId
-      && !settings.profiles.some((profile) => profile.id === this.manualProfileId)
-    ) {
-      this.manualProfileId = "";
-    }
+    this.reconcileSettings(settings);
+    const cached = this.cachedResolution(settings, context);
+    if (cached) return cached;
+
+    const resolved = this.resolveUncached(settings, context);
+    if (this.cacheAllowed(settings, context)) this.storeResolution(settings, context, resolved);
     return resolved;
   }
 
@@ -83,5 +96,65 @@ export class SceneRuntime {
     if (!context?.path) return "Workspace → default appearance";
     const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
     return `${context.path} → default appearance${pool}`;
+  }
+
+  private resolveUncached(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
+    if (typeof __VEIL_DEV__ !== "undefined" && __VEIL_DEV__) {
+      runtimeWorkProfiler.record("sceneResolution");
+    }
+    if (this.manualProfileId) {
+      const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
+      if (profile) {
+        return {
+          rule: null,
+          profile,
+          path: profile.wallpaperPath,
+          appearance: copyAppearance(profile),
+        };
+      }
+    }
+    return resolveWallpaper(settings, context);
+  }
+
+  private cacheAllowed(settings: VeilSettings, context: NoteContext | null): boolean {
+    if (context?.now) return false;
+    return !settings.wallpaperRules.some((rule) =>
+      rule.enabled
+      && rule.matchType === "property"
+      && DYNAMIC_SYSTEM_RULE.test(rule.matchValue),
+    );
+  }
+
+  private cachedResolution(
+    settings: VeilSettings,
+    context: NoteContext | null,
+  ): ResolvedWallpaper | null {
+    if (!this.cacheAllowed(settings, context)) return null;
+    const cached = context
+      ? this.contextResolutionCache.get(settings)?.get(context)
+      : this.workspaceResolutionCache.get(settings);
+    return cached?.revision === this.resolutionRevision ? cached.resolved : null;
+  }
+
+  private storeResolution(
+    settings: VeilSettings,
+    context: NoteContext | null,
+    resolved: ResolvedWallpaper,
+  ): void {
+    const entry: CachedSceneResolution = {
+      revision: this.resolutionRevision,
+      resolved,
+    };
+    if (!context) {
+      this.workspaceResolutionCache.set(settings, entry);
+      return;
+    }
+
+    let cache = this.contextResolutionCache.get(settings);
+    if (!cache) {
+      cache = new WeakMap<NoteContext, CachedSceneResolution>();
+      this.contextResolutionCache.set(settings, cache);
+    }
+    cache.set(context, entry);
   }
 }

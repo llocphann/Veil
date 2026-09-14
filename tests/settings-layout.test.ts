@@ -5,12 +5,14 @@ import test from "node:test";
 const source = fs.readFileSync("src/settings-tab.ts", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 
-void test("Veil settings expose the five primary tabs in the intended order", () => {
-  const expected = ["Wallpaper", "Appearance", "Behavior", "Scenes", "Routing"];
+void test("Veil settings expose the four primary tabs in the intended order", () => {
+  const expected = ["Wallpaper", "Appearance", "Automation", "Data"];
   const labels = [...source.matchAll(/\{ id: "[^"]+", label: "([^"]+)"/g)]
     .map((match) => match[1]);
   assert.deepEqual(labels.slice(0, expected.length), expected);
-  assert.doesNotMatch(source, /label: "Data"/);
+  assert.doesNotMatch(source, /label: "Behavior"/);
+  assert.doesNotMatch(source, /label: "Scenes"/);
+  assert.doesNotMatch(source, /label: "Routing"/);
   assert.doesNotMatch(source, /label: "About"/);
   assert.doesNotMatch(source, /label: "Actions"/);
   assert.doesNotMatch(source, /label: "Support"/);
@@ -33,12 +35,25 @@ void test("settings descriptions stay concise", () => {
   assert.match(source, /"Opacity exclusions": "No opacity exclusions yet\."/);
 });
 
-void test("data and about render as shared sections below tab content", () => {
+void test("behavior is merged into Wallpaper and scenes plus routing are merged into Automation", () => {
+  assert.match(source, /"Playback & motion",\s*"veil-settings-panel-wallpaper"/);
+  assert.match(source, /"Quick actions", "veil-settings-panel-wallpaper"/);
+  assert.match(source, /cloneDefinition\(scenes, "Scenes", "veil-settings-panel-automation"\)/);
+  assert.match(source, /cloneDefinition\(activeContext, "Active context", "veil-settings-panel-automation"\)/);
+  assert.match(source, /cloneDefinition\(wallpaperRouting, "Wallpaper routing", "veil-settings-panel-automation"\)/);
+  assert.match(source, /cloneDefinition\(opacityExclusions, "Opacity exclusions", "veil-settings-panel-automation"\)/);
+  assert.doesNotMatch(source, /veil-settings-panel-behavior/);
+  assert.doesNotMatch(source, /veil-settings-panel-scenes/);
+  assert.doesNotMatch(source, /veil-settings-panel-routing/);
+});
+
+void test("data recovery renders in the Data tab while about remains shared", () => {
+  assert.match(source, /\{ id: "data", label: "Data", icon: "database" \}/);
+  assert.match(source, /"Data & recovery", "veil-settings-panel-data"/);
   assert.match(source, /const sharedSections = compact\(\[/);
-  assert.match(source, /"Data & recovery", "veil-settings-section-data"/);
   assert.match(source, /"About & support", "veil-settings-section-about"/);
   assert.match(source, /simplifyDescriptions\(sharedSections\)/);
-  assert.doesNotMatch(source, /veil-settings-panel-data/);
+  assert.doesNotMatch(source, /veil-settings-section-data/);
   assert.doesNotMatch(source, /veil-settings-panel-about/);
 });
 

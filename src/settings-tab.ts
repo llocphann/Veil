@@ -1,12 +1,12 @@
 import { setIcon, type SettingDefinitionItem } from "obsidian";
+import { SettingsPoolVisibilityTransition } from "./settings-pool-visibility-transition";
 import { WallpaperSettingsTab as BaseWallpaperSettingsTab } from "./settings-tab-base";
 
 const SETTINGS_SECTIONS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
   { id: "appearance", label: "Appearance", icon: "palette" },
-  { id: "behavior", label: "Behavior", icon: "timer" },
-  { id: "scenes", label: "Scenes", icon: "layers-3" },
-  { id: "routing", label: "Routing", icon: "list-filter" },
+  { id: "automation", label: "Automation", icon: "workflow" },
+  { id: "data", label: "Data", icon: "database" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -40,7 +40,9 @@ const SIMPLE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "Wallpaper file": "Choose an image, GIF, or video.",
   "Wallpaper library": "Browse and choose wallpapers.",
   "Wallpaper pool": "Randomly use media from the wallpaper folder.",
+  "Wallpaper folder": "Choose the folder used by the wallpaper pool.",
   "Include subfolders": "Include media from subfolders.",
+  "Change interval": "Choose how often the pool changes wallpaper.",
   "Display mode": "Choose how media fits the screen.",
   "Horizontal focal point": "Move the focus left or right.",
   "Vertical focal point": "Move the focus up or down.",
@@ -148,16 +150,46 @@ function compact(
     Boolean(definition));
 }
 
+function isPoolToggleKey(key: string): boolean {
+  return key === "wallpaperPoolEnabled"
+    || /^profile:[^:]+:wallpaperPoolEnabled$/.test(key);
+}
+
 /**
  * Presentation adapter for Veil settings.
  *
  * The underlying settings implementation remains in settings-tab-base.ts so
  * routing, validation, import/export, and Scene behavior stay unchanged. The
- * tab bar exposes only the primary feature sections; portable data controls
- * and about/support are rendered as shared sections beneath every tab.
+ * tab bar exposes the primary feature and data sections while about/support
+ * remains a shared section beneath every tab.
  */
 export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
   private activeSection: SettingsSectionId = "wallpaper";
+  private animateNextPoolUpdate = false;
+  private readonly poolVisibilityTransition = new SettingsPoolVisibilityTransition(
+    () => this.containerEl,
+  );
+
+  override setControlValue(key: string, value: unknown): void {
+    if (isPoolToggleKey(key) && this.getControlValue(key) !== value) {
+      this.animateNextPoolUpdate = true;
+    }
+    super.setControlValue(key, value);
+  }
+
+  override update(): void {
+    if (!this.animateNextPoolUpdate) {
+      super.update();
+      return;
+    }
+    this.animateNextPoolUpdate = false;
+    this.poolVisibilityTransition.run(() => super.update());
+  }
+
+  override hide(): void {
+    this.poolVisibilityTransition.clear();
+    super.hide();
+  }
 
   override getSettingDefinitions(): SettingDefinitionItem<string>[] {
     const base = super.getSettingDefinitions();
@@ -191,13 +223,10 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
       cloneDefinition(
         video,
         "Playback & motion",
-        "veil-settings-panel-behavior",
+        "veil-settings-panel-wallpaper",
         [...transitionItems, ...itemsOf(video)],
       ),
-      cloneDefinition(actions, "Quick actions", "veil-settings-panel-behavior", quickActions),
-      cloneDefinition(activeContext, "Active context", "veil-settings-panel-routing"),
-      cloneDefinition(wallpaperRouting, "Wallpaper routing", "veil-settings-panel-routing"),
-      cloneDefinition(opacityExclusions, "Opacity exclusions", "veil-settings-panel-routing"),
+      cloneDefinition(actions, "Quick actions", "veil-settings-panel-wallpaper", quickActions),
       cloneDefinition(
         wallpaper,
         "Framing & opacity",
@@ -205,11 +234,14 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
         appearanceItems,
       ),
       cloneDefinition(effects, "Effects", "veil-settings-panel-appearance"),
-      cloneDefinition(scenes, "Scenes", "veil-settings-panel-scenes"),
+      cloneDefinition(scenes, "Scenes", "veil-settings-panel-automation"),
+      cloneDefinition(activeContext, "Active context", "veil-settings-panel-automation"),
+      cloneDefinition(wallpaperRouting, "Wallpaper routing", "veil-settings-panel-automation"),
+      cloneDefinition(opacityExclusions, "Opacity exclusions", "veil-settings-panel-automation"),
+      cloneDefinition(actions, "Data & recovery", "veil-settings-panel-data", dataActions),
     ]);
 
     const sharedSections = compact([
-      cloneDefinition(actions, "Data & recovery", "veil-settings-section-data", dataActions),
       cloneDefinition(support, "About & support", "veil-settings-section-about"),
     ]);
 

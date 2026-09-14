@@ -1,4 +1,4 @@
-import type { SettingDefinitionItem, TFile } from "obsidian";
+import type { App, SettingDefinitionItem, TFile } from "obsidian";
 import {
   DISPLAY_MODES,
   mediaKind,
@@ -8,15 +8,18 @@ import type {
   RangeSliderFactory,
   SliderFactory,
 } from "./settings-appearance-definitions";
+import { renderVaultFolderControl } from "./settings-folder-picker";
 
 export interface WallpaperDefinitionActions {
   openWallpaperLibrary: () => void;
+  setControlValue: (key: string, value: unknown) => void;
   bindWallpaperStatus: (descEl: HTMLElement, settingEl: HTMLElement) => () => void;
   activeContextSummary: () => string;
   bindActiveContext: (descEl: HTMLElement) => () => void;
 }
 
 export function createWallpaperDefinitions(
+  app: App,
   settings: VeilSettings,
   actions: WallpaperDefinitionActions,
   slider: SliderFactory,
@@ -38,14 +41,20 @@ export function createWallpaperDefinitions(
         control: { type: "toggle", key: "enabled" },
       },
       {
+        name: "Wallpaper pool",
+        desc: "Randomly choose supported media from a wallpaper folder.",
+        control: { type: "toggle", key: "wallpaperPoolEnabled" },
+      },
+      {
         name: "Wallpaper file",
-        desc: "Choose an image, GIF, or video from this vault. With a pool enabled, this file anchors the pool folder.",
+        desc: "Choose an image, GIF, or video from this vault.",
         control: {
           type: "file",
           key: "wallpaperPath",
           placeholder: "Media/Wallpapers/example.webp",
           filter: (file: TFile) => Boolean(mediaKind(file)),
         },
+        visible: () => !settings.wallpaperPoolEnabled,
       },
       {
         name: "Wallpaper library",
@@ -58,16 +67,36 @@ export function createWallpaperDefinitions(
               .onClick(actions.openWallpaperLibrary),
           );
         },
+        visible: () => !settings.wallpaperPoolEnabled,
       },
       {
-        name: "Wallpaper pool",
-        desc: "Randomly choose supported media from the selected wallpaper's folder. The choice stays stable until shuffled or the appearance changes.",
-        control: { type: "toggle", key: "wallpaperPoolEnabled" },
+        name: "Wallpaper folder",
+        desc: "Choose the vault folder used by the wallpaper pool.",
+        render: (setting) => renderVaultFolderControl(
+          app,
+          setting,
+          settings.wallpaperPoolFolder,
+          (path) => actions.setControlValue("wallpaperPoolFolder", path),
+        ),
+        visible: () => settings.wallpaperPoolEnabled,
       },
       {
         name: "Include subfolders",
-        desc: "Also include supported media in descendant folders of the wallpaper folder.",
+        desc: "Also include supported media in descendant folders.",
         control: { type: "toggle", key: "wallpaperPoolIncludeSubfolders" },
+        visible: () => settings.wallpaperPoolEnabled,
+      },
+      {
+        name: "Change interval",
+        desc: "Automatically choose another pool wallpaper every 5 to 120 minutes.",
+        control: {
+          type: "slider",
+          key: "wallpaperPoolChangeInterval",
+          min: 5,
+          max: 120,
+          step: 1,
+          displayFormat: (value) => `${value} min`,
+        },
         visible: () => settings.wallpaperPoolEnabled,
       },
       {

@@ -9,9 +9,9 @@ const resolverSource = readFileSync(
 );
 
 void test("wallpaper source keys are media-only identities", () => {
-  assert.match(resolverSource, /key: wallpaperMediaIdentityKey\(\{/);
+  assert.match(resolverSource, /wallpaperMediaIdentityKey\(\{/);
   const keyBody = resolverSource.match(
-    /key: wallpaperMediaIdentityKey\(\{([\s\S]*?)\}\),/,
+    /wallpaperMediaIdentityKey\(\{([\s\S]*?)\}\)/,
   )?.[1] || "";
   assert.match(keyBody, /path: file\.path/);
   assert.match(keyBody, /url/);
@@ -20,6 +20,7 @@ void test("wallpaper source keys are media-only identities", () => {
   assert.match(keyBody, /revision: sourceRevision/);
   assert.doesNotMatch(keyBody, /contextKey/);
   assert.doesNotMatch(keyBody, /manualProfileId/);
+  assert.doesNotMatch(keyBody, /appearance/);
 });
 
 void test("scene switches do not force a media revision", () => {

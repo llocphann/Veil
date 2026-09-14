@@ -1,4 +1,4 @@
-import { Notice, PluginSettingTab, normalizePath, setIcon } from "obsidian";
+import { Notice, PluginSettingTab, setIcon } from "obsidian";
 import type {
   App,
   SettingDefinition,
@@ -27,9 +27,11 @@ import {
   reorderScenes,
   reorderWallpaperRules,
 } from "./settings-collection-model";
+import { SettingsControlFrameQueue } from "./settings-control-frame-queue";
 import {
+  continuousControlPatch,
+  controlCanFrameCoalesce,
   controlValue,
-  findRule,
   globalControlRequiresRender,
   parseProfileControlKey,
   parseRuleControlKey,
@@ -56,10 +58,7 @@ import {
   createWallpaperDefinitions,
   type WallpaperDefinitionActions,
 } from "./settings-wallpaper-definitions";
-import {
-  DEFAULT_SETTINGS,
-  normalizeSettings,
-} from "./settings";
+import { DEFAULT_SETTINGS } from "./settings";
 
 const MAX_SCENES = 64;
 const MAX_CONTEXT_RULES = 96;
@@ -76,6 +75,7 @@ type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
 
 export class WallpaperSettingsTab extends PluginSettingTab {
   private readonly plugin: VeilPlugin;
+  private readonly continuousControls: SettingsControlFrameQueue;
   private statusEl: HTMLElement | null = null;
   private statusRowEl: HTMLElement | null = null;
   private contextEl: HTMLElement | null = null;
@@ -84,45 +84,40 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   constructor(app: App, plugin: VeilPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.continuousControls = new SettingsControlFrameQueue(
+      (callback) => {
+        const ownerWindow = this.containerEl.ownerDocument.defaultView;
+        if (!ownerWindow) {
+          callback();
+          return () => undefined;
+        }
+        const frame = ownerWindow.requestAnimationFrame(callback);
+        return () => ownerWindow.cancelAnimationFrame(frame);
+      },
+      (values) => this.applyContinuousControlValues(values),
+    );
   }
 
   getControlValue(key: string): unknown {
-    return controlValue(this.plugin.settings, key);
+    return this.continuousControls.value(
+      key,
+      controlValue(this.plugin.settings, key),
+    );
   }
 
   setControlValue(key: string, value: unknown): void {
-    const profileKey = parseProfileControlKey(key);
-    if (profileKey) {
-      const profiles = this.plugin.settings.profiles.map((profile) =>
-        profile.id === profileKey.id
-          ? { ...profile, [profileKey.field]: value }
-          : profile,
-      );
-      this.plugin.updateSettings({ profiles });
-      if (profileControlRequiresRender(profileKey.field)) this.update();
-      else this.refreshDomState();
+    if (this.getControlValue(key) === value) return;
+    if (controlCanFrameCoalesce(key)) {
+      this.continuousControls.queue(key, value);
       return;
     }
 
-    const ruleKey = parseRuleControlKey(key);
-    if (ruleKey) {
-      const rule = findRule(this.plugin.settings, ruleKey.kind, ruleKey.id);
-      if (!rule) return;
-      setRuleControlValue(rule, ruleKey.field, value);
-      this.plugin.updateSettings({
-        wallpaperRules: this.plugin.settings.wallpaperRules,
-        opacityExclusions: this.plugin.settings.opacityExclusions,
-      });
-      if (ruleControlRequiresRender(ruleKey.field)) this.update();
-      else this.refreshDomState();
-      return;
-    }
+    this.continuousControls.flush();
+    this.applyControlValue(key, value);
+  }
 
-    if (!(key in DEFAULT_SETTINGS)) return;
-    const next = normalizeSettings({ ...this.plugin.settings, [key]: value }, normalizePath);
-    this.plugin.updateSettings(next);
-    if (globalControlRequiresRender(key)) this.update();
-    else this.refreshDomState();
+  public flushControlUpdates(): void {
+    this.continuousControls.flush();
   }
 
   updateStatus(): void {
@@ -148,6 +143,61 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       this.actionsDefinitions(),
       this.supportDefinitions(),
     ];
+  }
+
+  private applyContinuousControlValues(values: ReadonlyMap<string, unknown>): void {
+    const patch = continuousControlPatch(this.plugin.settings, values);
+    if (!patch) return;
+    this.plugin.updateSettings(patch);
+    this.refreshDomState();
+  }
+
+  private applyControlValue(key: string, value: unknown): void {
+    if (controlValue(this.plugin.settings, key) === value) return;
+
+    const profileKey = parseProfileControlKey(key);
+    if (profileKey) {
+      const profiles = this.plugin.settings.profiles.map((profile) =>
+        profile.id === profileKey.id
+          ? { ...profile, [profileKey.field]: value }
+          : profile,
+      );
+      this.plugin.updateSettings({ profiles });
+      if (profileControlRequiresRender(profileKey.field)) this.update();
+      else this.refreshDomState();
+      return;
+    }
+
+    const ruleKey = parseRuleControlKey(key);
+    if (ruleKey) {
+      if (ruleKey.kind === "wallpaper") {
+        if (!this.plugin.settings.wallpaperRules.some((rule) => rule.id === ruleKey.id)) return;
+        const wallpaperRules = this.plugin.settings.wallpaperRules.map((rule) => {
+          if (rule.id !== ruleKey.id) return rule;
+          const next = { ...rule };
+          setRuleControlValue(next, ruleKey.field, value);
+          return next;
+        });
+        this.plugin.updateSettings({ wallpaperRules });
+      } else {
+        if (!this.plugin.settings.opacityExclusions.some((rule) => rule.id === ruleKey.id)) return;
+        const opacityExclusions = this.plugin.settings.opacityExclusions.map((rule) => {
+          if (rule.id !== ruleKey.id) return rule;
+          const next = { ...rule };
+          setRuleControlValue(next, ruleKey.field, value);
+          return next;
+        });
+        this.plugin.updateSettings({ opacityExclusions });
+      }
+      if (ruleControlRequiresRender(ruleKey.field)) this.update();
+      else this.refreshDomState();
+      return;
+    }
+
+    if (!(key in DEFAULT_SETTINGS)) return;
+    this.plugin.updateSettings({ [key]: value });
+    if (globalControlRequiresRender(key)) this.update();
+    else this.refreshDomState();
   }
 
   private rangeSlider(
@@ -204,6 +254,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           const cleanups: Array<() => void> = [];
 
           const activate = (tabId: SettingsTabId, focus = false): void => {
+            this.continuousControls.flush();
             this.activeTab = tabId;
             this.containerEl.dataset.veilSettingsTab = tabId;
             for (const candidate of buttons) {
@@ -263,6 +314,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
 
   private wallpaperDefinitions(): SettingDefinitionItem<string> {
     return createWallpaperDefinitions(
+      this.app,
       this.plugin.settings,
       this.wallpaperDefinitionActions(),
       (key, name, desc, maximum, unit, disabled) =>
@@ -274,7 +326,11 @@ export class WallpaperSettingsTab extends PluginSettingTab {
 
   private wallpaperDefinitionActions(): WallpaperDefinitionActions {
     return {
-      openWallpaperLibrary: () => this.plugin.openWallpaperLibrary(),
+      openWallpaperLibrary: () => {
+        this.continuousControls.flush();
+        this.plugin.openWallpaperLibrary();
+      },
+      setControlValue: (key, value) => this.setControlValue(key, value),
       bindWallpaperStatus: (descEl, settingEl) => {
         this.statusEl = descEl;
         this.statusRowEl = settingEl;
@@ -314,10 +370,12 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       deleteScene: (id) => this.deleteProfile(id),
       duplicateScene: (id) => this.duplicateScene(id),
       copyGlobalAppearanceToScene: (id) => this.copyGlobalAppearanceToProfile(id),
+      setControlValue: (key, value) => this.setControlValue(key, value),
     };
   }
 
   private addScene(): void {
+    this.continuousControls.flush();
     if (this.plugin.settings.profiles.length >= MAX_SCENES) {
       new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
       return;
@@ -327,6 +385,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private reorderScene(oldIndex: number, newIndex: number): void {
+    this.continuousControls.flush();
     const profiles = reorderScenes(this.plugin.settings.profiles, oldIndex, newIndex);
     if (!profiles) return;
     this.plugin.updateSettings({ profiles });
@@ -366,6 +425,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private addWallpaperRule(): void {
+    this.continuousControls.flush();
     if (this.plugin.settings.wallpaperRules.length >= MAX_CONTEXT_RULES) {
       new Notice(`Veil supports up to ${MAX_CONTEXT_RULES} wallpaper rules.`);
       return;
@@ -377,6 +437,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private reorderWallpaperRule(oldIndex: number, newIndex: number): void {
+    this.continuousControls.flush();
     const wallpaperRules = reorderWallpaperRules(
       this.plugin.settings.wallpaperRules,
       oldIndex,
@@ -388,6 +449,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private addOpacityExclusion(): void {
+    this.continuousControls.flush();
     if (this.plugin.settings.opacityExclusions.length >= MAX_CONTEXT_RULES) {
       new Notice(`Veil supports up to ${MAX_CONTEXT_RULES} opacity exclusions.`);
       return;
@@ -399,6 +461,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private reorderOpacityExclusion(oldIndex: number, newIndex: number): void {
+    this.continuousControls.flush();
     const opacityExclusions = reorderOpacityExclusions(
       this.plugin.settings.opacityExclusions,
       oldIndex,
@@ -431,19 +494,35 @@ export class WallpaperSettingsTab extends PluginSettingTab {
 
   private actionDefinitionActions(): SettingsActionDefinitionsActions {
     return {
-      openWallpaperLibrary: () => this.plugin.openWallpaperLibrary(),
-      reloadWallpaper: () => this.plugin.refreshWallpaper(true),
-      shuffleWallpaperPool: () => this.plugin.shuffleWallpaperPool(),
-      exportSettings: () => exportVeilSettingsFile(
-        this.containerEl,
-        this.plugin.settings,
-        this.plugin.manifest.version,
-      ),
-      importSettings: () => chooseVeilSettingsImportFile(
-        this.containerEl,
-        this.transferIoActions(),
-      ),
+      openWallpaperLibrary: () => {
+        this.continuousControls.flush();
+        this.plugin.openWallpaperLibrary();
+      },
+      reloadWallpaper: () => {
+        this.continuousControls.flush();
+        this.plugin.refreshWallpaper(true);
+      },
+      shuffleWallpaperPool: () => {
+        this.continuousControls.flush();
+        this.plugin.shuffleWallpaperPool();
+      },
+      exportSettings: () => {
+        this.continuousControls.flush();
+        exportVeilSettingsFile(
+          this.containerEl,
+          this.plugin.settings,
+          this.plugin.manifest.version,
+        );
+      },
+      importSettings: () => {
+        this.continuousControls.flush();
+        chooseVeilSettingsImportFile(
+          this.containerEl,
+          this.transferIoActions(),
+        );
+      },
       restoreDefaults: () => {
+        this.continuousControls.flush();
         this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
         void this.plugin.flushSettings().then(() => this.update());
       },
@@ -453,6 +532,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   private transferIoActions(): SettingsTransferIoActions {
     return {
       applyImportedSettings: async (settings) => {
+        this.continuousControls.flush();
         this.plugin.updateSettings(settings);
         await this.plugin.flushSettings();
       },
@@ -461,6 +541,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private duplicateScene(id: string): void {
+    this.continuousControls.flush();
     if (this.plugin.settings.profiles.length >= MAX_SCENES) {
       new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
       return;
@@ -472,6 +553,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private copyGlobalAppearanceToProfile(id: string): void {
+    this.continuousControls.flush();
     const profiles = copyGlobalAppearanceToScene(this.plugin.settings, id);
     if (!profiles) return;
     this.plugin.updateSettings({ profiles });
@@ -479,6 +561,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private deleteProfile(id: string): void {
+    this.continuousControls.flush();
     const collections = removeScene(this.plugin.settings, id);
     if (!collections) return;
     this.plugin.updateSettings(collections);
@@ -486,6 +569,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private deleteWallpaperRule(id: string): void {
+    this.continuousControls.flush();
     const wallpaperRules = removeWallpaperRule(this.plugin.settings.wallpaperRules, id);
     if (!wallpaperRules) return;
     this.plugin.updateSettings({ wallpaperRules });
@@ -493,6 +577,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private deleteOpacityRule(id: string): void {
+    this.continuousControls.flush();
     const opacityExclusions = removeOpacityExclusion(this.plugin.settings.opacityExclusions, id);
     if (!opacityExclusions) return;
     this.plugin.updateSettings({ opacityExclusions });
@@ -500,6 +585,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   hide(): void {
+    this.flushControlUpdates();
     this.statusEl = null;
     this.statusRowEl = null;
     this.contextEl = null;

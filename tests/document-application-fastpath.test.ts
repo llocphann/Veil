@@ -123,6 +123,34 @@ void test("document appearance returns before DOM work when the signature is unc
   assert.ok(guardIndex >= 0 && firstStyleWrite > guardIndex);
 });
 
+void test("changed appearances skip unchanged per-property DOM writes", () => {
+  assert.ok(
+    appearanceSource.includes(
+      "if (state.layer.dataset.colorOverlay !== colorOverlay)",
+    ),
+  );
+  assert.ok(
+    appearanceSource.includes(
+      "if (state.layer.dataset.reduceMotion !== reduceMotion)",
+    ),
+  );
+  assert.ok(
+    appearanceSource.includes(
+      "document.body.style.getPropertyValue(PANE_OPACITY_VARIABLE) !== paneOpacityValue",
+    ),
+  );
+  assert.ok(
+    appearanceSource.includes(
+      "document.body.classList.contains(PANE_CONTENT_CLASS) !== fadePaneContent",
+    ),
+  );
+  assert.ok(
+    appearanceSource.includes(
+      "!document.body.classList.contains(BODY_CLASS)",
+    ),
+  );
+});
+
 void test("playback skips redundant animation and pause mutations", () => {
   assert.match(
     lifecycleSource,

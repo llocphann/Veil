@@ -2,40 +2,42 @@ import type { VeilSettings } from "./settings";
 
 interface PoolConfiguration {
   id: string;
-  wallpaperPath: string;
+  folder: string;
   enabled: boolean;
   includeSubfolders: boolean;
+  changeInterval: number;
 }
 
 function configurationFor(
   id: string,
-  wallpaperPath: string,
+  folder: string,
   enabled: boolean,
   includeSubfolders: boolean,
+  changeInterval: number,
 ): PoolConfiguration {
-  return { id, wallpaperPath, enabled, includeSubfolders };
+  return { id, folder, enabled, includeSubfolders, changeInterval };
 }
 
 function configurationEqual(left: PoolConfiguration, right: PoolConfiguration): boolean {
-  return left.wallpaperPath === right.wallpaperPath
+  return selectionConfigurationEqual(left, right)
+    && left.changeInterval === right.changeInterval;
+}
+
+function selectionConfigurationEqual(left: PoolConfiguration, right: PoolConfiguration): boolean {
+  return left.folder === right.folder
     && left.enabled === right.enabled
     && left.includeSubfolders === right.includeSubfolders;
 }
 
-function poolFolder(path: string): string {
-  const separator = path.lastIndexOf("/");
-  return separator >= 0 ? path.slice(0, separator) : "";
-}
-
 function poolSelectionKey(configuration: PoolConfiguration): string {
-  return `${configuration.id}|${poolFolder(configuration.wallpaperPath)}|${
+  return `${configuration.id}|${configuration.folder}|${
     configuration.includeSubfolders ? "recursive" : "direct"
   }`;
 }
 
 function poolCandidateCacheKey(configuration: PoolConfiguration): string | null {
-  if (!configuration.enabled || !configuration.wallpaperPath) return null;
-  return `${poolFolder(configuration.wallpaperPath)}|${
+  if (!configuration.enabled) return null;
+  return `${configuration.folder}|${
     configuration.includeSubfolders ? "recursive" : "direct"
   }`;
 }
@@ -44,24 +46,27 @@ export function wallpaperPoolConfiguration(settings: VeilSettings): PoolConfigur
   return [
     configurationFor(
       "default",
-      settings.wallpaperPath,
+      settings.wallpaperPoolFolder,
       settings.wallpaperPoolEnabled,
       settings.wallpaperPoolIncludeSubfolders,
+      settings.wallpaperPoolChangeInterval,
     ),
     ...settings.profiles
       .map((profile) => configurationFor(
         `profile:${profile.id}`,
-        profile.wallpaperPath,
+        profile.wallpaperPoolFolder,
         profile.wallpaperPoolEnabled,
         profile.wallpaperPoolIncludeSubfolders,
+        profile.wallpaperPoolChangeInterval,
       ))
       .sort((left, right) => left.id.localeCompare(right.id)),
   ];
 }
 
-export function wallpaperPoolConfigurationChanges(
+function configurationChanges(
   previous: VeilSettings,
   next: VeilSettings,
+  equal: (left: PoolConfiguration, right: PoolConfiguration) => boolean,
 ): string[] {
   const before = new Map(
     wallpaperPoolConfiguration(previous).map((configuration) => [configuration.id, configuration]),
@@ -76,9 +81,23 @@ export function wallpaperPoolConfigurationChanges(
       const nextConfiguration = after.get(id);
       return !previousConfiguration
         || !nextConfiguration
-        || !configurationEqual(previousConfiguration, nextConfiguration);
+        || !equal(previousConfiguration, nextConfiguration);
     })
     .sort((left, right) => left.localeCompare(right));
+}
+
+export function wallpaperPoolConfigurationChanges(
+  previous: VeilSettings,
+  next: VeilSettings,
+): string[] {
+  return configurationChanges(previous, next, configurationEqual);
+}
+
+export function wallpaperPoolSelectionConfigurationChanges(
+  previous: VeilSettings,
+  next: VeilSettings,
+): string[] {
+  return configurationChanges(previous, next, selectionConfigurationEqual);
 }
 
 export function staleWallpaperPoolCandidateCacheKeys(
@@ -107,6 +126,15 @@ export function wallpaperPoolConfigurationChanged(
   return wallpaperPoolConfigurationChanges(previous, next).length > 0;
 }
 
+export function wallpaperPoolChangeIntervalForContext(
+  settings: VeilSettings,
+  contextKey: string,
+): number {
+  const configuration = wallpaperPoolConfiguration(settings)
+    .find((candidate) => candidate.id === contextKey);
+  return configuration?.enabled ? configuration.changeInterval : 0;
+}
+
 export function rewriteWallpaperPoolSelectionPaths(
   selections: Map<string, string>,
   rewrite: (path: string) => string,
@@ -121,14 +149,7 @@ export function rewriteWallpaperPoolSelectionPaths(
   return changed;
 }
 
-/**
- * Preserve session pool selections when Obsidian reports a vault rename.
- *
- * Pool selection keys include the anchor folder, so a folder rename must move
- * both the map key and its selected path. The returned context IDs tell the
- * caller which configuration changes are rename-equivalent and therefore must
- * not be invalidated like a user-selected anchor/scope change.
- */
+/** Preserve session pool selections when Obsidian reports a vault rename. */
 export function rewriteWallpaperPoolSelectionsForRename(
   selections: Map<string, string>,
   previous: VeilSettings,
@@ -149,7 +170,8 @@ export function rewriteWallpaperPoolSelectionsForRename(
     if (
       previousConfiguration.enabled !== nextConfiguration.enabled
       || previousConfiguration.includeSubfolders !== nextConfiguration.includeSubfolders
-      || rewrite(previousConfiguration.wallpaperPath) !== nextConfiguration.wallpaperPath
+      || previousConfiguration.changeInterval !== nextConfiguration.changeInterval
+      || rewrite(previousConfiguration.folder) !== nextConfiguration.folder
     ) {
       continue;
     }

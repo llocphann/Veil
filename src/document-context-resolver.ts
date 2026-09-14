@@ -5,59 +5,130 @@ import {
   type WorkspaceLeaf,
 } from "obsidian";
 import type { NoteContext } from "./context-rules";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 
 export class DocumentContextResolver {
   private readonly activeRootLeaves = new Map<Document, WorkspaceLeaf>();
+  private readonly workspaceDocumentRegistry = new Set<Document>();
+  private readonly contextCache = new Map<Document, NoteContext>();
 
-  constructor(private readonly app: App) {}
+  constructor(private readonly app: App) {
+    this.rememberDocument(this.app.workspace.containerEl.ownerDocument);
+  }
+
+  initializeDocuments(): void {
+    this.rememberDocument(this.app.workspace.containerEl.ownerDocument);
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      this.rememberDocument(leaf.view.containerEl.ownerDocument);
+    });
+  }
+
+  rememberDocument(document: Document): void {
+    if (!document.defaultView?.closed) this.workspaceDocumentRegistry.add(document);
+  }
+
+  workspaceDocuments(): ReadonlySet<Document> {
+    return this.workspaceDocumentRegistry;
+  }
 
   rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): Document | null {
     if (!leaf) return null;
     const document = leaf.view.containerEl.ownerDocument;
     if (!this.isRootLeafForDocument(leaf, document)) return null;
+    this.rememberDocument(document);
+    this.invalidateDocument(document);
     this.activeRootLeaves.set(document, leaf);
     return document;
   }
 
+  invalidateDocument(document: Document): void {
+    this.contextCache.delete(document);
+  }
+
+  invalidateDocuments(documents: Iterable<Document>): void {
+    for (const document of documents) this.invalidateDocument(document);
+  }
+
+  invalidateAllContexts(): void {
+    this.contextCache.clear();
+  }
+
   forgetDocument(document: Document): void {
     this.activeRootLeaves.delete(document);
+    this.workspaceDocumentRegistry.delete(document);
+    this.contextCache.delete(document);
   }
 
   clear(): void {
     this.activeRootLeaves.clear();
+    this.workspaceDocumentRegistry.clear();
+    this.contextCache.clear();
   }
 
   documentsAffectedByLayoutChange(): Document[] {
     const affected: Document[] = [];
-    for (const document of this.workspaceDocuments()) {
+    for (const document of this.workspaceDocumentRegistry) {
+      if (document.defaultView?.closed) {
+        this.forgetDocument(document);
+        continue;
+      }
       const remembered = this.activeRootLeaves.get(document) || null;
       if (this.isRootLeafForDocument(remembered, document)) continue;
 
       if (remembered) this.activeRootLeaves.delete(document);
       const replacement = this.findRootLeafForDocument(document);
       if (replacement) this.activeRootLeaves.set(document, replacement);
-      if (remembered || replacement) affected.push(document);
+      if (remembered || replacement) {
+        this.invalidateDocument(document);
+        affected.push(document);
+      }
     }
     return affected;
   }
 
   contextForDocument(document: Document): NoteContext {
+    const cached = this.contextCache.get(document);
+    if (cached) return cached;
+    if (typeof __VEIL_DEV__ !== "undefined" && __VEIL_DEV__) {
+      runtimeWorkProfiler.record("contextBuild");
+    }
+
     const candidate = this.fileForDocument(document);
     const theme = document.body.classList.contains("theme-dark")
       ? "dark"
       : document.body.classList.contains("theme-light")
         ? "light"
         : undefined;
-    if (!candidate) {
-      return {
-        path: "",
-        name: "",
-        basename: "",
-        tags: [],
-        properties: {},
-        theme,
-      };
-    }
+    const context: NoteContext = candidate
+      ? this.contextForFile(candidate, theme)
+      : {
+          path: "",
+          name: "",
+          basename: "",
+          tags: [],
+          properties: {},
+          theme,
+        };
+    this.contextCache.set(document, context);
+    return context;
+  }
+
+  documentsForFile(file: TFile): Document[] {
+    return Array.from(this.workspaceDocumentRegistry).filter((document) => {
+      const cached = this.contextCache.get(document);
+      if (cached) return cached.path === file.path;
+      return this.fileForDocument(document)?.path === file.path;
+    });
+  }
+
+  isActiveFile(file: TFile): boolean {
+    return this.documentsForFile(file).length > 0;
+  }
+
+  private contextForFile(
+    candidate: TFile,
+    theme: NoteContext["theme"],
+  ): NoteContext {
     const cache = this.app.metadataCache.getFileCache(candidate);
     return {
       path: candidate.path,
@@ -67,21 +138,6 @@ export class DocumentContextResolver {
       properties: cache?.frontmatter || {},
       theme,
     };
-  }
-
-  documentsForFile(file: TFile): Document[] {
-    const documents = this.workspaceDocuments();
-    return documents.filter((document) => this.fileForDocument(document)?.path === file.path);
-  }
-
-  isActiveFile(file: TFile): boolean {
-    return this.documentsForFile(file).length > 0;
-  }
-
-  private workspaceDocuments(): Document[] {
-    const documents = new Set<Document>([this.app.workspace.containerEl.ownerDocument]);
-    this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    return Array.from(documents);
   }
 
   private fileForDocument(document: Document): TFile | null {

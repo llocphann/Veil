@@ -13,8 +13,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const BASELINE_VERSION = "1.5.3";
-const BASELINE_SHA = "9d7594a35955a3841c25d70aae67c832a028cc85";
+const BASELINE_VERSION = "1.6.0";
+const BASELINE_SHA = "8576bcf7e2d1942d2ffec2a1f449d3d5cc1cef73";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const nodeCommand = process.execPath;
 
@@ -104,24 +104,84 @@ function analyzeSourceContracts(baselineMain, candidateMain) {
   const candidateShuffle = block(candidateMain, "public shuffleWallpaperPool", "public openWallpaperLibrary");
 
   const contracts = [
-    { label: "active-leaf broad workspace refresh", baseline: /active-leaf-change[\s\S]{0,350}?refreshWallpaper\(\)/.test(baselineMain), candidate: /active-leaf-change[\s\S]{0,350}?refreshWallpaper\(\)/.test(candidateMain), expected: false },
-    { label: "file-open broad workspace refresh", baseline: /file-open[\s\S]{0,220}?refreshWallpaper\(\)/.test(baselineMain), candidate: /file-open[\s\S]{0,220}?refreshWallpaper\(\)/.test(candidateMain), expected: false },
-    { label: "layout-change broad workspace refresh", baseline: /layout-change[\s\S]{0,450}?refreshWallpaper\(\)/.test(baselineMain), candidate: /layout-change[\s\S]{0,450}?refreshWallpaper\(\)/.test(candidateMain), expected: false },
-    { label: "css-change broad workspace refresh", baseline: /css-change[\s\S]{0,700}?refreshWallpaper\(\)/.test(baselineMain), candidate: /css-change[\s\S]{0,700}?refreshWallpaper\(\)/.test(candidateMain), expected: false },
-    { label: "settings normalized no-op guard", baseline: /veilSettingsEqual\(previous, next\)/.test(baselineMain), candidate: /veilSettingsEqual\(previous, next\)/.test(candidateMain), expected: true },
-    { label: "settings impact classifier", baseline: /classifySettingsChange\(previous, next\)/.test(baselineMain), candidate: /classifySettingsChange\(previous, next\)/.test(candidateMain), expected: true },
-    { label: "document-scoped scheduling", baseline: /scheduleApplyToDocuments\(/.test(baselineMain), candidate: /scheduleApplyToDocuments\(/.test(candidateMain), expected: true },
-    { label: "theme dependency gate", baseline: /contextRulesDependOnTheme/.test(baselineMain), candidate: /contextRulesDependOnTheme/.test(candidateMain), expected: true },
-    { label: "scene switch bumps global source revision", baseline: /sourceRevision\s*\+=\s*1/.test(baselineScene), candidate: /sourceRevision\s*\+=\s*1/.test(candidateScene), expected: false },
-    { label: "pool shuffle bumps global source revision", baseline: /sourceRevision\s*\+=\s*1/.test(baselineShuffle), candidate: /sourceRevision\s*\+=\s*1/.test(candidateShuffle), expected: false },
-    { label: "vault path targeted invalidation", baseline: /refreshDocumentsAffectedByVaultPath/.test(baselineMain), candidate: /refreshDocumentsAffectedByVaultPath/.test(candidateMain), expected: true },
+    {
+      label: "active-leaf broad workspace refresh",
+      baseline: /active-leaf-change[\s\S]{0,350}?refreshWallpaper\(\)/.test(baselineMain),
+      candidate: /active-leaf-change[\s\S]{0,350}?refreshWallpaper\(\)/.test(candidateMain),
+      expected: false,
+    },
+    {
+      label: "file-open broad workspace refresh",
+      baseline: /file-open[\s\S]{0,220}?refreshWallpaper\(\)/.test(baselineMain),
+      candidate: /file-open[\s\S]{0,220}?refreshWallpaper\(\)/.test(candidateMain),
+      expected: false,
+    },
+    {
+      label: "layout-change broad workspace refresh",
+      baseline: /layout-change[\s\S]{0,450}?refreshWallpaper\(\)/.test(baselineMain),
+      candidate: /layout-change[\s\S]{0,450}?refreshWallpaper\(\)/.test(candidateMain),
+      expected: false,
+    },
+    {
+      label: "css-change broad workspace refresh",
+      baseline: /css-change[\s\S]{0,700}?refreshWallpaper\(\)/.test(baselineMain),
+      candidate: /css-change[\s\S]{0,700}?refreshWallpaper\(\)/.test(candidateMain),
+      expected: false,
+    },
+    {
+      label: "settings normalized no-op guard",
+      baseline: /veilSettingsEqual\(previous, next\)/.test(baselineMain),
+      candidate: /veilSettingsEqual\(previous, next\)/.test(candidateMain),
+      expected: true,
+    },
+    {
+      label: "settings impact classifier",
+      baseline: /classifySettingsChange\(previous, next\)/.test(baselineMain),
+      candidate: /classifySettingsChange\(previous, next\)/.test(candidateMain),
+      expected: true,
+    },
+    {
+      label: "document-scoped scheduling",
+      baseline: /scheduleApplyToDocuments\(/.test(baselineMain),
+      candidate: /scheduleApplyToDocuments\(/.test(candidateMain),
+      expected: true,
+    },
+    {
+      label: "theme dependency gate",
+      baseline: /contextRulesDependOnTheme/.test(baselineMain),
+      candidate: /contextRulesDependOnTheme/.test(candidateMain),
+      expected: true,
+    },
+    {
+      label: "scene switch bumps global source revision",
+      baseline: /sourceRevision\s*\+=\s*1/.test(baselineScene),
+      candidate: /sourceRevision\s*\+=\s*1/.test(candidateScene),
+      expected: false,
+    },
+    {
+      label: "pool shuffle bumps global source revision",
+      baseline: /sourceRevision\s*\+=\s*1/.test(baselineShuffle),
+      candidate: /sourceRevision\s*\+=\s*1/.test(candidateShuffle),
+      expected: false,
+    },
+    {
+      label: "vault path targeted invalidation",
+      baseline: /refreshDocumentsAffectedByVaultPath/.test(baselineMain),
+      candidate: /refreshDocumentsAffectedByVaultPath/.test(candidateMain),
+      expected: true,
+    },
   ];
 
   process.stdout.write("\nOptimization work-contract comparison\n");
   process.stdout.write(`Baseline: ${BASELINE_VERSION}\n\n`);
   let passed = true;
   for (const contract of contracts) {
-    passed = printRow(contract.label, yesNo(contract.baseline), yesNo(contract.candidate), yesNo(contract.expected)) && passed;
+    passed = printRow(
+      contract.label,
+      yesNo(contract.baseline),
+      yesNo(contract.candidate),
+      yesNo(contract.expected),
+    ) && passed;
   }
   return passed;
 }
@@ -137,7 +197,10 @@ function buildBaseline(ref) {
     return statSync(join(worktree, "main.js")).size;
   } finally {
     if (existsSync(worktree)) {
-      spawnSync("git", ["worktree", "remove", "--force", worktree], { cwd: ROOT, stdio: "ignore" });
+      spawnSync("git", ["worktree", "remove", "--force", worktree], {
+        cwd: ROOT,
+        stdio: "ignore",
+      });
     }
     rmSync(parent, { recursive: true, force: true });
   }
@@ -156,6 +219,7 @@ function main() {
   process.stdout.write(`Veil performance gate: ${BASELINE_VERSION} -> ${packageJson.version}\n`);
 
   ensureDependencies();
+
   process.stdout.write("\n[1/5] Running deterministic performance contracts...\n");
   run(npmCommand, ["run", "test:perf"]);
 
@@ -171,7 +235,9 @@ function main() {
 
   process.stdout.write("\n[4/5] Comparing production bundle size...\n");
   const candidateBundleBytes = statSync(join(ROOT, "main.js")).size;
-  const baselineBundleBytes = process.env.VEIL_PERF_SKIP_BASELINE_BUILD === "1" ? null : buildBaseline(baselineRef);
+  const baselineBundleBytes = process.env.VEIL_PERF_SKIP_BASELINE_BUILD === "1"
+    ? null
+    : buildBaseline(baselineRef);
   let bundlePass = true;
   if (baselineBundleBytes === null) {
     process.stdout.write(`Candidate main.js: ${candidateBundleBytes.toLocaleString()} bytes (baseline build skipped)\n`);
