@@ -85,7 +85,9 @@ void test("layout invalidation keeps valid remembered roots as a no-op", () => {
   assert.match(body, /if \(this\.isRootLeafForDocument\(remembered, document\)\) continue/);
   assert.match(body, /const replacement = this\.findRootLeafForDocument\(document\)/);
   assert.match(body, /if \(replacement\) this\.activeRootLeaves\.set\(document, replacement\)/);
-  assert.match(body, /if \(remembered \|\| replacement\) affected\.push\(document\)/);
+  assert.match(body, /if \(remembered \|\| replacement\) \{/);
+  assert.match(body, /this\.invalidateDocument\(document\)/);
+  assert.match(body, /affected\.push\(document\)/);
 });
 
 void test("fallback root discovery is cached for later no-op context resolution", () => {
