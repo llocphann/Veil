@@ -8,7 +8,7 @@ const contextSource = readFileSync(
   "utf8",
 );
 
-test("main delegates document context ownership", () => {
+void test("main delegates document context ownership", () => {
   assert.match(mainSource, /new DocumentContextResolver\(this\.app\)/);
   assert.doesNotMatch(mainSource, /activeRootLeaves/);
   assert.match(contextSource, /private readonly activeRootLeaves/);
