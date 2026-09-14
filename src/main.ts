@@ -17,6 +17,7 @@ import { SceneSwitcherModal } from "./scene-switcher-modal";
 import { veilSettingsEqual } from "./settings-change-detection";
 import { classifySettingsChange } from "./settings-change-impact";
 import { resolvedDocumentSettingsChanged } from "./settings-document-invalidation";
+import { normalizeSettingsPatch } from "./settings-patch-normalization";
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
@@ -210,7 +211,7 @@ export default class VeilPlugin extends Plugin {
   ): void {
     if (this.unloaded) return;
     const previous = this.settings;
-    const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
+    const next = normalizeSettingsPatch(previous, patch, normalizePath);
     if (veilSettingsEqual(previous, next)) return;
     const impact = classifySettingsChange(previous, next);
     const affectedDocuments = impact.documentResolution && !impact.enabled
@@ -409,6 +410,7 @@ export default class VeilPlugin extends Plugin {
   }
 
   private setStatus(message: string, tone: StatusTone = "info"): void {
+    if (this.status.message === message && this.status.tone === tone) return;
     this.status = { message, tone };
     this.settingTab?.updateStatus();
   }
