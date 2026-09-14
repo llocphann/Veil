@@ -11,7 +11,7 @@ void test("plugin unload cancels scheduled work and removes document state", () 
   assert.match(unload, /clearTimeout\(this\.systemRoutingTimer\)/);
   assert.match(unload, /flushSettings\(\)/);
   assert.match(unload, /clearAllDocuments\(\)/);
-  assert.match(unload, /activeRootLeaves\.clear\(\)/);
+  assert.match(unload, /documentContexts\.clear\(\)/);
   assert.match(unload, /poolCandidates\.clear\(\)/);
   assert.match(unload, /poolSelections\.clear\(\)/);
   assert.match(unload, /previousPoolSelections\.clear\(\)/);
@@ -31,7 +31,7 @@ void test("document disposal releases timers, listeners, media resources, and DO
 void test("closing a pop-out drops its leaf cache and wallpaper layer", () => {
   assert.match(
     source,
-    /workspace\.on\("window-close",[\s\S]*?activeRootLeaves\.delete\(window\.document\);[\s\S]*?clearDocument\(window\.document\)/,
+    /workspace\.on\("window-close",[\s\S]*?documentContexts\.forgetDocument\(window\.document\);[\s\S]*?clearDocument\(window\.document\)/,
   );
 });
 
