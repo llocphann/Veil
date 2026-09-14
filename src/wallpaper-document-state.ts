@@ -1,3 +1,4 @@
+import type { WallpaperMediaPhase } from "./wallpaper-media-phase";
 import type { MediaKind, VeilAppearance } from "./settings";
 
 export interface WallpaperDocumentState {
@@ -6,6 +7,7 @@ export interface WallpaperDocumentState {
   kind: Exclude<MediaKind, "">;
   sourceLabel: string;
   contextLabel: string;
+  phase: WallpaperMediaPhase;
   layer: HTMLDivElement;
   media: HTMLImageElement | HTMLVideoElement;
   vignette: HTMLDivElement;
