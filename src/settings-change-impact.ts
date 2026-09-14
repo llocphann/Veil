@@ -34,9 +34,10 @@ function wallpaperPathsChanged(
 }
 
 function defaultPoolConfigurationChanged(previous: VeilSettings, next: VeilSettings): boolean {
-  return previous.wallpaperPath !== next.wallpaperPath
-    || previous.wallpaperPoolEnabled !== next.wallpaperPoolEnabled
-    || previous.wallpaperPoolIncludeSubfolders !== next.wallpaperPoolIncludeSubfolders;
+  return previous.wallpaperPoolEnabled !== next.wallpaperPoolEnabled
+    || previous.wallpaperPoolFolder !== next.wallpaperPoolFolder
+    || previous.wallpaperPoolIncludeSubfolders !== next.wallpaperPoolIncludeSubfolders
+    || previous.wallpaperPoolChangeInterval !== next.wallpaperPoolChangeInterval;
 }
 
 export function classifySettingsChange(
