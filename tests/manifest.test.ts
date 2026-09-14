@@ -58,7 +58,7 @@ void test("release files and required repository documents exist", () => {
   assert.match(readme, /https:\/\/www\.buymeacoffee\.com\/llocphann/);
   assert.match(
     readme,
-    /https:\/\/raw\.githubusercontent\.com\/llocphann\/Veil\/main\/assets\/buy-me-a-coffee\.svg/,
+    /https:\/\/raw\.githubusercontent\.com\/llocphann\/Veil\/stable\/assets\/buy-me-a-coffee\.svg/,
   );
   assert.match(readme, /\.obsidian\/plugins\/veil\//);
   assert.doesNotMatch(readme, /\.obsidian\/plugins\/vault-dashboard-background\//);
