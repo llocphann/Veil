@@ -35,8 +35,8 @@ jobs:
 
       - name: Verify release source
         run: |
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
-            echo "Release tag commit must be reachable from main." >&2
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/stable || {
+            echo "Release tag commit must be reachable from stable." >&2
             exit 1
           }
 
@@ -79,8 +79,8 @@ jobs:
             manifest.json
             styles.css
 
-      - name: Create draft release
+      - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "Veil $GITHUB_REF_NAME" --generate-notes main.js manifest.json styles.css
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "Veil $GITHUB_REF_NAME" --generate-notes main.js manifest.json styles.css
