@@ -5,6 +5,7 @@ import {
   type WorkspaceLeaf,
 } from "obsidian";
 import type { NoteContext } from "./context-rules";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 
 export class DocumentContextResolver {
   private readonly activeRootLeaves = new Map<Document, WorkspaceLeaf>();
@@ -88,6 +89,7 @@ export class DocumentContextResolver {
   contextForDocument(document: Document): NoteContext {
     const cached = this.contextCache.get(document);
     if (cached) return cached;
+    if (__VEIL_DEV__) runtimeWorkProfiler.record("contextBuild");
 
     const candidate = this.fileForDocument(document);
     const theme = document.body.classList.contains("theme-dark")
