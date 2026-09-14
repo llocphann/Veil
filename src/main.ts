@@ -162,7 +162,10 @@ export default class VeilPlugin extends Plugin {
       if (document) this.scheduleApplyToDocuments([document]);
     }));
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshMostRecentDocument()));
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshWallpaper()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => {
+      const affected = this.documentContexts.documentsAffectedByLayoutChange();
+      if (affected.length) this.scheduleApplyToDocuments(affected);
+    }));
     this.registerEvent(
       this.app.metadataCache.on("changed", (file) => {
         if (!this.layoutReady) return;
