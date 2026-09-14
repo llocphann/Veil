@@ -1,4 +1,10 @@
-import { appearanceFromSettings, type VeilSettings } from "./settings";
+import {
+  veilAppearanceEqual,
+  veilOpacityExclusionsEqual,
+  veilProfilesEqual,
+  veilWallpaperRulesEqual,
+} from "./settings-change-detection";
+import type { VeilSettings } from "./settings";
 import { wallpaperPoolConfigurationChanged } from "./wallpaper-pool-config";
 
 export interface SettingsChangeImpact {
@@ -14,21 +20,23 @@ export interface SettingsChangeImpact {
   documentResolution: boolean;
 }
 
-function equalValue(left: unknown, right: unknown): boolean {
-  if (left === right) return true;
-  return JSON.stringify(left) === JSON.stringify(right);
+function wallpaperPathsChanged(
+  previous: readonly { id: string; wallpaperPath: string }[],
+  next: readonly { id: string; wallpaperPath: string }[],
+): boolean {
+  if (previous === next) return false;
+  if (previous.length !== next.length) return true;
+  const before = new Map(previous.map((item) => [item.id, item.wallpaperPath]));
+  for (const item of next) {
+    if (before.get(item.id) !== item.wallpaperPath) return true;
+  }
+  return false;
 }
 
-function profileWallpaperPaths(settings: VeilSettings): Array<[string, string]> {
-  return settings.profiles
-    .map((profile) => [profile.id, profile.wallpaperPath] as [string, string])
-    .sort(([left], [right]) => left.localeCompare(right));
-}
-
-function ruleWallpaperPaths(settings: VeilSettings): Array<[string, string]> {
-  return settings.wallpaperRules
-    .map((rule) => [rule.id, rule.wallpaperPath] as [string, string])
-    .sort(([left], [right]) => left.localeCompare(right));
+function defaultPoolConfigurationChanged(previous: VeilSettings, next: VeilSettings): boolean {
+  return previous.wallpaperPath !== next.wallpaperPath
+    || previous.wallpaperPoolEnabled !== next.wallpaperPoolEnabled
+    || previous.wallpaperPoolIncludeSubfolders !== next.wallpaperPoolIncludeSubfolders;
 }
 
 export function classifySettingsChange(
@@ -36,18 +44,20 @@ export function classifySettingsChange(
   next: VeilSettings,
 ): SettingsChangeImpact {
   const enabled = previous.enabled !== next.enabled;
-  const globalAppearance = !equalValue(
-    appearanceFromSettings(previous),
-    appearanceFromSettings(next),
+  const globalAppearance = !veilAppearanceEqual(previous, next);
+  const profiles = !veilProfilesEqual(previous.profiles, next.profiles);
+  const wallpaperRules = !veilWallpaperRulesEqual(previous.wallpaperRules, next.wallpaperRules);
+  const opacityExclusions = !veilOpacityExclusionsEqual(
+    previous.opacityExclusions,
+    next.opacityExclusions,
   );
-  const profiles = !equalValue(previous.profiles, next.profiles);
-  const wallpaperRules = !equalValue(previous.wallpaperRules, next.wallpaperRules);
-  const opacityExclusions = !equalValue(previous.opacityExclusions, next.opacityExclusions);
   const libraryRecent = previous.wallpaperPath !== next.wallpaperPath
-    || !equalValue(profileWallpaperPaths(previous), profileWallpaperPaths(next))
-    || !equalValue(ruleWallpaperPaths(previous), ruleWallpaperPaths(next));
+    || wallpaperPathsChanged(previous.profiles, next.profiles)
+    || wallpaperPathsChanged(previous.wallpaperRules, next.wallpaperRules);
   const visibleDocumentChange =
     globalAppearance || profiles || wallpaperRules || opacityExclusions;
+  const poolRuntime = defaultPoolConfigurationChanged(previous, next)
+    || (profiles && wallpaperPoolConfigurationChanged(previous, next));
 
   return {
     enabled,
@@ -57,7 +67,7 @@ export function classifySettingsChange(
     opacityExclusions,
     libraryRecent,
     sceneRuntime: profiles,
-    poolRuntime: wallpaperPoolConfigurationChanged(previous, next),
+    poolRuntime,
     routingSchedule: enabled || wallpaperRules || opacityExclusions,
     documentResolution: enabled || (next.enabled && visibleDocumentChange),
   };
