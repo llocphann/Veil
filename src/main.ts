@@ -10,6 +10,7 @@ import { DocumentContextResolver } from "./document-context-resolver";
 import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import { veilSettingsEqual } from "./settings-change-detection";
+import { classifySettingsChange } from "./settings-change-impact";
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
@@ -182,12 +183,17 @@ export default class VeilPlugin extends Plugin {
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
     if (veilSettingsEqual(previous, next)) return;
-    if (rememberRecent) this.wallpaperLibrary.rememberSettingsChanges(previous, next);
+    const impact = classifySettingsChange(previous, next);
+    if (rememberRecent && impact.libraryRecent) {
+      this.wallpaperLibrary.rememberSettingsChanges(previous, next);
+    }
     this.settings = next;
-    this.scenes.reconcileSettings(next);
-    this.wallpaperPools.reconcileSettings(previous, next, preservedPoolContexts);
-    this.systemRouting.reschedule();
-    this.refreshWallpaper();
+    if (impact.sceneRuntime) this.scenes.reconcileSettings(next);
+    if (impact.poolRuntime) {
+      this.wallpaperPools.reconcileSettings(previous, next, preservedPoolContexts);
+    }
+    if (impact.routingSchedule) this.systemRouting.reschedule();
+    if (impact.documentResolution) this.refreshWallpaper();
     this.scheduleSave();
   }
 
