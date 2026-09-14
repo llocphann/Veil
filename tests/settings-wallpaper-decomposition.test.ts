@@ -48,7 +48,11 @@ void test("wallpaper pool hides file and library without clearing them and expos
   const subfolders = wallpaperSource.indexOf('name: "Include subfolders"');
   const interval = wallpaperSource.indexOf('name: "Change interval"');
   assert.ok(pool >= 0 && folder > pool && subfolders > folder && interval > subfolders);
-  assert.match(wallpaperSource, /key: "wallpaperPoolFolder"/);
+  assert.match(wallpaperSource, /renderVaultFolderControl\(/);
+  assert.match(
+    wallpaperSource,
+    /actions\.setControlValue\("wallpaperPoolFolder", path\)/,
+  );
   assert.match(wallpaperSource, /key: "wallpaperPoolChangeInterval"/);
   assert.match(wallpaperSource, /value === 0 \? "Off" : `\$\{value\} min`/);
   assert.doesNotMatch(wallpaperSource, /wallpaperPath\s*[:=]\s*""/);
