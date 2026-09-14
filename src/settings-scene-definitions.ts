@@ -1,4 +1,4 @@
-import { normalizePath } from "obsidian";
+import { normalizePath, TFolder } from "obsidian";
 import type {
   App,
   SettingDefinitionItem,
@@ -62,11 +62,18 @@ function scenePage(
   const file = profile.wallpaperPath
     ? app.vault.getFileByPath(normalizePath(profile.wallpaperPath))
     : null;
-  const ready = Boolean(file && mediaKind(file));
+  const folder = profile.wallpaperPoolFolder
+    ? app.vault.getAbstractFileByPath(normalizePath(profile.wallpaperPoolFolder))
+    : app.vault.getRoot();
+  const ready = profile.wallpaperPoolEnabled
+    ? folder instanceof TFolder
+    : Boolean(file && mediaKind(file));
   return {
     type: "page",
     name: profile.name || `Scene ${index + 1}`,
-    desc: profile.wallpaperPath || "No wallpaper selected",
+    desc: profile.wallpaperPoolEnabled
+      ? `Pool: ${profile.wallpaperPoolFolder || "Vault root"}`
+      : profile.wallpaperPath || "No wallpaper selected",
     displayValue: () => ready ? (profile.wallpaperPoolEnabled ? "Pool" : "Ready") : "Needs wallpaper",
     status: () => ready ? null : "warning",
     items: [
@@ -77,23 +84,47 @@ function scenePage(
       },
       {
         name: "Wallpaper file",
-        desc: "Media used by this scene. With a pool enabled, it anchors the pool folder.",
+        desc: "Media used by this scene when its wallpaper pool is off.",
         control: {
           type: "file",
           key: key("wallpaperPath"),
           placeholder: "Media/Wallpapers/focus.webp",
           filter: (candidate: TFile) => Boolean(mediaKind(candidate)),
         },
+        visible: () => !profile.wallpaperPoolEnabled,
       },
       {
         name: "Wallpaper pool",
-        desc: "Randomly choose from supported media in this scene's wallpaper folder and keep the choice stable until shuffled.",
+        desc: "Randomly choose supported media from this scene's wallpaper folder.",
         control: { type: "toggle", key: key("wallpaperPoolEnabled") },
+      },
+      {
+        name: "Wallpaper folder",
+        desc: "Choose the vault folder used by this scene's pool.",
+        control: {
+          type: "text",
+          key: key("wallpaperPoolFolder"),
+          placeholder: "Media/Wallpapers",
+        },
+        visible: () => profile.wallpaperPoolEnabled,
       },
       {
         name: "Include subfolders",
         desc: "Include descendant folders when building this scene's pool.",
         control: { type: "toggle", key: key("wallpaperPoolIncludeSubfolders") },
+        visible: () => profile.wallpaperPoolEnabled,
+      },
+      {
+        name: "Change interval",
+        desc: "Automatically choose another pool wallpaper; 0 disables rotation.",
+        control: {
+          type: "slider",
+          key: key("wallpaperPoolChangeInterval"),
+          min: 0,
+          max: 1440,
+          step: 1,
+          displayFormat: (value) => value === 0 ? "Off" : `${value} min`,
+        },
         visible: () => profile.wallpaperPoolEnabled,
       },
       ...createSceneAppearanceDefinitions(profile, key, slider, rangeSlider),
