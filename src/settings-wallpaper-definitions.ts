@@ -41,6 +41,11 @@ export function createWallpaperDefinitions(
         control: { type: "toggle", key: "enabled" },
       },
       {
+        name: "Wallpaper pool",
+        desc: "Randomly choose supported media from a wallpaper folder.",
+        control: { type: "toggle", key: "wallpaperPoolEnabled" },
+      },
+      {
         name: "Wallpaper file",
         desc: "Choose an image, GIF, or video from this vault.",
         control: {
@@ -63,11 +68,6 @@ export function createWallpaperDefinitions(
           );
         },
         visible: () => !settings.wallpaperPoolEnabled,
-      },
-      {
-        name: "Wallpaper pool",
-        desc: "Randomly choose supported media from a wallpaper folder.",
-        control: { type: "toggle", key: "wallpaperPoolEnabled" },
       },
       {
         name: "Wallpaper folder",
@@ -155,7 +155,6 @@ export function createWallpaperDefinitions(
       ),
       slider(
         "paneContentOpacity",
-        "Pane & content opacity",
         "Fade each outer pane as one group, including nested backgrounds, text, icons, and images.",
       ),
     ],
