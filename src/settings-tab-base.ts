@@ -3,14 +3,12 @@ import type {
   App,
   SettingDefinition,
   SettingDefinitionItem,
-  SettingDefinitionPage,
   TFile,
 } from "obsidian";
 import type VeilPlugin from "./main";
 import { duplicateSceneProfile } from "./scene-profile-actions";
 import {
   createEffectsDefinitions,
-  createSceneAppearanceDefinitions,
   createVideoDefinitions,
 } from "./settings-appearance-definitions";
 import {
@@ -18,6 +16,10 @@ import {
   createWallpaperRuleDefinitions,
   type RoutingDefinitionActions,
 } from "./settings-routing-definitions";
+import {
+  createSceneDefinitions,
+  type SceneDefinitionActions,
+} from "./settings-scene-definitions";
 import {
   DEFAULT_SETTINGS,
   DISPLAY_MODES,
@@ -401,134 +403,47 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private sceneDefinitions(): SettingDefinitionItem<string> {
-    return {
-      type: "list",
-      heading: "Scenes",
-      cls: "veil-settings-panel-rules",
-      emptyState: "No scenes. Create one from the current appearance, then route notes to it below.",
-      items: this.plugin.settings.profiles.map((profile, index) => this.scenePage(profile, index)),
-      addItem: {
-        name: "Add scene from current appearance",
-        action: () => {
-          if (this.plugin.settings.profiles.length >= MAX_SCENES) {
-            new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
-            return;
-          }
-          const profiles = [
-            ...this.plugin.settings.profiles,
-            createProfile(this.plugin.settings.profiles, this.plugin.settings),
-          ];
-          this.plugin.updateSettings({ profiles });
-          this.update();
-        },
-      },
-      onReorder: (oldIndex, newIndex) => {
-        const profiles = [...this.plugin.settings.profiles];
-        const [profile] = profiles.splice(oldIndex, 1);
-        if (!profile) return;
-        profiles.splice(newIndex, 0, profile);
-        this.plugin.updateSettings({ profiles });
-        this.update();
-      },
-      onDelete: (index) => {
-        const profile = this.plugin.settings.profiles[index];
-        if (profile) this.deleteProfile(profile.id);
-      },
-    };
-  }
-
-  private scenePage(profile: VeilProfile, index: number): SettingDefinitionPage<string> {
-    const key = (field: string): string => `profile:${profile.id}:${field}`;
-    const file = profile.wallpaperPath
-      ? this.app.vault.getFileByPath(normalizePath(profile.wallpaperPath))
-      : null;
-    const ready = Boolean(file && mediaKind(file));
-    return {
-      type: "page",
-      name: profile.name || `Scene ${index + 1}`,
-      desc: profile.wallpaperPath || "No wallpaper selected",
-      displayValue: () => ready ? (profile.wallpaperPoolEnabled ? "Pool" : "Ready") : "Needs wallpaper",
-      status: () => ready ? null : "warning",
-      items: [
-        {
-          name: "Scene name",
-          desc: "A short label shown when selecting this scene in a routing rule.",
-          control: { type: "text", key: key("name"), placeholder: `Scene ${index + 1}` },
-        },
-        {
-          name: "Wallpaper file",
-          desc: "Media used by this scene. With a pool enabled, it anchors the pool folder.",
-          control: {
-            type: "file",
-            key: key("wallpaperPath"),
-            placeholder: "Media/Wallpapers/focus.webp",
-            filter: (candidate: TFile) => Boolean(mediaKind(candidate)),
-          },
-        },
-        {
-          name: "Wallpaper pool",
-          desc: "Randomly choose from supported media in this scene's wallpaper folder and keep the choice stable until shuffled.",
-          control: { type: "toggle", key: key("wallpaperPoolEnabled") },
-        },
-        {
-          name: "Include subfolders",
-          desc: "Include descendant folders when building this scene's pool.",
-          control: { type: "toggle", key: key("wallpaperPoolIncludeSubfolders") },
-          visible: () => profile.wallpaperPoolEnabled,
-        },
-        ...this.sceneAppearanceDefinitions(profile, key),
-        {
-          name: "Duplicate scene",
-          desc: "Create an independent copy of this scene with a new ID and the same wallpaper, pool, appearance, transition, and video settings.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Duplicate")
-                .setIcon("copy")
-                .onClick(() => this.duplicateScene(profile.id)),
-            );
-          },
-        },
-        {
-          name: "Copy current global appearance",
-          desc: "Replace this scene's wallpaper, pool, framing, opacity, effects, transition, and video behavior with the current global appearance while keeping its name.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Copy current")
-                .onClick(() => this.copyGlobalAppearanceToProfile(profile.id)),
-            );
-          },
-        },
-        {
-          name: "Delete scene",
-          desc: "Rules using it fall back to this scene's wallpaper as a legacy inline rule.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Delete scene")
-                .setIcon("trash-2")
-                .setDestructive()
-                .onClick(() => this.deleteProfile(profile.id)),
-            );
-          },
-        },
-      ],
-    };
-  }
-
-  private sceneAppearanceDefinitions(
-    profile: VeilProfile,
-    key: (field: string) => string,
-  ): SettingDefinition<string>[] {
-    return createSceneAppearanceDefinitions(
-      profile,
-      key,
-      (sliderKey, name, desc, maximum, unit, disabled) =>
-        this.slider(sliderKey, name, desc, maximum, unit, disabled),
-      (rangeKey, name, desc, minimum, maximum, step, unit, disabled) =>
-        this.rangeSlider(rangeKey, name, desc, minimum, maximum, step, unit, disabled),
+    return createSceneDefinitions(
+      this.app,
+      this.plugin.settings,
+      this.sceneDefinitionActions(),
+      (key, name, desc, maximum, unit, disabled) =>
+        this.slider(key, name, desc, maximum, unit, disabled),
+      (key, name, desc, minimum, maximum, step, unit, disabled) =>
+        this.rangeSlider(key, name, desc, minimum, maximum, step, unit, disabled),
     );
+  }
+
+  private sceneDefinitionActions(): SceneDefinitionActions {
+    return {
+      addScene: () => this.addScene(),
+      reorderScene: (oldIndex, newIndex) => this.reorderScene(oldIndex, newIndex),
+      deleteScene: (id) => this.deleteProfile(id),
+      duplicateScene: (id) => this.duplicateScene(id),
+      copyGlobalAppearanceToScene: (id) => this.copyGlobalAppearanceToProfile(id),
+    };
+  }
+
+  private addScene(): void {
+    if (this.plugin.settings.profiles.length >= MAX_SCENES) {
+      new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
+      return;
+    }
+    const profiles = [
+      ...this.plugin.settings.profiles,
+      createProfile(this.plugin.settings.profiles, this.plugin.settings),
+    ];
+    this.plugin.updateSettings({ profiles });
+    this.update();
+  }
+
+  private reorderScene(oldIndex: number, newIndex: number): void {
+    const profiles = [...this.plugin.settings.profiles];
+    const [profile] = profiles.splice(oldIndex, 1);
+    if (!profile) return;
+    profiles.splice(newIndex, 0, profile);
+    this.plugin.updateSettings({ profiles });
+    this.update();
   }
 
   private activeContextDefinition(): SettingDefinitionItem<string> {
