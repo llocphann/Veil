@@ -21,7 +21,7 @@ function storedSchemaVersion(data: Record<string, unknown>): number {
   const value = data[VEIL_PERSISTED_DATA_SCHEMA_KEY];
   if (value === undefined) return 0;
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
-    throw new Error(`Invalid Veil persisted data schema: ${String(value)}.`);
+    throw new Error(`Invalid Veil persisted data schema marker (${typeof value}).`);
   }
   if (value > VEIL_PERSISTED_DATA_SCHEMA_VERSION) {
     throw new Error(
