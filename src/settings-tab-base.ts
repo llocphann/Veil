@@ -3,7 +3,6 @@ import type {
   App,
   SettingDefinition,
   SettingDefinitionItem,
-  TFile,
 } from "obsidian";
 import type VeilPlugin from "./main";
 import {
@@ -48,9 +47,12 @@ import {
   type SceneDefinitionActions,
 } from "./settings-scene-definitions";
 import {
+  createActiveContextDefinition,
+  createWallpaperDefinitions,
+  type WallpaperDefinitionActions,
+} from "./settings-wallpaper-definitions";
+import {
   DEFAULT_SETTINGS,
-  DISPLAY_MODES,
-  mediaKind,
   normalizeSettings,
 } from "./settings";
 import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-transfer";
@@ -257,120 +259,36 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private wallpaperDefinitions(): SettingDefinitionItem<string> {
+    return createWallpaperDefinitions(
+      this.plugin.settings,
+      this.wallpaperDefinitionActions(),
+      (key, name, desc, maximum, unit, disabled) =>
+        this.slider(key, name, desc, maximum, unit, disabled),
+      (key, name, desc, minimum, maximum, step, unit, disabled) =>
+        this.rangeSlider(key, name, desc, minimum, maximum, step, unit, disabled),
+    );
+  }
+
+  private wallpaperDefinitionActions(): WallpaperDefinitionActions {
     return {
-      type: "group",
-      heading: "Wallpaper",
-      cls: "veil-settings-panel-wallpaper",
-      items: [
-        {
-          name: "Live preview",
-          desc: "Changes preview immediately. Rules can replace only the wallpaper or switch the complete appearance through a scene.",
-          searchable: false,
-        },
-        {
-          name: "Enable wallpaper",
-          desc: "Restore the theme's normal background when turned off.",
-          control: { type: "toggle", key: "enabled" },
-        },
-        {
-          name: "Wallpaper file",
-          desc: "Choose an image, GIF, or video from this vault. With a pool enabled, this file anchors the pool folder.",
-          control: {
-            type: "file",
-            key: "wallpaperPath",
-            placeholder: "Media/Wallpapers/example.webp",
-            filter: (file: TFile) => Boolean(mediaKind(file)),
-          },
-        },
-        {
-          name: "Wallpaper library",
-          desc: "Browse all supported vault media visually, search paths, and manage favorites or recently selected files.",
-          render: (setting) => {
-            setting.addButton((button) =>
-              button
-                .setButtonText("Open library")
-                .setIcon("images")
-                .onClick(() => this.plugin.openWallpaperLibrary()),
-            );
-          },
-        },
-        {
-          name: "Wallpaper pool",
-          desc: "Randomly choose supported media from the selected wallpaper's folder. The choice stays stable until shuffled or the appearance changes.",
-          control: { type: "toggle", key: "wallpaperPoolEnabled" },
-        },
-        {
-          name: "Include subfolders",
-          desc: "Also include supported media in descendant folders of the wallpaper folder.",
-          control: { type: "toggle", key: "wallpaperPoolIncludeSubfolders" },
-          visible: () => this.plugin.settings.wallpaperPoolEnabled,
-        },
-        {
-          name: "Wallpaper status",
-          desc: "Waiting for the workspace…",
-          searchable: false,
-          render: (setting) => {
-            setting.settingEl.classList.add("vault-dashboard-wallpaper-status");
-            setting.descEl.setAttribute("role", "status");
-            setting.descEl.setAttribute("aria-live", "polite");
-            this.statusEl = setting.descEl;
-            this.statusRowEl = setting.settingEl;
-            this.updateStatus();
-            return () => {
-              if (this.statusEl === setting.descEl) this.statusEl = null;
-              if (this.statusRowEl === setting.settingEl) this.statusRowEl = null;
-            };
-          },
-        },
-        {
-          name: "Display mode",
-          desc: "The same sizing rules apply to every supported media type.",
-          control: { type: "dropdown", key: "displayMode", options: DISPLAY_MODES },
-        },
-        this.slider(
-          "wallpaperPositionX",
-          "Horizontal focal point",
-          "Move the crop focus from the left edge (0%) to the right edge (100%).",
-        ),
-        this.slider(
-          "wallpaperPositionY",
-          "Vertical focal point",
-          "Move the crop focus from the top edge (0%) to the bottom edge (100%).",
-        ),
-        this.rangeSlider(
-          "wallpaperZoom",
-          "Wallpaper zoom",
-          "Zoom into the wallpaper while keeping the selected focal point anchored.",
-          100,
-          200,
-          1,
-          "%",
-        ),
-        this.rangeSlider(
-          "transitionDuration",
-          "Wallpaper transition",
-          "Crossfade duration for rule, scene, and pool changes. Set to 0 for an instant switch.",
-          0,
-          2000,
-          20,
-          " ms",
-        ),
-        this.slider(
-          "opacity",
-          "Wallpaper opacity",
-          "0% hides the wallpaper; 100% shows its full opacity.",
-        ),
-        this.slider(
-          "paneOpacity",
-          "Pane background opacity",
-          "Lower values reveal more wallpaper without fading pane content.",
-        ),
-        this.slider(
-          "paneContentOpacity",
-          "Pane & content opacity",
-          "Fade each outer pane as one group, including nested backgrounds, text, icons, and images.",
-        ),
-      ],
+      openWallpaperLibrary: () => this.plugin.openWallpaperLibrary(),
+      bindWallpaperStatus: (descEl, settingEl) => {
+        this.statusEl = descEl;
+        this.statusRowEl = settingEl;
+        this.updateStatus();
+        return () => {
+          if (this.statusEl === descEl) this.statusEl = null;
+          if (this.statusRowEl === settingEl) this.statusRowEl = null;
+        };
+      },
+      activeContextSummary: () => this.plugin.activeContextSummary(),
+      bindActiveContext: (descEl) => {
+        this.contextEl = descEl;
+        this.updateStatus();
+        return () => {
+          if (this.contextEl === descEl) this.contextEl = null;
+        };
+      },
     };
   }
 
@@ -413,25 +331,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private activeContextDefinition(): SettingDefinitionItem<string> {
-    return {
-      type: "group",
-      heading: "Active context",
-      cls: "veil-settings-panel-rules",
-      items: [{
-        name: "Resolved appearance",
-        desc: this.plugin.activeContextSummary(),
-        searchable: false,
-        render: (setting) => {
-          this.contextEl = setting.descEl;
-          setting.descEl.setAttribute("role", "status");
-          setting.descEl.setAttribute("aria-live", "polite");
-          this.updateStatus();
-          return () => {
-            if (this.contextEl === setting.descEl) this.contextEl = null;
-          };
-        },
-      }],
-    };
+    return createActiveContextDefinition(this.wallpaperDefinitionActions());
   }
 
   private wallpaperRuleDefinitions(): SettingDefinitionItem<string> {
