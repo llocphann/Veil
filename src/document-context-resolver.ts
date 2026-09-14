@@ -89,7 +89,9 @@ export class DocumentContextResolver {
   contextForDocument(document: Document): NoteContext {
     const cached = this.contextCache.get(document);
     if (cached) return cached;
-    if (__VEIL_DEV__) runtimeWorkProfiler.record("contextBuild");
+    if (typeof __VEIL_DEV__ !== "undefined" && __VEIL_DEV__) {
+      runtimeWorkProfiler.record("contextBuild");
+    }
 
     const candidate = this.fileForDocument(document);
     const theme = document.body.classList.contains("theme-dark")
