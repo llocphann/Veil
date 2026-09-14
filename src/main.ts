@@ -195,6 +195,7 @@ export default class VeilPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.settingTab?.flushControlUpdates();
     this.unloaded = true;
     this.documentApply.cancel();
     this.systemRouting.clear();
