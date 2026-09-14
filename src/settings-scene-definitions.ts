@@ -85,6 +85,11 @@ function scenePage(
         control: { type: "text", key: key("name"), placeholder: `Scene ${index + 1}` },
       },
       {
+        name: "Wallpaper pool",
+        desc: "Randomly choose supported media from this scene's wallpaper folder.",
+        control: { type: "toggle", key: key("wallpaperPoolEnabled") },
+      },
+      {
         name: "Wallpaper file",
         desc: "Media used by this scene when its wallpaper pool is off.",
         control: {
@@ -94,11 +99,6 @@ function scenePage(
           filter: (candidate: TFile) => Boolean(mediaKind(candidate)),
         },
         visible: () => !profile.wallpaperPoolEnabled,
-      },
-      {
-        name: "Wallpaper pool",
-        desc: "Randomly choose supported media from this scene's wallpaper folder.",
-        control: { type: "toggle", key: key("wallpaperPoolEnabled") },
       },
       {
         name: "Wallpaper folder",
