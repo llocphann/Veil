@@ -174,8 +174,8 @@ export class WallpaperSourceResolver {
 
   private rememberLookup(path: string, lookup: CachedMediaLookup): void {
     if (!this.mediaLookupCache.has(path) && this.mediaLookupCache.size >= MAX_SOURCE_LOOKUPS) {
-      const oldest = this.mediaLookupCache.keys().next().value;
-      if (typeof oldest === "string") this.mediaLookupCache.delete(oldest);
+      const oldest = this.mediaLookupCache.keys().next();
+      if (!oldest.done) this.mediaLookupCache.delete(oldest.value);
     }
     this.mediaLookupCache.delete(path);
     this.mediaLookupCache.set(path, lookup);
