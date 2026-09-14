@@ -129,12 +129,20 @@ void test("folder topology only invalidates when it can remove or move candidate
   assert.equal(candidates.size, 0);
 });
 
-void test("vault handlers use scoped pool cache invalidation", () => {
-  const source = fs.readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+void test("vault handlers delegate scoped pool cache invalidation", () => {
+  const mainSource = fs.readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+  const runtimeSource = fs.readFileSync(
+    new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
+    "utf8",
+  );
   for (const event of ["create", "delete", "rename"] as const) {
     assert.match(
-      source,
-      new RegExp(`invalidatePoolCandidatesForVaultEvent\\(\\s*this\\.poolCandidates,\\s*\\"${event}\\"`),
+      mainSource,
+      new RegExp(`wallpaperPools\\.invalidateVaultEvent\\(\\s*\\"${event}\\"`),
     );
   }
+  assert.match(
+    runtimeSource,
+    /invalidatePoolCandidatesForVaultEvent\(\s*this\.candidates,\s*event,/,
+  );
 });

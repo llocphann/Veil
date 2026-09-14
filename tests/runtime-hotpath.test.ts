@@ -7,6 +7,10 @@ const contextSource = fs.readFileSync(
   new URL("../src/document-context-resolver.ts", import.meta.url),
   "utf8",
 );
+const poolSource = fs.readFileSync(
+  new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
+  "utf8",
+);
 
 void test("metadata cache changes skip active-file work before layout is ready", () => {
   assert.match(
@@ -33,10 +37,11 @@ void test("note contexts and active-file checks share the cheap file lookup", ()
 });
 
 void test("settings changes retain unrelated wallpaper pool candidate caches", () => {
-  const updateSettingsBody = source.match(
-    /public updateSettings\([\s\S]*?\n\s{2}public flushSettings\(/,
+  assert.match(source, /wallpaperPools\.reconcileSettings\(previous, next, preservedPoolContexts\)/);
+  const reconcileBody = poolSource.match(
+    /reconcileSettings\([\s\S]*?\n\s{2}invalidateVaultEvent\(/,
   )?.[0] || "";
-  assert.match(updateSettingsBody, /staleWallpaperPoolCandidateCacheKeys\(previous, next\)/);
-  assert.match(updateSettingsBody, /this\.poolCandidates\.delete\(key\)/);
-  assert.doesNotMatch(updateSettingsBody, /this\.poolCandidates\.clear\(\)/);
+  assert.match(reconcileBody, /staleWallpaperPoolCandidateCacheKeys\(previous, next\)/);
+  assert.match(reconcileBody, /this\.candidates\.delete\(key\)/);
+  assert.doesNotMatch(reconcileBody, /this\.candidates\.clear\(\)/);
 });

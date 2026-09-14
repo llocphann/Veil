@@ -37,12 +37,7 @@ import {
   wallpaperLibraryTargetPatch,
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
-import {
-  rewriteWallpaperPoolSelectionsForRename,
-  staleWallpaperPoolCandidateCacheKeys,
-  wallpaperPoolConfigurationChanges,
-} from "./wallpaper-pool-config";
-import { invalidatePoolCandidatesForVaultEvent } from "./pool-cache-invalidation";
+import { WallpaperPoolRuntime } from "./wallpaper-pool-runtime";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const BODY_CLASS = "vault-dashboard-background";
@@ -95,9 +90,7 @@ export default class VeilPlugin extends Plugin {
 
   private readonly documents = new Map<Document, DocumentState>();
   private readonly documentContexts = new DocumentContextResolver(this.app);
-  private readonly poolCandidates = new Map<string, string[]>();
-  private readonly poolSelections = new Map<string, string>();
-  private readonly previousPoolSelections = new Map<string, string>();
+  private readonly wallpaperPools = new WallpaperPoolRuntime(this.app);
   private wallpaperLibrary: WallpaperLibraryState = { favorites: [], recent: [] };
   private manualProfileId = "";
   private settingTab: WallpaperSettingsTab | null = null;
@@ -190,9 +183,7 @@ export default class VeilPlugin extends Plugin {
     void this.flushSettings();
     this.clearAllDocuments();
     this.documentContexts.clear();
-    this.poolCandidates.clear();
-    this.poolSelections.clear();
-    this.previousPoolSelections.clear();
+    this.wallpaperPools.clear();
   }
 
   public updateSettings(
@@ -203,27 +194,12 @@ export default class VeilPlugin extends Plugin {
     if (this.unloaded) return;
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
-    const changedPoolContexts = wallpaperPoolConfigurationChanges(previous, next);
-    const stalePoolCandidateKeys = staleWallpaperPoolCandidateCacheKeys(previous, next);
-    const preservedPoolContextIds = new Set(preservedPoolContexts);
     if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
     this.settings = next;
     if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
       this.manualProfileId = "";
     }
-    for (const key of stalePoolCandidateKeys) this.poolCandidates.delete(key);
-    if (changedPoolContexts.length > 0) {
-      for (const contextKey of changedPoolContexts) {
-        if (preservedPoolContextIds.has(contextKey)) continue;
-        const prefix = `${contextKey}|`;
-        for (const key of Array.from(this.poolSelections.keys())) {
-          if (key.startsWith(prefix)) this.poolSelections.delete(key);
-        }
-        for (const key of Array.from(this.previousPoolSelections.keys())) {
-          if (key.startsWith(prefix)) this.previousPoolSelections.delete(key);
-        }
-      }
-    }
+    this.wallpaperPools.reconcileSettings(previous, next, preservedPoolContexts);
     this.rescheduleSystemRouting();
     this.refreshWallpaper();
     this.scheduleSave();
@@ -277,10 +253,7 @@ export default class VeilPlugin extends Plugin {
     }
 
     const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
-    const selectionKey = this.poolSelectionKey(resolved.appearance, contextKey);
-    const current = this.poolSelections.get(selectionKey);
-    if (current) this.previousPoolSelections.set(selectionKey, current);
-    this.poolSelections.delete(selectionKey);
+    this.wallpaperPools.shuffle(resolved.appearance, contextKey);
     this.sourceRevision += 1;
     this.scheduleApplyToWorkspace();
   }
@@ -439,8 +412,7 @@ export default class VeilPlugin extends Plugin {
   private registerVaultEvents(): void {
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        invalidatePoolCandidatesForVaultEvent(
-          this.poolCandidates,
+        this.wallpaperPools.invalidateVaultEvent(
           "create",
           file.path,
           "",
@@ -454,8 +426,7 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        invalidatePoolCandidatesForVaultEvent(
-          this.poolCandidates,
+        this.wallpaperPools.invalidateVaultEvent(
           "delete",
           file.path,
           "",
@@ -467,8 +438,7 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        invalidatePoolCandidatesForVaultEvent(
-          this.poolCandidates,
+        this.wallpaperPools.invalidateVaultEvent(
           "rename",
           file.path,
           oldPath,
@@ -527,20 +497,11 @@ export default class VeilPlugin extends Plugin {
           || renamedLibrary.recent.join("\n") !== this.wallpaperLibrary.recent.join("\n");
         if (libraryChanged) this.wallpaperLibrary = renamedLibrary;
 
-        const preservedPoolContexts = Array.from(new Set([
-          ...rewriteWallpaperPoolSelectionsForRename(
-            this.poolSelections,
-            this.settings,
-            next,
-            rename,
-          ),
-          ...rewriteWallpaperPoolSelectionsForRename(
-            this.previousPoolSelections,
-            this.settings,
-            next,
-            rename,
-          ),
-        ]));
+        const preservedPoolContexts = this.wallpaperPools.rewriteSelectionsForRename(
+          this.settings,
+          next,
+          rename,
+        );
 
         if (changed) this.updateSettings(next, false, preservedPoolContexts);
         else {
@@ -1011,7 +972,7 @@ export default class VeilPlugin extends Plugin {
     const poolActive = (!resolved.rule || Boolean(resolved.profile))
       && resolved.appearance.wallpaperPoolEnabled;
     const path = poolActive
-      ? this.poolPathForAppearance(resolved.appearance, contextKey)
+      ? this.wallpaperPools.pathForAppearance(resolved.appearance, contextKey)
       : resolved.path;
     const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
     const file = invalidPath ? null : this.app.vault.getAbstractFileByPath(path);
@@ -1081,49 +1042,6 @@ export default class VeilPlugin extends Plugin {
     if (profileId) return `profile:${profileId}`;
     if (ruleId) return `rule:${ruleId}`;
     return "default";
-  }
-
-  private poolSelectionKey(appearance: VeilAppearance, contextKey: string): string {
-    const anchor = appearance.wallpaperPath;
-    const separator = anchor.lastIndexOf("/");
-    const folder = separator >= 0 ? anchor.slice(0, separator) : "";
-    return `${contextKey}|${folder}|${appearance.wallpaperPoolIncludeSubfolders ? "recursive" : "direct"}`;
-  }
-
-  private poolPathForAppearance(appearance: VeilAppearance, contextKey: string): string {
-    const anchor = appearance.wallpaperPath;
-    if (!anchor) return "";
-    const separator = anchor.lastIndexOf("/");
-    const folder = separator >= 0 ? anchor.slice(0, separator) : "";
-    const recursive = appearance.wallpaperPoolIncludeSubfolders;
-    const candidateKey = `${folder}|${recursive ? "recursive" : "direct"}`;
-    let candidates = this.poolCandidates.get(candidateKey);
-    if (!candidates) {
-      const prefix = folder ? `${folder}/` : "";
-      candidates = this.app.vault.getFiles()
-        .filter((file) => {
-          if (!mediaKind(file)) return false;
-          if (folder && !file.path.startsWith(prefix)) return false;
-          const relative = folder ? file.path.slice(prefix.length) : file.path;
-          return recursive || !relative.includes("/");
-        })
-        .map((file) => file.path)
-        .sort((left, right) => left.localeCompare(right));
-      this.poolCandidates.set(candidateKey, candidates);
-    }
-    if (candidates.length === 0) return anchor;
-
-    const selectionKey = this.poolSelectionKey(appearance, contextKey);
-    const current = this.poolSelections.get(selectionKey);
-    if (current && candidates.includes(current)) return current;
-
-    const previous = this.previousPoolSelections.get(selectionKey);
-    const choices = previous && candidates.length > 1
-      ? candidates.filter((candidate) => candidate !== previous)
-      : candidates;
-    const selected = choices[Math.floor(Math.random() * choices.length)] || anchor;
-    this.poolSelections.set(selectionKey, selected);
-    return selected;
   }
 
   private setDocumentStatus(

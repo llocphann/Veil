@@ -12,9 +12,7 @@ void test("plugin unload cancels scheduled work and removes document state", () 
   assert.match(unload, /flushSettings\(\)/);
   assert.match(unload, /clearAllDocuments\(\)/);
   assert.match(unload, /documentContexts\.clear\(\)/);
-  assert.match(unload, /poolCandidates\.clear\(\)/);
-  assert.match(unload, /poolSelections\.clear\(\)/);
-  assert.match(unload, /previousPoolSelections\.clear\(\)/);
+  assert.match(unload, /wallpaperPools\.clear\(\)/);
 });
 
 void test("document disposal releases timers, listeners, media resources, and DOM", () => {
