@@ -1,4 +1,5 @@
 import { normalizePath } from "obsidian";
+import { persistedVeilDataSnapshot } from "./persisted-data-schema";
 import { normalizeSettings, type VeilSettings } from "./settings";
 import type { WallpaperLibraryState } from "./wallpaper-library-state";
 
@@ -34,16 +35,9 @@ export class SettingsPersistence {
     if (!this.pendingSave) return this.saveQueue;
 
     this.pendingSave = false;
-    const snapshot = normalizeSettings(this.getSettings(), normalizePath);
-    const library = this.getLibrary();
-    const librarySnapshot: WallpaperLibraryState = {
-      favorites: [...library.favorites],
-      recent: [...library.recent],
-    };
-    const task = this.saveQueue.then(() => this.saveData({
-      ...snapshot,
-      wallpaperLibrary: librarySnapshot,
-    }));
+    const settings = normalizeSettings(this.getSettings(), normalizePath);
+    const snapshot = persistedVeilDataSnapshot(settings, this.getLibrary());
+    const task = this.saveQueue.then(() => this.saveData(snapshot));
     this.saveQueue = task.catch((error: unknown) => {
       this.onSaveError(error);
     });
