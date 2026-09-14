@@ -28,96 +28,14 @@ jobs:
         with:
           node-version: 24
 
-      - name: Relabel candidate metadata and release docs
+      - name: Relabel candidate metadata
         run: |
           npm version 1.6.0 --no-git-tag-version --ignore-scripts
           node version-bump.mjs
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          versions_path = Path('versions.json')
-          versions = json.loads(versions_path.read_text())
-          versions.pop('2.0.0', None)
-          versions['1.6.0'] = '1.13.7'
-          versions_path.write_text(json.dumps(versions, indent=2) + '\n')
-
-          changelog = Path('CHANGELOG.md')
-          text = changelog.read_text()
-          text = text.replace('## 2.0.0', '## 1.6.0', 1)
-          text = text.replace('Veil 2.0 stability contract', 'Veil 1.6 stability contract')
-          changelog.write_text(text)
-
-          stability = Path('tests/stability-contract.test.ts')
-          text = stability.read_text().replace('2.0 invariant', '1.6 invariant')
-          stability.write_text(text)
-
-          readme = Path('README.md')
-          text = readme.read_text()
-          start = text.index('## Roadmap to 2.0 — complete on `dev`')
-          end = text.index('## Privacy', start)
-          replacement = '''## 1.6.0 — Optimization and stability release — complete on `dev`
-
-Veil 1.6.0 consolidates all optimization and hardening work after 1.5.3 into one refinement release. The feature set remains focused on the existing wallpaper workflow; this release concentrates on lower runtime cost, clearer internal ownership, deterministic state handling, and stronger regression guarantees.
-
-### Architecture decomposition
-
-- Reduce orchestration and state ownership concentrated in `main.ts`.
-- Split Settings and Wallpaper Library responsibilities into smaller, independently testable modules.
-- Clarify ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
-- Preserve existing user-facing behavior while restructuring internals.
-
-### Runtime invalidation and no-op fast paths
-
-- Use document-scoped scheduling for context, Settings, vault, and pool changes.
-- Suppress unchanged DOM, playback, and routing work with stable runtime signatures.
-- Restrict multi-window updates to documents whose resolved output is affected.
-- Keep unrelated metadata-cache and vault events outside hot-path work.
-
-### Media lifecycle and transition efficiency
-
-- Separate media identity from routing, Scene, appearance, and playback identity.
-- Reuse unchanged media without replacing `src`, calling `load()`, reallocating layers, or restarting crossfades.
-- Keep video playback stable when only visual settings change.
-- Guard stale media events against superseded document state.
-
-### State, UI efficiency, and release hardening
-
-- Use an explicit deterministic persisted-data migration pipeline.
-- Avoid unnecessary Settings and Wallpaper Library rerenders when local DOM-state updates are sufficient.
-- Keep development-only runtime work profiling out of production builds.
-- Constrain animated effects under hidden-window and reduced-motion idle policies.
-- Derive release versioning from published semantic-version history rather than stale candidate metadata.
-
-### 1.6 stability contract
-
-The release is guarded by dedicated regression coverage:
-
-1. A no-op context refresh performs no meaningful work.
-2. Appearance-only changes never reload unchanged media.
-3. A context change invalidates only affected windows and documents.
-4. Vault changes invalidate only relevant media and wallpaper-pool caches.
-5. Idle operation has no unnecessary recurring timers, animation, DOM mutation, or vault scanning.
-6. Every persisted-data version has a deterministic migration path.
-
-Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL remain outside the 1.6.0 scope unless required by the core wallpaper experience.
-
-### Development branches
-
-Veil uses an explicit three-stage promotion flow:
-
-`dev` → `prerelease` → `stable`
-
-- `dev` is the integration branch. Every push runs the full verification workflow, but it does not create a smoke-test bundle or publish a release.
-- `prerelease` is the manual smoke-test gate. Promoting a verified `dev` state here runs verification again and uploads a short-lived `main.js` / `manifest.json` / `styles.css` bundle for manual testing.
-- Smoke testing is performed manually before any promotion to `stable`; there is no automatic `dev` → `prerelease` or `prerelease` → `stable` branch promotion.
-- `stable` is the default and release branch. A manually promoted prerelease candidate is checked against the current `prerelease` source, verified again, versioned from published release history when needed, tagged, attested, and published.
-- Stable release source must match the smoke-tested `prerelease` tree, preventing direct untested changes on `stable` from becoming a release.
-
-'''
-          readme.write_text(text[:start] + replacement + text[end:])
-          PY
-
+          node -e "const fs=require('fs'); const p='versions.json'; const v=JSON.parse(fs.readFileSync(p,'utf8')); delete v['2.0.0']; v['1.6.0']='1.13.7'; fs.writeFileSync(p, JSON.stringify(v,null,2)+'\\n');"
+          sed -i '0,/^## 2\.0\.0$/s//## 1.6.0/' CHANGELOG.md
+          sed -i 's/Veil 2\.0 stability contract/Veil 1.6 stability contract/g' CHANGELOG.md
+          sed -i 's/2\.0 invariant/1.6 invariant/g' tests/stability-contract.test.ts
           git rm .github/workflows/dev-scan-version-labels.yml
 
       - name: Commit relabeled candidate to dev
@@ -127,6 +45,6 @@ Veil uses an explicit three-stage promotion flow:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git add package.json package-lock.json manifest.json versions.json CHANGELOG.md README.md tests/stability-contract.test.ts .github/workflows/dev-scan-version-labels.yml
+          git add package.json package-lock.json manifest.json versions.json CHANGELOG.md tests/stability-contract.test.ts .github/workflows/dev-scan-version-labels.yml
           git commit -m "chore: relabel Veil candidate as 1.6.0"
           git push origin HEAD:dev
