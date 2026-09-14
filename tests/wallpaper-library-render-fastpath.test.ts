@@ -18,13 +18,16 @@ void test("vault selection patches card state unless recent ordering must change
   assert.equal((body.match(/this\.renderVaultGrid\(\)/g) || []).length, 1);
 });
 
-void test("vault selection state updates existing cards instead of rebuilding them", () => {
+void test("vault selection patches only cards whose selected state changed", () => {
   const body = source.match(
     /private updateVaultSelection\([\s\S]*?\n {2}private updateFavoriteButton/,
   )?.[0] || "";
 
   assert.match(body, /querySelectorAll<HTMLElement>/);
-  assert.match(body, /card\.dataset\.selected = String\(card\.dataset\.path === selectedPath\)/);
+  assert.match(body, /const selected = String\(card\.dataset\.path === selectedPath\)/);
+  assert.match(body, /if \(card\.dataset\.selected === selected\) continue/);
+  assert.match(body, /card\.dataset\.selected = selected/);
+  assert.match(body, /runtimeWorkProfiler\.record\("libraryCardPatch", patchCount\)/);
   assert.doesNotMatch(body, /renderVaultGrid/);
 });
 
