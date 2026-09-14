@@ -4,7 +4,8 @@ import { mediaKind, type VeilAppearance, type VeilSettings } from "./settings";
 import {
   rewriteWallpaperPoolSelectionsForRename,
   staleWallpaperPoolCandidateCacheKeys,
-  wallpaperPoolConfigurationChanges,
+  wallpaperPoolChangeIntervalForContext,
+  wallpaperPoolSelectionConfigurationChanges,
 } from "./wallpaper-pool-config";
 
 export type WallpaperPoolVaultEvent = "create" | "delete" | "rename";
@@ -15,10 +16,17 @@ type VaultEventListener = (
   isFolder: boolean,
 ) => void;
 
+interface PoolRotationSchedule {
+  contextKey: string;
+  intervalMinutes: number;
+  dueAt: number;
+}
+
 export class WallpaperPoolRuntime {
   private readonly candidates = new Map<string, string[]>();
   private readonly selections = new Map<string, string>();
   private readonly previousSelections = new Map<string, string>();
+  private readonly rotationSchedules = new Map<string, PoolRotationSchedule>();
   private readonly vaultEventListeners = new Set<VaultEventListener>();
 
   constructor(private readonly app: App) {}
@@ -27,6 +35,7 @@ export class WallpaperPoolRuntime {
     this.candidates.clear();
     this.selections.clear();
     this.previousSelections.clear();
+    this.rotationSchedules.clear();
     this.vaultEventListeners.clear();
   }
 
@@ -40,7 +49,7 @@ export class WallpaperPoolRuntime {
     next: VeilSettings,
     preservedContexts: readonly string[] = [],
   ): void {
-    const changedContexts = wallpaperPoolConfigurationChanges(previous, next);
+    const changedContexts = wallpaperPoolSelectionConfigurationChanges(previous, next);
     const staleCandidateKeys = staleWallpaperPoolCandidateCacheKeys(previous, next);
     const preserved = new Set(preservedContexts);
 
@@ -53,6 +62,25 @@ export class WallpaperPoolRuntime {
       }
       for (const key of Array.from(this.previousSelections.keys())) {
         if (key.startsWith(prefix)) this.previousSelections.delete(key);
+      }
+      for (const key of Array.from(this.rotationSchedules.keys())) {
+        if (key.startsWith(prefix)) this.rotationSchedules.delete(key);
+      }
+    }
+
+    const now = Date.now();
+    for (const [selectionKey, schedule] of this.rotationSchedules) {
+      const nextInterval = wallpaperPoolChangeIntervalForContext(next, schedule.contextKey);
+      if (nextInterval <= 0) {
+        this.rotationSchedules.delete(selectionKey);
+        continue;
+      }
+      if (nextInterval !== schedule.intervalMinutes) {
+        this.rotationSchedules.set(selectionKey, {
+          contextKey: schedule.contextKey,
+          intervalMinutes: nextInterval,
+          dueAt: now + nextInterval * 60_000,
+        });
       }
     }
   }
@@ -101,13 +129,32 @@ export class WallpaperPoolRuntime {
     const current = this.selections.get(selectionKey);
     if (current) this.previousSelections.set(selectionKey, current);
     this.selections.delete(selectionKey);
+    this.rotationSchedules.delete(selectionKey);
+  }
+
+  nextRotationBoundary(): number | null {
+    let boundary: number | null = null;
+    for (const schedule of this.rotationSchedules.values()) {
+      if (boundary === null || schedule.dueAt < boundary) boundary = schedule.dueAt;
+    }
+    return boundary;
+  }
+
+  consumeDueRotations(now = Date.now()): string[] {
+    const contexts = new Set<string>();
+    for (const [selectionKey, schedule] of Array.from(this.rotationSchedules.entries())) {
+      if (schedule.dueAt > now) continue;
+      const current = this.selections.get(selectionKey);
+      if (current) this.previousSelections.set(selectionKey, current);
+      this.selections.delete(selectionKey);
+      this.rotationSchedules.delete(selectionKey);
+      contexts.add(schedule.contextKey);
+    }
+    return Array.from(contexts).sort((left, right) => left.localeCompare(right));
   }
 
   pathForAppearance(appearance: VeilAppearance, contextKey: string): string {
-    const anchor = appearance.wallpaperPath;
-    if (!anchor) return "";
-    const separator = anchor.lastIndexOf("/");
-    const folder = separator >= 0 ? anchor.slice(0, separator) : "";
+    const folder = appearance.wallpaperPoolFolder;
     const recursive = appearance.wallpaperPoolIncludeSubfolders;
     const candidateKey = `${folder}|${recursive ? "recursive" : "direct"}`;
     let candidates = this.candidates.get(candidateKey);
@@ -124,25 +171,63 @@ export class WallpaperPoolRuntime {
         .sort((left, right) => left.localeCompare(right));
       this.candidates.set(candidateKey, candidates);
     }
-    if (candidates.length === 0) return anchor;
 
     const selectionKey = this.selectionKey(appearance, contextKey);
+    if (candidates.length === 0) {
+      this.rotationSchedules.delete(selectionKey);
+      return appearance.wallpaperPath;
+    }
+
     const current = this.selections.get(selectionKey);
-    if (current && candidates.includes(current)) return current;
+    if (current && candidates.includes(current)) {
+      this.ensureRotationSchedule(
+        selectionKey,
+        contextKey,
+        appearance.wallpaperPoolChangeInterval,
+        candidates.length,
+      );
+      return current;
+    }
 
     const previous = this.previousSelections.get(selectionKey);
     const choices = previous && candidates.length > 1
       ? candidates.filter((candidate) => candidate !== previous)
       : candidates;
-    const selected = choices[Math.floor(Math.random() * choices.length)] || anchor;
+    const selected = choices[Math.floor(Math.random() * choices.length)] || appearance.wallpaperPath;
     this.selections.set(selectionKey, selected);
+    this.ensureRotationSchedule(
+      selectionKey,
+      contextKey,
+      appearance.wallpaperPoolChangeInterval,
+      candidates.length,
+      true,
+    );
     return selected;
   }
 
+  private ensureRotationSchedule(
+    selectionKey: string,
+    contextKey: string,
+    intervalMinutes: number,
+    candidateCount: number,
+    reset = false,
+  ): void {
+    if (intervalMinutes <= 0 || candidateCount <= 1) {
+      this.rotationSchedules.delete(selectionKey);
+      return;
+    }
+    const current = this.rotationSchedules.get(selectionKey);
+    if (!reset && current?.intervalMinutes === intervalMinutes) return;
+    this.rotationSchedules.set(selectionKey, {
+      contextKey,
+      intervalMinutes,
+      dueAt: Date.now() + intervalMinutes * 60_000,
+    });
+  }
+
   private selectionKey(appearance: VeilAppearance, contextKey: string): string {
-    const anchor = appearance.wallpaperPath;
-    const separator = anchor.lastIndexOf("/");
-    const folder = separator >= 0 ? anchor.slice(0, separator) : "";
-    return `${contextKey}|${folder}|${appearance.wallpaperPoolIncludeSubfolders ? "recursive" : "direct"}`;
+    return `${contextKey}|${appearance.wallpaperPoolFolder}|${
+      appearance.wallpaperPoolIncludeSubfolders ? "recursive" : "direct"
+    }`;
   }
 }
