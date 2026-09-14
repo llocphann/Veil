@@ -26,6 +26,10 @@ const settingsBaseSource = fs.readFileSync(
   new URL("../src/settings-tab-base.ts", import.meta.url),
   "utf8",
 );
+const mainSource = fs.readFileSync(
+  new URL("../src/main.ts", import.meta.url),
+  "utf8",
+);
 
 function settingsFixture(): VeilSettings {
   const settings: VeilSettings = {
@@ -230,4 +234,14 @@ void test("one frame batch emits one settings update and hide flushes before per
   const flushIndex = hideBody.indexOf("this.flushControlUpdates();");
   const persistIndex = hideBody.indexOf("this.plugin.flushSettings()");
   assert.ok(flushIndex >= 0 && persistIndex > flushIndex);
+});
+
+void test("plugin unload flushes the final control frame before disabling updates", () => {
+  const unloadBody = mainSource.match(/onunload\(\): void \{[\s\S]*?\n {2}\}/)?.[0] || "";
+  const flushIndex = unloadBody.indexOf("this.settingTab?.flushControlUpdates();");
+  const unloadIndex = unloadBody.indexOf("this.unloaded = true;");
+  const persistIndex = unloadBody.indexOf("this.flushSettings()");
+  assert.ok(flushIndex >= 0);
+  assert.ok(unloadIndex > flushIndex);
+  assert.ok(persistIndex > unloadIndex);
 });
