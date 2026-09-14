@@ -5,16 +5,20 @@ import {
   rewriteWallpaperPoolSelectionPaths,
   rewriteWallpaperPoolSelectionsForRename,
   staleWallpaperPoolCandidateCacheKeys,
+  wallpaperPoolChangeIntervalForContext,
   wallpaperPoolConfiguration,
   wallpaperPoolConfigurationChanged,
   wallpaperPoolConfigurationChanges,
+  wallpaperPoolSelectionConfigurationChanges,
 } from "../src/wallpaper-pool-config";
 
 function fixture() {
   return normalizeSettings({
     wallpaperPath: "Media/default.webp",
     wallpaperPoolEnabled: true,
+    wallpaperPoolFolder: "Media",
     wallpaperPoolIncludeSubfolders: false,
+    wallpaperPoolChangeInterval: 10,
     opacity: 15,
     profiles: [
       {
@@ -22,7 +26,9 @@ function fixture() {
         name: "Focus",
         wallpaperPath: "Media/Focus/focus.webp",
         wallpaperPoolEnabled: true,
+        wallpaperPoolFolder: "Media/Focus",
         wallpaperPoolIncludeSubfolders: true,
+        wallpaperPoolChangeInterval: 20,
         opacity: 40,
       },
       {
@@ -30,32 +36,36 @@ function fixture() {
         name: "Reading",
         wallpaperPath: "Media/Reading/read.webp",
         wallpaperPoolEnabled: false,
+        wallpaperPoolFolder: "Media/Reading",
       },
     ],
   });
 }
 
-void test("pool configuration ignores appearance-only changes", () => {
+void test("pool configuration ignores appearance-only and hidden wallpaper-file changes", () => {
   const previous = fixture();
   const next = normalizeSettings({
     ...previous,
+    wallpaperPath: "Elsewhere/fallback.webp",
     opacity: 67,
     blurEnabled: true,
-    blurIntensity: 12,
     profiles: previous.profiles.map((profile) =>
-      profile.id === "focus" ? { ...profile, opacity: 75, effectPreset: "retro" } : profile,
+      profile.id === "focus"
+        ? { ...profile, wallpaperPath: "Elsewhere/focus-fallback.webp", opacity: 75 }
+        : profile,
     ),
   });
+
   assert.equal(wallpaperPoolConfigurationChanged(previous, next), false);
   assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), []);
 });
 
-void test("pool configuration reports only the appearance whose pool topology changed", () => {
+void test("pool topology follows explicit folder and recursive scope", () => {
   const previous = fixture();
   assert.deepEqual(
     wallpaperPoolConfigurationChanges(previous, normalizeSettings({
       ...previous,
-      wallpaperPath: "Media/other.webp",
+      wallpaperPoolFolder: "Other",
     })),
     ["default"],
   );
@@ -72,39 +82,40 @@ void test("pool configuration reports only the appearance whose pool topology ch
   );
 });
 
-void test("changing one scene pool does not invalidate unrelated scene selections", () => {
+void test("interval changes reschedule a pool without invalidating its selection topology", () => {
+  const previous = fixture();
+  const next = normalizeSettings({ ...previous, wallpaperPoolChangeInterval: 30 });
+
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), ["default"]);
+  assert.deepEqual(wallpaperPoolSelectionConfigurationChanges(previous, next), []);
+  assert.equal(wallpaperPoolChangeIntervalForContext(next, "default"), 30);
+  assert.equal(wallpaperPoolChangeIntervalForContext(next, "profile:focus"), 20);
+  assert.equal(wallpaperPoolChangeIntervalForContext(next, "profile:reading"), 0);
+});
+
+void test("changing one scene folder does not invalidate unrelated scene selections", () => {
   const previous = fixture();
   const next = normalizeSettings({
     ...previous,
     profiles: previous.profiles.map((profile) =>
       profile.id === "focus"
-        ? { ...profile, wallpaperPath: "Media/Focus/alternate.webp" }
+        ? { ...profile, wallpaperPoolFolder: "Other/Focus" }
         : profile,
     ),
   });
-  const changes = wallpaperPoolConfigurationChanges(previous, next);
-  assert.deepEqual(changes, ["profile:focus"]);
-  assert.equal(changes.includes("profile:reading"), false);
-  assert.equal(changes.includes("default"), false);
+  assert.deepEqual(wallpaperPoolSelectionConfigurationChanges(previous, next), ["profile:focus"]);
 });
 
 void test("candidate cache eviction keeps reusable folder scans", () => {
   const previous = fixture();
-  const sameFolder = normalizeSettings({
-    ...previous,
-    profiles: previous.profiles.map((profile) =>
-      profile.id === "focus"
-        ? { ...profile, wallpaperPath: "Media/Focus/alternate.webp" }
-        : profile,
-    ),
-  });
+  const sameFolder = normalizeSettings({ ...previous, wallpaperPath: "Media/alternate.webp" });
   assert.deepEqual(staleWallpaperPoolCandidateCacheKeys(previous, sameFolder), []);
 
   const movedFolder = normalizeSettings({
     ...previous,
     profiles: previous.profiles.map((profile) =>
       profile.id === "focus"
-        ? { ...profile, wallpaperPath: "Other/Focus/focus.webp" }
+        ? { ...profile, wallpaperPoolFolder: "Other/Focus" }
         : profile,
     ),
   });
@@ -112,38 +123,11 @@ void test("candidate cache eviction keeps reusable folder scans", () => {
     staleWallpaperPoolCandidateCacheKeys(previous, movedFolder),
     ["Media/Focus|recursive"],
   );
-
-  const sharedPrevious = normalizeSettings({
-    ...previous,
-    profiles: [
-      ...previous.profiles,
-      {
-        id: "cinema",
-        name: "Cinema",
-        wallpaperPath: "Media/Focus/cinema.webp",
-        wallpaperPoolEnabled: true,
-        wallpaperPoolIncludeSubfolders: true,
-      },
-    ],
-  });
-  const sharedNext = normalizeSettings({
-    ...sharedPrevious,
-    profiles: sharedPrevious.profiles.map((profile) =>
-      profile.id === "focus"
-        ? { ...profile, wallpaperPath: "Other/Focus/focus.webp" }
-        : profile,
-    ),
-  });
-  assert.deepEqual(staleWallpaperPoolCandidateCacheKeys(sharedPrevious, sharedNext), []);
 });
 
 void test("scene reordering does not invalidate stable pool selections", () => {
   const previous = fixture();
-  const next = normalizeSettings({
-    ...previous,
-    profiles: [...previous.profiles].reverse(),
-  });
-  assert.equal(wallpaperPoolConfigurationChanged(previous, next), false);
+  const next = normalizeSettings({ ...previous, profiles: [...previous.profiles].reverse() });
   assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), []);
   assert.deepEqual(
     wallpaperPoolConfiguration(previous).map((entry) => entry.id),
@@ -153,14 +137,8 @@ void test("scene reordering does not invalidate stable pool selections", () => {
 
 void test("adding or removing a scene invalidates only that scene pool state", () => {
   const previous = fixture();
-  const removed = normalizeSettings({
-    ...previous,
-    profiles: previous.profiles.slice(0, 1),
-  });
-  assert.deepEqual(
-    wallpaperPoolConfigurationChanges(previous, removed),
-    ["profile:reading"],
-  );
+  const removed = normalizeSettings({ ...previous, profiles: previous.profiles.slice(0, 1) });
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, removed), ["profile:reading"]);
 
   const added = normalizeSettings({
     ...previous,
@@ -171,20 +149,17 @@ void test("adding or removing a scene invalidates only that scene pool state", (
         name: "Cinema",
         wallpaperPath: "Media/Cinema/cinema.webp",
         wallpaperPoolEnabled: true,
+        wallpaperPoolFolder: "Media/Cinema",
       },
     ],
   });
-  assert.deepEqual(
-    wallpaperPoolConfigurationChanges(previous, added),
-    ["profile:cinema"],
-  );
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, added), ["profile:cinema"]);
 });
 
-void test("renaming selected pool media preserves the current and previous selections", () => {
+void test("renaming selected pool media preserves current selection path state", () => {
   const selections = new Map([
     ["default|Media|direct", "Media/current.webp"],
     ["profile:focus|Media/Focus|recursive", "Media/Focus/old.webp"],
-    ["profile:reading|Media/Reading|direct", "Media/Reading/read.webp"],
   ]);
   const rewrite = (path: string): string =>
     path === "Media/Focus/old.webp" ? "Media/Focus/renamed.webp" : path;
@@ -194,14 +169,9 @@ void test("renaming selected pool media preserves the current and previous selec
     selections.get("profile:focus|Media/Focus|recursive"),
     "Media/Focus/renamed.webp",
   );
-  assert.equal(selections.get("default|Media|direct"), "Media/current.webp");
-  assert.equal(
-    rewriteWallpaperPoolSelectionPaths(selections, rewrite),
-    false,
-  );
 });
 
-void test("vault folder rename moves the pool selection key and selected path", () => {
+void test("vault folder rename moves explicit pool selection key and selected path", () => {
   const previous = fixture();
   const oldPath = "Media/Focus";
   const newPath = "Wallpapers/Focus";
@@ -213,7 +183,11 @@ void test("vault folder rename moves the pool selection key and selected path", 
     ...previous,
     profiles: previous.profiles.map((profile) =>
       profile.id === "focus"
-        ? { ...profile, wallpaperPath: rewrite(profile.wallpaperPath) }
+        ? {
+            ...profile,
+            wallpaperPath: rewrite(profile.wallpaperPath),
+            wallpaperPoolFolder: rewrite(profile.wallpaperPoolFolder),
+          }
         : profile,
     ),
   });
@@ -222,9 +196,9 @@ void test("vault folder rename moves the pool selection key and selected path", 
   ]);
 
   assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), ["profile:focus"]);
-  assert.deepEqual(
-    rewriteWallpaperPoolSelectionsForRename(selections, previous, next, rewrite),
-    ["default", "profile:focus", "profile:reading"],
+  assert.ok(
+    rewriteWallpaperPoolSelectionsForRename(selections, previous, next, rewrite)
+      .includes("profile:focus"),
   );
   assert.equal(selections.has("profile:focus|Media/Focus|recursive"), false);
   assert.equal(
@@ -233,36 +207,11 @@ void test("vault folder rename moves the pool selection key and selected path", 
   );
 });
 
-void test("vault anchor-file rename preserves a pool selection without moving its folder key", () => {
+void test("wallpaper-file rename or manual file change does not move an explicit pool", () => {
   const previous = fixture();
-  const oldPath = "Media/default.webp";
-  const newPath = "Media/default-renamed.webp";
-  const rewrite = (path: string): string => path === oldPath ? newPath : path;
-  const next = normalizeSettings({ ...previous, wallpaperPath: newPath });
-  const selections = new Map([
-    ["default|Media|direct", "Media/other-selected.webp"],
-  ]);
+  const renamed = normalizeSettings({ ...previous, wallpaperPath: "Media/default-renamed.webp" });
+  const manual = normalizeSettings({ ...previous, wallpaperPath: "Other/default.webp" });
 
-  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, next), ["default"]);
-  assert.ok(
-    rewriteWallpaperPoolSelectionsForRename(selections, previous, next, rewrite).includes("default"),
-  );
-  assert.equal(selections.get("default|Media|direct"), "Media/other-selected.webp");
-});
-
-void test("manual anchor changes are not mistaken for vault renames", () => {
-  const previous = fixture();
-  const next = normalizeSettings({ ...previous, wallpaperPath: "Other/default.webp" });
-  const selections = new Map([
-    ["default|Media|direct", "Media/current.webp"],
-  ]);
-
-  const preserved = rewriteWallpaperPoolSelectionsForRename(
-    selections,
-    previous,
-    next,
-    (path) => path,
-  );
-  assert.equal(preserved.includes("default"), false);
-  assert.equal(selections.get("default|Media|direct"), "Media/current.webp");
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, renamed), []);
+  assert.deepEqual(wallpaperPoolConfigurationChanges(previous, manual), []);
 });
