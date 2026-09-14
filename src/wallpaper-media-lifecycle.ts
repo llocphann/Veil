@@ -83,13 +83,16 @@ export function syncWallpaperPlayback(options: PlaybackOptions): void {
     appearance.opacity === 0
     || (appearance.pauseWhenHidden && document.hidden)
     || (appearance.respectReducedMotion && Boolean(state.motionQuery?.matches));
-  state.layer.dataset.animationPaused = String(motionPaused);
+  const animationPaused = String(motionPaused);
+  if (state.layer.dataset.animationPaused !== animationPaused) {
+    state.layer.dataset.animationPaused = animationPaused;
+  }
   if (state.kind !== "video" || state.disposed || state.failed || isUnloaded()) return;
 
   const video = state.media as HTMLVideoElement;
   const shouldPlay = isEnabled() && appearance.opacity > 0 && !motionPaused;
   if (!shouldPlay) {
-    video.pause();
+    if (!video.paused) video.pause();
     return;
   }
   if (!video.paused || state.playPromise || !video.getAttribute("src")) return;
