@@ -27,6 +27,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Verify prerelease promotion source
+        run: |
+          git fetch --no-tags origin prerelease:refs/remotes/origin/prerelease
+          PRERELEASE_SHA=$(git rev-parse origin/prerelease)
+          PRERELEASE_TREE=$(git rev-parse "${PRERELEASE_SHA}^{tree}")
+          STABLE_TREE=$(git rev-parse "${GITHUB_SHA}^{tree}")
+
+          git merge-base --is-ancestor "${PRERELEASE_SHA}" "${GITHUB_SHA}" || {
+            echo "Stable releases must be promoted from prerelease." >&2
+            exit 1
+          }
+
+          if [ "${PRERELEASE_TREE}" != "${STABLE_TREE}" ]; then
+            echo "Stable source must exactly match the smoke-tested prerelease tree." >&2
+            exit 1
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -99,7 +116,7 @@ jobs:
           const heading = `## ${version}`;
           if (!changelog.includes(heading)) {
             const marker = '## Unreleased';
-            const entry = `${marker}\n\n${heading}\n\n- Promote the verified development state to the stable release channel.`;
+            const entry = `${marker}\n\n${heading}\n\n- Promote the smoke-tested prerelease state to the stable release channel.`;
             if (!changelog.includes(marker)) throw new Error('CHANGELOG.md is missing the Unreleased section.');
             changelog = changelog.replace(marker, entry);
             fs.writeFileSync(path, changelog);
