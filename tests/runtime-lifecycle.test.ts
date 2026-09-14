@@ -4,11 +4,13 @@ import test from "node:test";
 
 const source = fs.readFileSync("src/main.ts", "utf8");
 const lifecycleSource = fs.readFileSync("src/wallpaper-media-lifecycle.ts", "utf8");
+const applySchedulerSource = fs.readFileSync("src/document-apply-scheduler.ts", "utf8");
 
 void test("plugin unload cancels scheduled work and removes document state", () => {
   const unload = source.match(/onunload\(\): void \{([\s\S]*?)\n {2}\}/)?.[1] || "";
 
-  assert.match(unload, /cancelAnimationFrame\(this\.refreshFrame\)/);
+  assert.match(unload, /documentApply\.cancel\(\)/);
+  assert.match(applySchedulerSource, /window\.cancelAnimationFrame\(this\.frame\)/);
   assert.match(unload, /systemRouting\.clear\(\)/);
   assert.match(unload, /flushSettings\(\)/);
   assert.match(unload, /clearAllDocuments\(\)/);
