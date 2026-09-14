@@ -56,42 +56,13 @@ Start with:
 - [Data, Privacy, and Recovery](wiki/Data-Privacy-and-Recovery.md)
 - [Troubleshooting and Performance](wiki/Troubleshooting-and-Performance.md)
 
-## 1.6.0 — Optimization and stability release — complete on `dev`
+## Release baseline
 
-Veil 1.6.0 consolidates all optimization and hardening work after 1.5.3 into one refinement release. The feature set remains focused on the existing wallpaper workflow; this release concentrates on lower runtime cost, clearer internal ownership, deterministic state handling, and stronger regression guarantees.
+### 1.6.0 — Optimization and stability release — released
 
-### Architecture decomposition
+Veil 1.6.0 is the current optimization baseline after 1.5.3. It preserves the existing feature set while reducing redundant workspace refreshes, media reloads, DOM mutation, routing work, pool invalidation, and idle GPU/CPU activity.
 
-- Reduce orchestration and state ownership concentrated in `main.ts`.
-- Split Settings and Wallpaper Library responsibilities into smaller, independently testable modules.
-- Clarify ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
-- Preserve existing user-facing behavior while restructuring internals.
-
-### Runtime invalidation and no-op fast paths
-
-- Use document-scoped scheduling for context, Settings, vault, and pool changes.
-- Suppress unchanged DOM, playback, and routing work with stable runtime signatures.
-- Restrict multi-window updates to documents whose resolved output is affected.
-- Keep unrelated metadata-cache and vault events outside hot-path work.
-
-### Media lifecycle and transition efficiency
-
-- Separate media identity from routing, Scene, appearance, and playback identity.
-- Reuse unchanged media without replacing `src`, calling `load()`, reallocating layers, or restarting crossfades.
-- Keep video playback stable when only visual settings change.
-- Guard stale media events against superseded document state.
-
-### State, UI efficiency, and release hardening
-
-- Use an explicit deterministic persisted-data migration pipeline.
-- Avoid unnecessary Settings and Wallpaper Library rerenders when local DOM-state updates are sufficient.
-- Keep development-only runtime work profiling out of production builds.
-- Constrain animated effects under hidden-window and reduced-motion idle policies.
-- Derive release versioning from published semantic-version history rather than stale candidate metadata.
-
-### 1.6 stability contract
-
-The release is guarded by dedicated regression coverage:
+The release is guarded by six stability invariants:
 
 1. A no-op context refresh performs no meaningful work.
 2. Appearance-only changes never reload unchanged media.
@@ -100,7 +71,92 @@ The release is guarded by dedicated regression coverage:
 5. Idle operation has no unnecessary recurring timers, animation, DOM mutation, or vault scanning.
 6. Every persisted-data version has a deterministic migration path.
 
-Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL remain outside the 1.6.0 scope unless required by the core wallpaper experience.
+Performance regressions can be checked locally with one command:
+
+```bash
+npm run perf
+```
+
+The command runs deterministic performance contracts, verifies a production build, compares optimization behavior against the current `stable` baseline, checks bundle growth, and reports Settings-path microbenchmarks.
+
+## 1.7 — Runtime hot-path efficiency — in progress on `dev`
+
+Veil 1.7 continues the optimization-first direction without removing, simplifying, or changing existing user-facing features and functions. The goal is to reduce CPU work that still occurs inside already-scoped updates, especially during continuous Settings interaction, repeated context resolution, large Scene/rule configurations, and multi-window use.
+
+Every optimization must preserve the 1.6 stability contract and must be measurable through deterministic work-count regression tests or repeatable benchmark evidence. Timing-only changes that cannot be distinguished from machine noise are not sufficient by themselves.
+
+### Phase 1 — Cheap no-op and UI mutation fast paths
+
+- Make status updates idempotent so unchanged message/tone pairs do not refresh Settings UI.
+- Audit remaining class, dataset, style, and status writes for safe equality guards.
+- Keep these fast paths allocation-light and free of new timers or caches.
+- Extend profiler/test coverage so skipped work is observable in development builds.
+
+### Phase 2 — Patch-aware Settings change detection
+
+- Remove whole-object `JSON.stringify()` equality work from the normal Settings update hot path.
+- Compare scalar values directly and deep-compare only collections that a patch can actually affect.
+- Reuse one change-analysis pass instead of serializing the same profiles, rules, exclusions, and appearance state multiple times.
+- Preserve normalization, persistence, migration, recent-wallpaper tracking, routing schedule semantics, and pool reconciliation exactly.
+- Expand the Settings microbenchmark for small, medium, large, and stress-size configurations.
+
+### Phase 3 — Frame-coalesced continuous controls
+
+- Coalesce high-frequency slider/input changes so expensive runtime application happens at most once per animation frame.
+- Always preserve the latest input value and final persisted value; no intermediate user-visible state may be lost.
+- Keep control feedback visually immediate while separating cheap local UI updates from expensive document resolution/application work where safe.
+- Verify mouse, keyboard, and programmatic control updates retain existing semantics.
+
+### Phase 4 — Live workspace document registry
+
+- Maintain one authoritative set of active workspace documents instead of repeatedly reconstructing it through `iterateAllLeaves()` in multiple subsystems.
+- Update the registry through initial discovery, layout repair, pop-out open, and pop-out close events.
+- Reuse the registry for workspace apply, file-to-document lookup, pool targeting, vault-path invalidation, and layout invalidation.
+- Preserve root-leaf fallback discovery and multi-window correctness when Obsidian changes ownership unexpectedly.
+
+### Phase 5 — Document context caching
+
+- Cache resolved note context per document when file identity, metadata, and theme are unchanged.
+- Avoid repeated active-leaf lookup, metadata-cache access, tag extraction, and frontmatter object reconstruction on no-op document applies.
+- Invalidate context explicitly on file changes, metadata changes, layout/root ownership changes, theme dependency changes, and document close.
+- Ensure cached contexts never survive an invalidation boundary that can change Routing or opacity-exclusion output.
+
+### Phase 6 — Scene and routing resolution caching
+
+- Cache Scene/rule resolution behind explicit Settings, context, and manual-Scene revisions.
+- Reuse unchanged resolution for pool targeting, Settings invalidation, vault-path checks, status summaries, and document application.
+- Keep manual Scene changes deterministic and avoid cache state that mutates during side-effect-free snapshot comparisons.
+- Preserve all Routing precedence, legacy inline-rule fallback, and opacity-exclusion behavior.
+
+### Phase 7 — Source-resolution and media lookup caching
+
+- Cache vault source lookup data when resolved path, file stat, and explicit source revision are unchanged.
+- Avoid repeated path validation, `getAbstractFileByPath()`, media-kind detection, resource URL generation, and media-key assembly for an unchanged source.
+- Keep media identity separate from appearance, Scene/routing identity, and playback identity so visual changes still never force media reloads.
+- Invalidate source lookup only for relevant vault events, pool selection changes, resolved-path changes, or explicit Reload.
+
+### Phase 8 — Measurement and release gate
+
+- Extend the development-only work profiler with counters for context builds, Scene/rule resolution, source resolution, Settings comparison, and skipped no-op work where useful.
+- Extend `npm run perf` so 1.7 compares against the released 1.6.0 baseline and fails on structural performance regressions.
+- Keep production profiler/debug markers fully stripped from `main.js`.
+- Track production bundle growth separately from runtime efficiency; smaller hot-path work must not justify uncontrolled bundle expansion.
+- Add an optional live-Obsidian benchmark harness only where Electron/DOM/media timing is necessary to validate behavior that deterministic tests cannot measure.
+
+### 1.7 acceptance criteria
+
+1. All 1.6 stability-contract tests remain green without weakening assertions.
+2. No existing Scene, Routing, Wallpaper Library, pool, appearance, video, transition, persistence, import/export, command, or multi-window behavior is removed or intentionally changed.
+3. `npm run perf` passes against the released 1.6.0 baseline.
+4. Settings-path work scales better for large profile/rule collections and does not add a new full-settings serialization pass.
+5. Continuous Settings controls perform no more than one expensive runtime apply per animation frame where batching is applicable.
+6. Repeated document applies with unchanged file metadata/theme reuse cached context and resolution instead of rebuilding equivalent state.
+7. Idle Veil continues to perform no unnecessary recurring work.
+8. Any new cache has an explicit invalidation contract and regression tests proving stale state cannot escape it.
+
+### 1.7 non-goals
+
+The 1.7 cycle remains performance-focused. New wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, a substantially more complex Routing DSL, and other feature-expansion work remain outside scope unless required to preserve an existing feature while optimizing it.
 
 ### Development branches
 
