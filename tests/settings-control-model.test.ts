@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import {
+  continuousControlPatch,
+  controlCanFrameCoalesce,
   controlValue,
   findProfile,
   findRule,
@@ -115,6 +117,57 @@ void test("render invalidation classification remains explicit", () => {
   assert.equal(ruleControlRequiresRender("excludePaneSurface"), false);
   assert.equal(ruleControlRequiresRender("excludePaneContent"), false);
   assert.equal(ruleControlRequiresRender("matchValue"), false);
+});
+
+void test("only continuous appearance sliders can frame-coalesce", () => {
+  assert.equal(controlCanFrameCoalesce("opacity"), true);
+  assert.equal(controlCanFrameCoalesce("wallpaperZoom"), true);
+  assert.equal(controlCanFrameCoalesce("profile:scene-1:opacity"), true);
+  assert.equal(controlCanFrameCoalesce("profile:scene-1:transitionDuration"), true);
+  assert.equal(controlCanFrameCoalesce("enabled"), false);
+  assert.equal(controlCanFrameCoalesce("wallpaperPoolEnabled"), false);
+  assert.equal(controlCanFrameCoalesce("profile:scene-1:name"), false);
+  assert.equal(controlCanFrameCoalesce("wallpaper-rule:wallpaper-1:matchValue"), false);
+});
+
+void test("continuous control values collapse into one immutable settings patch", () => {
+  const settings = settingsFixture();
+  const second = createProfile(settings.profiles, settings);
+  second.id = "scene-2";
+  second.name = "Rest";
+  settings.profiles = [...settings.profiles, second];
+
+  const firstProfile = settings.profiles[0];
+  const secondProfile = settings.profiles[1];
+  const patch = continuousControlPatch(settings, new Map<string, unknown>([
+    ["opacity", 42],
+    ["profile:scene-1:opacity", 35],
+    ["profile:scene-1:wallpaperZoom", 125],
+    ["profile:scene-1:name", "Ignored"],
+  ]));
+
+  assert.ok(patch);
+  assert.equal(patch.opacity, 42);
+  assert.ok(patch.profiles);
+  assert.notEqual(patch.profiles, settings.profiles);
+  assert.notEqual(patch.profiles[0], firstProfile);
+  assert.equal(patch.profiles[0]?.opacity, 35);
+  assert.equal(patch.profiles[0]?.wallpaperZoom, 125);
+  assert.equal(patch.profiles[0]?.name, "Focus");
+  assert.equal(patch.profiles[1], secondProfile);
+  assert.equal(settings.opacity, DEFAULT_SETTINGS.opacity);
+  assert.equal(firstProfile?.opacity, DEFAULT_SETTINGS.opacity);
+});
+
+void test("continuous patch returns null when every queued value is already current", () => {
+  const settings = settingsFixture();
+  assert.equal(
+    continuousControlPatch(settings, new Map([
+      ["opacity", settings.opacity],
+      ["profile:scene-1:opacity", settings.profiles[0]?.opacity],
+    ])),
+    null,
+  );
 });
 
 void test("settings base delegates control-model ownership", () => {
