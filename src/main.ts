@@ -274,7 +274,6 @@ export default class VeilPlugin extends Plugin {
     }
     if (change.kind === "unchanged") return;
 
-    this.sourceRevision += 1;
     this.scheduleApplyToWorkspace();
     this.settingTab?.updateStatus();
     if (change.kind === "cleared") {
