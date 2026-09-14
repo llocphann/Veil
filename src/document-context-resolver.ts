@@ -11,11 +11,12 @@ export class DocumentContextResolver {
 
   constructor(private readonly app: App) {}
 
-  rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): void {
-    if (!leaf) return;
+  rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): Document | null {
+    if (!leaf) return null;
     const document = leaf.view.containerEl.ownerDocument;
-    if (!this.isRootLeafForDocument(leaf, document)) return;
+    if (!this.isRootLeafForDocument(leaf, document)) return null;
     this.activeRootLeaves.set(document, leaf);
+    return document;
   }
 
   forgetDocument(document: Document): void {
@@ -54,13 +55,19 @@ export class DocumentContextResolver {
     };
   }
 
+  documentsForFile(file: TFile): Document[] {
+    const documents = this.workspaceDocuments();
+    return documents.filter((document) => this.fileForDocument(document)?.path === file.path);
+  }
+
   isActiveFile(file: TFile): boolean {
+    return this.documentsForFile(file).length > 0;
+  }
+
+  private workspaceDocuments(): Document[] {
     const documents = new Set<Document>([this.app.workspace.containerEl.ownerDocument]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    for (const document of documents) {
-      if (this.fileForDocument(document)?.path === file.path) return true;
-    }
-    return false;
+    return Array.from(documents);
   }
 
   private fileForDocument(document: Document): TFile | null {
