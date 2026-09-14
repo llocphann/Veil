@@ -11,6 +11,7 @@ import { SceneRuntime } from "./scene-runtime";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import { veilSettingsEqual } from "./settings-change-detection";
 import { classifySettingsChange } from "./settings-change-impact";
+import { resolvedDocumentSettingsChanged } from "./settings-document-invalidation";
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
@@ -184,6 +185,9 @@ export default class VeilPlugin extends Plugin {
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
     if (veilSettingsEqual(previous, next)) return;
     const impact = classifySettingsChange(previous, next);
+    const affectedDocuments = impact.documentResolution && !impact.enabled
+      ? this.documentsAffectedBySettings(previous, next)
+      : null;
     if (rememberRecent && impact.libraryRecent) {
       this.wallpaperLibrary.rememberSettingsChanges(previous, next);
     }
@@ -193,7 +197,10 @@ export default class VeilPlugin extends Plugin {
       this.wallpaperPools.reconcileSettings(previous, next, preservedPoolContexts);
     }
     if (impact.routingSchedule) this.systemRouting.reschedule();
-    if (impact.documentResolution) this.refreshWallpaper();
+    if (impact.documentResolution) {
+      if (impact.enabled) this.refreshWallpaper();
+      else if (affectedDocuments?.size) this.scheduleApplyToDocuments(affectedDocuments);
+    }
     this.scheduleSave();
   }
 
@@ -298,6 +305,44 @@ export default class VeilPlugin extends Plugin {
     else this.refreshWallpaper();
   }
 
+  private workspaceDocuments(): Set<Document> {
+    const documents = new Set(this.documents.keys());
+    documents.add(this.app.workspace.containerEl.ownerDocument);
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      documents.add(leaf.view.containerEl.ownerDocument);
+    });
+    return documents;
+  }
+
+  private documentsAffectedBySettings(
+    previous: VeilSettings,
+    next: VeilSettings,
+  ): Set<Document> {
+    const affected = new Set<Document>();
+    for (const document of this.workspaceDocuments()) {
+      if (document.defaultView?.closed) {
+        affected.add(document);
+        continue;
+      }
+      const currentContext = this.documentContexts.contextForDocument(document);
+      const context: NoteContext = { ...currentContext, now: new Date() };
+      const previousResolved = this.scenes.resolveSnapshot(previous, context);
+      const nextResolved = this.scenes.resolveSnapshot(next, context);
+      if (
+        resolvedDocumentSettingsChanged(
+          previous,
+          next,
+          context,
+          previousResolved,
+          nextResolved,
+        )
+      ) {
+        affected.add(document);
+      }
+    }
+    return affected;
+  }
+
   private setStatus(message: string, tone: StatusTone = "info"): void {
     this.status = { message, tone };
     this.settingTab?.updateStatus();
@@ -372,12 +417,7 @@ export default class VeilPlugin extends Plugin {
 
   private applyToWorkspace(): void {
     if (this.unloaded) return;
-    const documents = new Set(this.documents.keys());
-    documents.add(this.app.workspace.containerEl.ownerDocument);
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      documents.add(leaf.view.containerEl.ownerDocument);
-    });
-    for (const document of documents) this.applyScheduledDocument(document);
+    for (const document of this.workspaceDocuments()) this.applyScheduledDocument(document);
   }
 
   private applyScheduledDocument(document: Document): void {
