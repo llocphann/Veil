@@ -27,7 +27,18 @@ void test("zero opacity pauses motion and video playback", () => {
   assert.equal(state.shouldPlayVideo, false);
 });
 
-void test("hidden documents pause only when the policy is enabled", () => {
+void test("hidden documents always pause visual effects", () => {
+  assert.equal(
+    playback({ documentHidden: true, pauseWhenHidden: true }).motionPaused,
+    true,
+  );
+  assert.equal(
+    playback({ documentHidden: true, pauseWhenHidden: false }).motionPaused,
+    true,
+  );
+});
+
+void test("hidden video playback still follows the explicit policy", () => {
   assert.equal(
     playback({ documentHidden: true, pauseWhenHidden: true }).shouldPlayVideo,
     false,
@@ -36,6 +47,14 @@ void test("hidden documents pause only when the policy is enabled", () => {
     playback({ documentHidden: true, pauseWhenHidden: false }).shouldPlayVideo,
     true,
   );
+});
+
+void test("visibility changes invalidate playback identity even when video may continue", () => {
+  const visible = playback({ documentHidden: false, pauseWhenHidden: false });
+  const hidden = playback({ documentHidden: true, pauseWhenHidden: false });
+  assert.notEqual(visible.signature, hidden.signature);
+  assert.equal(hidden.motionPaused, true);
+  assert.equal(hidden.shouldPlayVideo, true);
 });
 
 void test("reduced motion pauses only when respected", () => {
