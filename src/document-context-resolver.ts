@@ -9,6 +9,7 @@ import type { NoteContext } from "./context-rules";
 export class DocumentContextResolver {
   private readonly activeRootLeaves = new Map<Document, WorkspaceLeaf>();
   private readonly workspaceDocumentRegistry = new Set<Document>();
+  private readonly contextCache = new Map<Document, NoteContext>();
 
   constructor(private readonly app: App) {
     this.rememberDocument(this.app.workspace.containerEl.ownerDocument);
@@ -34,18 +35,33 @@ export class DocumentContextResolver {
     const document = leaf.view.containerEl.ownerDocument;
     if (!this.isRootLeafForDocument(leaf, document)) return null;
     this.rememberDocument(document);
+    this.invalidateDocument(document);
     this.activeRootLeaves.set(document, leaf);
     return document;
+  }
+
+  invalidateDocument(document: Document): void {
+    this.contextCache.delete(document);
+  }
+
+  invalidateDocuments(documents: Iterable<Document>): void {
+    for (const document of documents) this.invalidateDocument(document);
+  }
+
+  invalidateAllContexts(): void {
+    this.contextCache.clear();
   }
 
   forgetDocument(document: Document): void {
     this.activeRootLeaves.delete(document);
     this.workspaceDocumentRegistry.delete(document);
+    this.contextCache.delete(document);
   }
 
   clear(): void {
     this.activeRootLeaves.clear();
     this.workspaceDocumentRegistry.clear();
+    this.contextCache.clear();
   }
 
   documentsAffectedByLayoutChange(): Document[] {
@@ -61,28 +77,54 @@ export class DocumentContextResolver {
       if (remembered) this.activeRootLeaves.delete(document);
       const replacement = this.findRootLeafForDocument(document);
       if (replacement) this.activeRootLeaves.set(document, replacement);
-      if (remembered || replacement) affected.push(document);
+      if (remembered || replacement) {
+        this.invalidateDocument(document);
+        affected.push(document);
+      }
     }
     return affected;
   }
 
   contextForDocument(document: Document): NoteContext {
+    const cached = this.contextCache.get(document);
+    if (cached) return cached;
+
     const candidate = this.fileForDocument(document);
     const theme = document.body.classList.contains("theme-dark")
       ? "dark"
       : document.body.classList.contains("theme-light")
         ? "light"
         : undefined;
-    if (!candidate) {
-      return {
-        path: "",
-        name: "",
-        basename: "",
-        tags: [],
-        properties: {},
-        theme,
-      };
-    }
+    const context: NoteContext = candidate
+      ? this.contextForFile(candidate, theme)
+      : {
+          path: "",
+          name: "",
+          basename: "",
+          tags: [],
+          properties: {},
+          theme,
+        };
+    this.contextCache.set(document, context);
+    return context;
+  }
+
+  documentsForFile(file: TFile): Document[] {
+    return Array.from(this.workspaceDocumentRegistry).filter((document) => {
+      const cached = this.contextCache.get(document);
+      if (cached) return cached.path === file.path;
+      return this.fileForDocument(document)?.path === file.path;
+    });
+  }
+
+  isActiveFile(file: TFile): boolean {
+    return this.documentsForFile(file).length > 0;
+  }
+
+  private contextForFile(
+    candidate: TFile,
+    theme: NoteContext["theme"],
+  ): NoteContext {
     const cache = this.app.metadataCache.getFileCache(candidate);
     return {
       path: candidate.path,
@@ -92,15 +134,6 @@ export class DocumentContextResolver {
       properties: cache?.frontmatter || {},
       theme,
     };
-  }
-
-  documentsForFile(file: TFile): Document[] {
-    return Array.from(this.workspaceDocumentRegistry)
-      .filter((document) => this.fileForDocument(document)?.path === file.path);
-  }
-
-  isActiveFile(file: TFile): boolean {
-    return this.documentsForFile(file).length > 0;
   }
 
   private fileForDocument(document: Document): TFile | null {
