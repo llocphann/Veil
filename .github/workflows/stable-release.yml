@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - stable
+    paths-ignore:
+      - README.md
+      - "wiki/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
