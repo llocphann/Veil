@@ -56,50 +56,42 @@ Start with:
 - [Data, Privacy, and Recovery](wiki/Data-Privacy-and-Recovery.md)
 - [Troubleshooting and Performance](wiki/Troubleshooting-and-Performance.md)
 
-## Roadmap to 2.0 — complete on `dev`
+## 1.6.0 — Optimization and stability release — complete on `dev`
 
-Veil 2.0 was developed as a refinement release rather than a feature-expansion release. The existing feature set already covered the main wallpaper workflow, so development from 1.6 through 2.0 focused on lower runtime cost, cleaner internal boundaries, deterministic state handling, and stronger regression guarantees.
+Veil 1.6.0 consolidates all optimization and hardening work after 1.5.3 into one refinement release. The feature set remains focused on the existing wallpaper workflow; this release concentrates on lower runtime cost, clearer internal ownership, deterministic state handling, and stronger regression guarantees.
 
-### 1.6 — Architecture decomposition — complete on `dev`
+### Architecture decomposition
 
-Architecture decomposition is complete on the development branch. The main runtime and Settings hotspot have been reduced into smaller ownership-focused modules while preserving behavior under the full verification suite.
+- Reduce orchestration and state ownership concentrated in `main.ts`.
+- Split Settings and Wallpaper Library responsibilities into smaller, independently testable modules.
+- Clarify ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
+- Preserve existing user-facing behavior while restructuring internals.
 
-- Reduce the amount of orchestration and state ownership concentrated in `main.ts`.
-- Split settings and Wallpaper Library responsibilities into smaller, independently testable modules.
-- Preserve existing behavior while clarifying ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
-- Avoid user-facing feature additions unless they are required to complete the refactor safely.
+### Runtime invalidation and no-op fast paths
 
-### 1.7 — Runtime invalidation and no-op fast paths — complete on `dev`
+- Use document-scoped scheduling for context, Settings, vault, and pool changes.
+- Suppress unchanged DOM, playback, and routing work with stable runtime signatures.
+- Restrict multi-window updates to documents whose resolved output is affected.
+- Keep unrelated metadata-cache and vault events outside hot-path work.
 
-Runtime invalidation now uses document-scoped scheduling for context, Settings, vault, and pool changes. Stable render signatures suppress unchanged DOM/playback work, no-op settings return before subsystem work, routing timers retain unchanged boundaries, and multi-window updates are limited to documents whose resolved output is affected.
+### Media lifecycle and transition efficiency
 
-- Replace broad refresh work with explicit invalidation for context, source, appearance, playback, layout, and pool state.
-- Add stable runtime signatures so unchanged context or appearance produces no DOM or media work.
-- Restrict multi-window updates to the documents whose resolved state actually changed.
-- Continue reducing metadata-cache and vault-event work on hot paths.
+- Separate media identity from routing, Scene, appearance, and playback identity.
+- Reuse unchanged media without replacing `src`, calling `load()`, reallocating layers, or restarting crossfades.
+- Keep video playback stable when only visual settings change.
+- Guard stale media events against superseded document state.
 
-### 1.8 — Media lifecycle and transition efficiency — complete on `dev`
+### State, UI efficiency, and release hardening
 
-Media identity is now independent from routing, Scene, appearance, and playback identity. Unchanged media is reused without replacing `src`, calling `load()`, reallocating the layer, or restarting a crossfade; playback uses its own stable signature, lifecycle phases are explicit from loading through disposal, and stale media events are guarded against superseded document state.
+- Use an explicit deterministic persisted-data migration pipeline.
+- Avoid unnecessary Settings and Wallpaper Library rerenders when local DOM-state updates are sufficient.
+- Keep development-only runtime work profiling out of production builds.
+- Constrain animated effects under hidden-window and reduced-motion idle policies.
+- Derive release versioning from published semantic-version history rather than stale candidate metadata.
 
-- Formalize media states from resolution and load through transition, active playback, and disposal.
-- Keep media identity separate from appearance and playback identity so visual changes do not reload unchanged images or videos.
-- Audit image, GIF, and video allocation, playback, cleanup, and stale-load behavior.
-- Ensure unchanged video sources do not restart when only visual settings change.
+### 1.6 stability contract
 
-### 1.9 — State, UI efficiency, and release hardening — complete on `dev`
-
-Persisted plugin data now has an explicit deterministic migration pipeline. Settings routing toggles and Wallpaper Library interactions avoid full rerenders when local DOM-state refreshes are sufficient, regression tests lock work-count fast paths, development builds expose a local runtime work profiler that is excluded from production, and animated CSS effects are constrained by hidden-window and reduced-motion idle policies.
-
-- Version the persisted settings schema and use explicit, deterministic migrations.
-- Reduce unnecessary Settings and Wallpaper Library rerenders and DOM churn.
-- Add regression tests that measure unnecessary work, not only functional output.
-- Add development-only performance instrumentation without telemetry or analytics.
-- Audit CSS effects and compositing so an idle Veil remains effectively idle.
-
-### 2.0 — Stability contract — complete on `dev`
-
-The 2.0 stability contract is now enforced by dedicated regression coverage. Runtime refreshes use stable no-op boundaries; active-leaf, file, layout, metadata, theme, Settings, and vault changes are scoped to affected documents or caches; unchanged media is reused across appearance changes; hidden visual effects pause; persisted data follows an explicit migration path; and release versioning derives from published release history instead of stale candidate metadata.
+The release is guarded by dedicated regression coverage:
 
 1. A no-op context refresh performs no meaningful work.
 2. Appearance-only changes never reload unchanged media.
@@ -108,7 +100,7 @@ The 2.0 stability contract is now enforced by dedicated regression coverage. Run
 5. Idle operation has no unnecessary recurring timers, animation, DOM mutation, or vault scanning.
 6. Every persisted-data version has a deterministic migration path.
 
-Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL remain intentionally outside the 2.0 scope unless they become necessary for the core wallpaper experience.
+Features such as additional wallpaper providers, cloud services, image editing, scripting, shader-heavy effects, Scene nesting, or a substantially more complex routing DSL remain outside the 1.6.0 scope unless required by the core wallpaper experience.
 
 ### Development branches
 
