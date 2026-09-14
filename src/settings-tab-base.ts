@@ -17,6 +17,17 @@ import {
   createVideoDefinitions,
 } from "./settings-appearance-definitions";
 import {
+  controlValue,
+  findProfile,
+  findRule,
+  globalControlRequiresRender,
+  parseProfileControlKey,
+  parseRuleControlKey,
+  profileControlRequiresRender,
+  ruleControlRequiresRender,
+  setRuleControlValue,
+} from "./settings-control-model";
+import {
   createOpacityExclusionDefinitions,
   createWallpaperRuleDefinitions,
   type RoutingDefinitionActions,
@@ -28,17 +39,12 @@ import {
 import {
   DEFAULT_SETTINGS,
   DISPLAY_MODES,
-  MATCH_TYPES,
   createOpacityExclusionRule,
   createProfile,
   createWallpaperRule,
   mediaKind,
   normalizeSettings,
-  type MatchType,
-  type OpacityExclusionRule,
   type VeilProfile,
-  type VeilSettings,
-  type WallpaperRule,
 } from "./settings";
 import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-transfer";
 
@@ -54,29 +60,7 @@ const SETTINGS_TABS = [
   { id: "support", label: "Support", icon: "heart" },
 ] as const;
 
-const DYNAMIC_GLOBAL_KEYS = new Set<string>([
-  "wallpaperPoolEnabled",
-  "vignetteMode",
-  "blurEnabled",
-  "dimEnabled",
-  "colorOverlayEnabled",
-  "effectPreset",
-]);
-
-const DYNAMIC_PROFILE_FIELDS = new Set<string>([
-  "name",
-  "wallpaperPath",
-  "wallpaperPoolEnabled",
-  "vignetteMode",
-  "blurEnabled",
-  "dimEnabled",
-  "colorOverlayEnabled",
-  "effectPreset",
-]);
-
-type SettingKey = keyof VeilSettings;
 type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
-type RuleKind = "wallpaper" | "opacity";
 
 export class WallpaperSettingsTab extends PluginSettingTab {
   private readonly plugin: VeilPlugin;
@@ -91,28 +75,11 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   getControlValue(key: string): unknown {
-    const profileKey = this.parseProfileKey(key);
-    if (profileKey) {
-      const profile = this.findProfile(profileKey.id);
-      return profile
-        ? (profile as unknown as Record<string, unknown>)[profileKey.field]
-        : undefined;
-    }
-
-    const ruleKey = this.parseRuleKey(key);
-    if (ruleKey) {
-      const rule = this.findRule(ruleKey.kind, ruleKey.id);
-      return rule
-        ? (rule as unknown as Record<string, unknown>)[ruleKey.field]
-        : undefined;
-    }
-
-    if (!(key in DEFAULT_SETTINGS)) return undefined;
-    return this.plugin.settings[key as SettingKey];
+    return controlValue(this.plugin.settings, key);
   }
 
   setControlValue(key: string, value: unknown): void {
-    const profileKey = this.parseProfileKey(key);
+    const profileKey = parseProfileControlKey(key);
     if (profileKey) {
       const profiles = this.plugin.settings.profiles.map((profile) =>
         profile.id === profileKey.id
@@ -120,27 +87,21 @@ export class WallpaperSettingsTab extends PluginSettingTab {
           : profile,
       );
       this.plugin.updateSettings({ profiles });
-      if (DYNAMIC_PROFILE_FIELDS.has(profileKey.field)) this.update();
+      if (profileControlRequiresRender(profileKey.field)) this.update();
       else this.refreshDomState();
       return;
     }
 
-    const ruleKey = this.parseRuleKey(key);
+    const ruleKey = parseRuleControlKey(key);
     if (ruleKey) {
-      const rule = this.findRule(ruleKey.kind, ruleKey.id);
+      const rule = findRule(this.plugin.settings, ruleKey.kind, ruleKey.id);
       if (!rule) return;
-      this.setRuleValue(rule, ruleKey.field, value);
+      setRuleControlValue(rule, ruleKey.field, value);
       this.plugin.updateSettings({
         wallpaperRules: this.plugin.settings.wallpaperRules,
         opacityExclusions: this.plugin.settings.opacityExclusions,
       });
-      if ([
-        "matchType",
-        "enabled",
-        "profileId",
-        "excludePaneSurface",
-        "excludePaneContent",
-      ].includes(ruleKey.field)) this.update();
+      if (ruleControlRequiresRender(ruleKey.field)) this.update();
       else this.refreshDomState();
       return;
     }
@@ -148,7 +109,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (!(key in DEFAULT_SETTINGS)) return;
     const next = normalizeSettings({ ...this.plugin.settings, [key]: value }, normalizePath);
     this.plugin.updateSettings(next);
-    if (DYNAMIC_GLOBAL_KEYS.has(key)) this.update();
+    if (globalControlRequiresRender(key)) this.update();
     else this.refreshDomState();
   }
 
@@ -578,72 +539,6 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     };
   }
 
-  private parseRuleKey(key: string): { kind: RuleKind; id: string; field: string } | null {
-    const [prefix, id, ...fieldParts] = key.split(":");
-    if (!id || fieldParts.length === 0) return null;
-    if (prefix !== "wallpaper-rule" && prefix !== "opacity-rule") return null;
-    return {
-      kind: prefix === "wallpaper-rule" ? "wallpaper" : "opacity",
-      id,
-      field: fieldParts.join(":"),
-    };
-  }
-
-  private parseProfileKey(key: string): { id: string; field: string } | null {
-    const [prefix, id, ...fieldParts] = key.split(":");
-    if (prefix !== "profile" || !id || fieldParts.length === 0) return null;
-    return { id, field: fieldParts.join(":") };
-  }
-
-  private findRule(
-    kind: RuleKind,
-    id: string,
-  ): WallpaperRule | OpacityExclusionRule | undefined {
-    return kind === "wallpaper"
-      ? this.plugin.settings.wallpaperRules.find((rule) => rule.id === id)
-      : this.plugin.settings.opacityExclusions.find((rule) => rule.id === id);
-  }
-
-  private findProfile(id: string): VeilProfile | undefined {
-    return this.plugin.settings.profiles.find((profile) => profile.id === id);
-  }
-
-  private setRuleValue(
-    rule: WallpaperRule | OpacityExclusionRule,
-    field: string,
-    value: unknown,
-  ): void {
-    if (field === "enabled") {
-      rule.enabled = value === true;
-      return;
-    }
-    if (field === "excludePaneSurface" && "excludePaneSurface" in rule) {
-      rule.excludePaneSurface = value === true;
-      return;
-    }
-    if (field === "excludePaneContent" && "excludePaneContent" in rule) {
-      rule.excludePaneContent = value === true;
-      return;
-    }
-    if (field === "matchType") {
-      rule.matchType = Object.keys(MATCH_TYPES).includes(String(value))
-        ? value as MatchType
-        : "path";
-      return;
-    }
-    if (field === "matchValue") {
-      rule.matchValue = typeof value === "string" ? value : "";
-      return;
-    }
-    if (field === "profileId" && "profileId" in rule) {
-      rule.profileId = typeof value === "string" ? value : "";
-      return;
-    }
-    if (field === "wallpaperPath" && "wallpaperPath" in rule) {
-      rule.wallpaperPath = typeof value === "string" ? value : "";
-    }
-  }
-
   private duplicateScene(id: string): void {
     if (this.plugin.settings.profiles.length >= MAX_SCENES) {
       new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
@@ -665,7 +560,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private copyGlobalAppearanceToProfile(id: string): void {
-    const current = this.findProfile(id);
+    const current = findProfile(this.plugin.settings, id);
     if (!current) return;
     const copied = createProfile([], this.plugin.settings);
     const profile: VeilProfile = { ...copied, id: current.id, name: current.name };
@@ -676,7 +571,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
   }
 
   private deleteProfile(id: string): void {
-    const profile = this.findProfile(id);
+    const profile = findProfile(this.plugin.settings, id);
     if (!profile) return;
     const profiles = this.plugin.settings.profiles.filter((candidate) => candidate.id !== id);
     const wallpaperRules = this.plugin.settings.wallpaperRules.map((rule) =>
