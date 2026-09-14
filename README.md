@@ -104,9 +104,15 @@ Features such as additional wallpaper providers, cloud services, image editing, 
 
 ### Development branches
 
-- `dev` is the integration branch for work moving toward the next release and must pass the full verification workflow.
-- `stable` contains release-ready source. Promotion to `stable` triggers the stable release pipeline, which verifies the source again, increments the patch version, synchronizes release metadata, tags the verified commit, and publishes the release artifacts.
-- `main` and `prerelease` remain available for compatibility with the existing repository history while the `dev` → `stable` flow is adopted.
+Veil uses an explicit three-stage promotion flow:
+
+`dev` → `prerelease` → `stable`
+
+- `dev` is the integration branch. Every push runs the full verification workflow, but it does not create a smoke-test bundle or publish a release.
+- `prerelease` is the manual smoke-test gate. Promoting a verified `dev` state here runs verification again and uploads a short-lived `main.js` / `manifest.json` / `styles.css` bundle for manual testing.
+- Smoke testing is performed manually before any promotion to `stable`; there is no automatic `dev` → `prerelease` or `prerelease` → `stable` branch promotion.
+- `stable` is the default and release branch. A manually promoted prerelease candidate is checked against the current `prerelease` source, verified again, patch-versioned when needed, tagged, attested, and published.
+- Stable release source must match the smoke-tested `prerelease` tree, preventing direct untested changes on `stable` from becoming a release.
 
 ## Privacy
 
@@ -125,7 +131,7 @@ The built-in Wallhaven browser is SFW-only and does not use or store a Wallhaven
 If Veil has made your Obsidian workspace more enjoyable, you can support its continued development here.
 
 <a href="https://www.buymeacoffee.com/llocphann">
-  <img src="https://raw.githubusercontent.com/llocphann/Veil/main/assets/buy-me-a-coffee.svg" alt="Buy Me a Coffee" height="48">
+  <img src="https://raw.githubusercontent.com/llocphann/Veil/stable/assets/buy-me-a-coffee.svg" alt="Buy Me a Coffee" height="48">
 </a>
 
 <sub>Your support helps me keep refining Veil, improving wallpaper workflows, routing, visual effects, and documentation.</sub>

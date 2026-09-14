@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.3
+
+- Promote the smoke-tested prerelease state to the stable release channel.
+
 ## 1.5.2
 
 - Promote the verified development state to the stable release channel.
