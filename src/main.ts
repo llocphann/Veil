@@ -2,15 +2,14 @@ import {
   Notice,
   Plugin,
   TFile,
-  getAllTags,
   normalizePath,
-  type WorkspaceLeaf,
 } from "obsidian";
 import {
   matchingOpacityExclusions,
   nextSystemContextBoundary,
   type NoteContext,
 } from "./context-rules";
+import { DocumentContextResolver } from "./document-context-resolver";
 import { resolveWallpaper, type ResolvedWallpaper } from "./profile-resolver";
 import { SceneSwitcherModal } from "./scene-switcher-modal";
 import {
@@ -95,7 +94,7 @@ export default class VeilPlugin extends Plugin {
   };
 
   private readonly documents = new Map<Document, DocumentState>();
-  private readonly activeRootLeaves = new Map<Document, WorkspaceLeaf>();
+  private readonly documentContexts = new DocumentContextResolver(this.app);
   private readonly poolCandidates = new Map<string, string[]>();
   private readonly poolSelections = new Map<string, string>();
   private readonly previousPoolSelections = new Map<string, string>();
@@ -151,13 +150,13 @@ export default class VeilPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       if (this.unloaded) return;
       this.layoutReady = true;
-      this.rememberActiveRootLeaf(this.app.workspace.getMostRecentLeaf());
+      this.documentContexts.rememberActiveRootLeaf(this.app.workspace.getMostRecentLeaf());
       this.registerVaultEvents();
       this.rescheduleSystemRouting();
       this.refreshWallpaper();
     });
     this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
-      this.rememberActiveRootLeaf(leaf);
+      this.documentContexts.rememberActiveRootLeaf(leaf);
       this.refreshWallpaper();
     }));
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshWallpaper()));
@@ -165,7 +164,7 @@ export default class VeilPlugin extends Plugin {
     this.registerEvent(
       this.app.metadataCache.on("changed", (file) => {
         if (!this.layoutReady) return;
-        if (this.isActiveFile(file)) this.refreshWallpaper();
+        if (this.documentContexts.isActiveFile(file)) this.refreshWallpaper();
       }),
     );
     this.registerEvent(
@@ -175,7 +174,7 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.workspace.on("window-close", (_workspaceWindow, window) => {
-        this.activeRootLeaves.delete(window.document);
+        this.documentContexts.forgetDocument(window.document);
         this.clearDocument(window.document);
       }),
     );
@@ -190,7 +189,7 @@ export default class VeilPlugin extends Plugin {
     this.systemRoutingTimer = null;
     void this.flushSettings();
     this.clearAllDocuments();
-    this.activeRootLeaves.clear();
+    this.documentContexts.clear();
     this.poolCandidates.clear();
     this.poolSelections.clear();
     this.previousPoolSelections.clear();
@@ -269,7 +268,7 @@ export default class VeilPlugin extends Plugin {
 
   public shuffleWallpaperPool(): void {
     const document = this.app.workspace.containerEl.ownerDocument;
-    const context = this.contextForDocument(document);
+    const context = this.documentContexts.contextForDocument(document);
     const resolved = this.resolveForContext(context);
     const poolAllowed = !resolved.rule || Boolean(resolved.profile);
     if (!poolAllowed || !resolved.appearance.wallpaperPoolEnabled) {
@@ -311,7 +310,7 @@ export default class VeilPlugin extends Plugin {
 
   public activeContextSummary(): string {
     const document = this.app.workspace.containerEl.ownerDocument;
-    const context = this.contextForDocument(document);
+    const context = this.documentContexts.contextForDocument(document);
     const resolved = this.resolveForContext(context);
     const subject = context?.path || "Workspace";
     if (this.manualProfileId && resolved.profile) {
@@ -591,7 +590,7 @@ export default class VeilPlugin extends Plugin {
     });
     for (const document of documents) {
       if (document.defaultView?.closed) {
-        this.activeRootLeaves.delete(document);
+        this.documentContexts.forgetDocument(document);
         this.clearDocument(document);
       } else {
         this.applyToDocument(document);
@@ -695,7 +694,7 @@ export default class VeilPlugin extends Plugin {
       this.clearDocument(document);
       return;
     }
-    const context = this.contextForDocument(document);
+    const context = this.documentContexts.contextForDocument(document);
     const current = this.documents.get(document) || null;
     const source = this.sourceForDocument(document, context);
     if (!source) {
@@ -794,7 +793,11 @@ export default class VeilPlugin extends Plugin {
       if (!isCurrent() || activeState.ready) return;
       activeState.ready = true;
       layer.hidden = false;
-      this.applyOptions(document, activeState, this.contextForDocument(document));
+      this.applyOptions(
+        document,
+        activeState,
+        this.documentContexts.contextForDocument(document),
+      );
       this.startCrossfade(document, activeState);
       this.setDocumentStatus(
         document,
@@ -817,7 +820,12 @@ export default class VeilPlugin extends Plugin {
       if (fallback && !fallback.disposed && fallback.layer.isConnected) {
         this.settleState(fallback);
         this.documents.set(document, fallback);
-        this.applyOptions(document, fallback, this.contextForDocument(document), fallback.appearance);
+        this.applyOptions(
+          document,
+          fallback,
+          this.documentContexts.contextForDocument(document),
+          fallback.appearance,
+        );
       } else {
         this.restoreDocumentStyles(document);
       }
@@ -1116,80 +1124,6 @@ export default class VeilPlugin extends Plugin {
     const selected = choices[Math.floor(Math.random() * choices.length)] || anchor;
     this.poolSelections.set(selectionKey, selected);
     return selected;
-  }
-
-  private fileForDocument(document: Document): TFile | null {
-    const leaf = this.leafForDocument(document);
-    const candidate: unknown = (leaf?.view as { file?: unknown } | undefined)?.file;
-    return candidate instanceof TFile ? candidate : null;
-  }
-
-  private contextForDocument(document: Document): NoteContext | null {
-    const candidate = this.fileForDocument(document);
-    const theme = document.body.classList.contains("theme-dark")
-      ? "dark"
-      : document.body.classList.contains("theme-light")
-        ? "light"
-        : undefined;
-    if (!candidate) {
-      return {
-        path: "",
-        name: "",
-        basename: "",
-        tags: [],
-        properties: {},
-        theme,
-      };
-    }
-    const cache = this.app.metadataCache.getFileCache(candidate);
-    return {
-      path: candidate.path,
-      name: candidate.name,
-      basename: candidate.basename,
-      tags: cache ? getAllTags(cache) || [] : [],
-      properties: cache?.frontmatter || {},
-      theme,
-    };
-  }
-
-  private rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): void {
-    if (!leaf) return;
-    const document = leaf.view.containerEl.ownerDocument;
-    if (!this.isRootLeafForDocument(leaf, document)) return;
-    this.activeRootLeaves.set(document, leaf);
-  }
-
-  private leafForDocument(document: Document): WorkspaceLeaf | null {
-    const remembered = this.activeRootLeaves.get(document) || null;
-    if (this.isRootLeafForDocument(remembered, document)) return remembered;
-    if (remembered) this.activeRootLeaves.delete(document);
-
-    const recent = this.app.workspace.getMostRecentLeaf();
-    if (recent && this.isRootLeafForDocument(recent, document)) {
-      this.activeRootLeaves.set(document, recent);
-      return recent;
-    }
-    const fallback: { leaf: WorkspaceLeaf | null } = { leaf: null };
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      if (!fallback.leaf && this.isRootLeafForDocument(leaf, document)) fallback.leaf = leaf;
-    });
-    return fallback.leaf;
-  }
-
-  private isRootLeafForDocument(leaf: WorkspaceLeaf | null, document: Document): boolean {
-    const container = leaf?.view?.containerEl;
-    return container?.ownerDocument === document
-      && container.isConnected
-      && Boolean(container.closest(".workspace-split.mod-root"));
-  }
-
-  private isActiveFile(file: TFile): boolean {
-    const documents = new Set<Document>([this.app.workspace.containerEl.ownerDocument]);
-    this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    for (const document of documents) {
-      if (this.fileForDocument(document)?.path === file.path) return true;
-    }
-    return false;
   }
 
   private setDocumentStatus(
