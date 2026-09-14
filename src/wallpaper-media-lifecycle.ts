@@ -1,4 +1,5 @@
 import type { WallpaperDocumentState } from "./wallpaper-document-state";
+import { wallpaperPlaybackState } from "./wallpaper-playback-state";
 
 const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
 const TRANSITION_CLEANUP_BUFFER = 80;
@@ -79,19 +80,28 @@ export interface PlaybackOptions {
 export function syncWallpaperPlayback(options: PlaybackOptions): void {
   const { document, state, isEnabled, isUnloaded, onError } = options;
   const appearance = state.appearance;
-  const motionPaused =
-    appearance.opacity === 0
-    || (appearance.pauseWhenHidden && document.hidden)
-    || (appearance.respectReducedMotion && Boolean(state.motionQuery?.matches));
-  const animationPaused = String(motionPaused);
-  if (state.layer.dataset.animationPaused !== animationPaused) {
-    state.layer.dataset.animationPaused = animationPaused;
+  const unloaded = isUnloaded();
+  const playback = wallpaperPlaybackState({
+    enabled: isEnabled() && !unloaded,
+    opacity: appearance.opacity,
+    pauseWhenHidden: appearance.pauseWhenHidden,
+    documentHidden: document.hidden,
+    respectReducedMotion: appearance.respectReducedMotion,
+    reducedMotion: Boolean(state.motionQuery?.matches),
+  });
+  const signatureChanged = state.playbackSignature !== playback.signature;
+  if (signatureChanged) {
+    state.playbackSignature = playback.signature;
+    const animationPaused = String(playback.motionPaused);
+    if (state.layer.dataset.animationPaused !== animationPaused) {
+      state.layer.dataset.animationPaused = animationPaused;
+    }
   }
-  if (state.kind !== "video" || state.disposed || state.failed || isUnloaded()) return;
+
+  if (state.kind !== "video" || state.disposed || state.failed || unloaded) return;
 
   const video = state.media as HTMLVideoElement;
-  const shouldPlay = isEnabled() && appearance.opacity > 0 && !motionPaused;
-  if (!shouldPlay) {
+  if (!playback.shouldPlayVideo) {
     if (!video.paused) video.pause();
     return;
   }
