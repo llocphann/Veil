@@ -55,10 +55,7 @@ import {
   createWallpaperDefinitions,
   type WallpaperDefinitionActions,
 } from "./settings-wallpaper-definitions";
-import {
-  DEFAULT_SETTINGS,
-  type VeilSettings,
-} from "./settings";
+import { DEFAULT_SETTINGS } from "./settings";
 
 const MAX_SCENES = 64;
 const MAX_CONTEXT_RULES = 96;
@@ -132,7 +129,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     }
 
     if (!(key in DEFAULT_SETTINGS)) return;
-    this.plugin.updateSettings({ [key]: value } as Partial<VeilSettings>);
+    this.plugin.updateSettings({ [key]: value });
     if (globalControlRequiresRender(key)) this.update();
     else this.refreshDomState();
   }
