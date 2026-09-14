@@ -99,7 +99,9 @@ export class SceneRuntime {
   }
 
   private resolveUncached(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
-    if (__VEIL_DEV__) runtimeWorkProfiler.record("sceneResolution");
+    if (typeof __VEIL_DEV__ !== "undefined" && __VEIL_DEV__) {
+      runtimeWorkProfiler.record("sceneResolution");
+    }
     if (this.manualProfileId) {
       const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
       if (profile) {
