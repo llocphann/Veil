@@ -40,20 +40,28 @@ export class SceneRuntime {
     return profile ? { kind: "selected", profile } : { kind: "missing" };
   }
 
-  resolve(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
+  resolveSnapshot(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
     const automatic = resolveWallpaper(settings, context);
     if (!this.manualProfileId) return automatic;
     const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
-    if (!profile) {
-      this.manualProfileId = "";
-      return automatic;
-    }
+    if (!profile) return automatic;
     return {
       rule: null,
       profile,
       path: profile.wallpaperPath,
       appearance: copyAppearance(profile),
     };
+  }
+
+  resolve(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
+    const resolved = this.resolveSnapshot(settings, context);
+    if (
+      this.manualProfileId
+      && !settings.profiles.some((profile) => profile.id === this.manualProfileId)
+    ) {
+      this.manualProfileId = "";
+    }
+    return resolved;
   }
 
   summary(settings: VeilSettings, context: NoteContext | null): string {
