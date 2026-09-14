@@ -1,4 +1,3 @@
-import { normalizePath } from "obsidian";
 import { normalizeSettings, type VeilSettings } from "./settings";
 
 export interface VaultRenameSettingsResult {
@@ -16,7 +15,7 @@ export function rewriteSettingsForVaultRename(
     value === oldPath || value.startsWith(`${oldPath}/`)
       ? newPath + value.slice(oldPath.length)
       : value;
-  const next = normalizeSettings(settings, normalizePath);
+  const next = normalizeSettings(settings);
   let changed = false;
 
   const wallpaperPath = rewritePath(next.wallpaperPath);
