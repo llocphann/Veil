@@ -2,6 +2,7 @@ import {
   matchingOpacityExclusions,
   type NoteContext,
 } from "./context-rules";
+import { runtimeWorkProfiler } from "./runtime-work-profiler";
 import type {
   OpacityExclusionRule,
   VeilAppearance,
@@ -46,6 +47,7 @@ export function applyDocumentAppearance(options: DocumentAppearanceOptions): voi
   state.appearance = appearance;
   if (state.applicationSignature === applicationSignature) return;
   state.applicationSignature = applicationSignature;
+  if (__VEIL_DEV__) runtimeWorkProfiler.record("appearanceApply");
 
   const filters: string[] = [];
   if (appearance.blurEnabled && appearance.blurIntensity > 0) {
