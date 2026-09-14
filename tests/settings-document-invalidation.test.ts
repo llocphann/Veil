@@ -121,10 +121,12 @@ void test("profile-backed rules ignore legacy fallback wallpaper changes", () =>
     profileId: profile.id,
     wallpaperPath: "Wallpapers/legacy-a.webp",
   }];
+  const previousRule = previous.wallpaperRules[0];
+  assert.ok(previousRule);
   const next: VeilSettings = {
     ...previous,
     wallpaperRules: [{
-      ...previous.wallpaperRules[0]!,
+      ...previousRule,
       wallpaperPath: "Wallpapers/legacy-b.webp",
     }],
   };
