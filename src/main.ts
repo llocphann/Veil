@@ -54,6 +54,7 @@ import {
   wallpaperLibraryTargetPatch,
   wallpaperLibraryTargets,
 } from "./wallpaper-library-targets";
+import { WallpaperPoolRotationScheduler } from "./wallpaper-pool-rotation-scheduler";
 import { WallpaperPoolRuntime } from "./wallpaper-pool-runtime";
 import { WallpaperSourceResolver } from "./wallpaper-source-resolver";
 import { WallpaperSettingsTab } from "./settings-tab";
@@ -74,6 +75,11 @@ export default class VeilPlugin extends Plugin {
   private readonly documentContexts = new DocumentContextResolver(this.app);
   private readonly scenes = new SceneRuntime();
   private readonly wallpaperPools = new WallpaperPoolRuntime(this.app);
+  private readonly poolRotation = new WallpaperPoolRotationScheduler(
+    () => this.wallpaperPools.nextRotationBoundary(),
+    () => !this.unloaded && this.layoutReady && this.settings.enabled,
+    () => this.rotateDueWallpaperPools(),
+  );
   private readonly wallpaperSources = new WallpaperSourceResolver(
     this.app,
     this.scenes,
@@ -204,6 +210,7 @@ export default class VeilPlugin extends Plugin {
     this.unloaded = true;
     this.documentApply.cancel();
     this.systemRouting.clear();
+    this.poolRotation.clear();
     void this.flushSettings();
     this.clearAllDocuments();
     this.documentContexts.clear();
@@ -232,6 +239,7 @@ export default class VeilPlugin extends Plugin {
       this.wallpaperPools.reconcileSettings(previous, next, preservedPoolContexts);
     }
     if (impact.routingSchedule) this.systemRouting.reschedule();
+    this.poolRotation.reschedule();
     if (impact.documentResolution) {
       if (impact.enabled) this.refreshWallpaper();
       else if (affectedDocuments?.size) this.scheduleApplyToDocuments(affectedDocuments);
@@ -268,6 +276,7 @@ export default class VeilPlugin extends Plugin {
     const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
     const affectedDocuments = this.documentsUsingPoolContext(contextKey);
     this.wallpaperPools.shuffle(resolved.appearance, contextKey);
+    this.poolRotation.reschedule();
     if (affectedDocuments.size) this.scheduleApplyToDocuments(affectedDocuments);
   }
 
@@ -388,6 +397,13 @@ export default class VeilPlugin extends Plugin {
       if (resolvedContextKey === contextKey) affected.add(document);
     }
     return affected;
+  }
+
+  private rotateDueWallpaperPools(): void {
+    for (const contextKey of this.wallpaperPools.consumeDueRotations()) {
+      const affectedDocuments = this.documentsUsingPoolContext(contextKey);
+      if (affectedDocuments.size) this.scheduleApplyToDocuments(affectedDocuments);
+    }
   }
 
   private documentsAffectedByVaultPath(path: string): Set<Document> {
@@ -519,6 +535,7 @@ export default class VeilPlugin extends Plugin {
     const context = this.documentContexts.contextForDocument(document);
     const current = this.documents.get(document) || null;
     const sourceResolution = this.wallpaperSources.resolve(context, this.sourceRevision);
+    this.poolRotation.reschedule();
     const source = sourceResolution.source;
     if (!source) {
       this.setDocumentStatus(
