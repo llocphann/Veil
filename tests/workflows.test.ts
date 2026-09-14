@@ -136,9 +136,14 @@ void test("stable promotion accepts only the smoke-tested prerelease source befo
   assert.match(versionJob, /needs: verify/);
   assert.match(versionJob, /permissions:\n[ ]{6}contents: write/);
   assert.doesNotMatch(versionJob, /npm ci|npm run check/);
-  assert.match(versionJob, /npm version patch --no-git-tag-version --ignore-scripts/);
+  assert.match(versionJob, /gh release list/);
+  assert.match(versionJob, /release-version\.mjs --latest/);
+  assert.match(versionJob, /release-version\.mjs "\$\{CURRENT_VERSION\}" "\$\{LATEST_PUBLISHED\}"/);
+  assert.match(versionJob, /npm version "\$\{VERSION\}" --no-git-tag-version --ignore-scripts/);
+  assert.doesNotMatch(versionJob, /npm version patch/);
   assert.match(versionJob, /node version-bump\.mjs/);
-  assert.match(versionJob, /gh release view/);
+  assert.match(versionJob, /refs\/tags\/\$\{VERSION\}/);
+  assert.match(versionJob, /gh release view "\$\{VERSION\}"/);
   assert.match(versionJob, /git push origin HEAD:stable/);
   assert.match(versionJob, /git push origin "\$\{VERSION\}"/);
   assert.match(versionJob, /veil-stable-manifest-/);
