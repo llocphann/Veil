@@ -4,9 +4,7 @@ import { WallpaperSettingsTab as BaseWallpaperSettingsTab } from "./settings-tab
 const SETTINGS_SECTIONS = [
   { id: "wallpaper", label: "Wallpaper", icon: "image" },
   { id: "appearance", label: "Appearance", icon: "palette" },
-  { id: "behavior", label: "Behavior", icon: "timer" },
-  { id: "scenes", label: "Scenes", icon: "layers-3" },
-  { id: "routing", label: "Routing", icon: "list-filter" },
+  { id: "automation", label: "Automation", icon: "workflow" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -191,13 +189,10 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
       cloneDefinition(
         video,
         "Playback & motion",
-        "veil-settings-panel-behavior",
+        "veil-settings-panel-wallpaper",
         [...transitionItems, ...itemsOf(video)],
       ),
-      cloneDefinition(actions, "Quick actions", "veil-settings-panel-behavior", quickActions),
-      cloneDefinition(activeContext, "Active context", "veil-settings-panel-routing"),
-      cloneDefinition(wallpaperRouting, "Wallpaper routing", "veil-settings-panel-routing"),
-      cloneDefinition(opacityExclusions, "Opacity exclusions", "veil-settings-panel-routing"),
+      cloneDefinition(actions, "Quick actions", "veil-settings-panel-wallpaper", quickActions),
       cloneDefinition(
         wallpaper,
         "Framing & opacity",
@@ -205,7 +200,10 @@ export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
         appearanceItems,
       ),
       cloneDefinition(effects, "Effects", "veil-settings-panel-appearance"),
-      cloneDefinition(scenes, "Scenes", "veil-settings-panel-scenes"),
+      cloneDefinition(scenes, "Scenes", "veil-settings-panel-automation"),
+      cloneDefinition(activeContext, "Active context", "veil-settings-panel-automation"),
+      cloneDefinition(wallpaperRouting, "Wallpaper routing", "veil-settings-panel-automation"),
+      cloneDefinition(opacityExclusions, "Opacity exclusions", "veil-settings-panel-automation"),
     ]);
 
     const sharedSections = compact([
