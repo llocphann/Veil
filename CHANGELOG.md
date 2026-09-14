@@ -4,110 +4,111 @@
 
 ## 1.7.0
 
-- Coalesce high-frequency appearance sliders to one Settings runtime update per animation frame while preserving immediate control feedback and the final persisted value.
-- Replace repeated workspace leaf scans with a live document registry shared by document application, metadata targeting, pool targeting, layout repair, and vault invalidation.
-- Cache document semantic context behind explicit file, metadata, layout, theme, rename, and window-lifecycle invalidation so no-op applies avoid repeated leaf and metadata work.
-- Cache static Scene and Routing resolution by Settings/context identity and manual-Scene revision while keeping time-, day-, and schedule-dependent routing uncached.
-- Cache wallpaper source/media lookup by path, file stat, and explicit source revision with bounded storage and scoped vault-event invalidation.
-- Extend development-only runtime work profiling with context-build, Scene-resolution, and source-lookup counters placed after their no-op/cache guards.
-- Move the performance gate to the exact released 1.6.0 baseline while retaining deterministic optimization contracts, production bundle verification, bundle-growth limits, and Settings-path benchmarks.
-- Preserve the complete 1.6 stability contract and existing Scene, Routing, Wallpaper Library, pool, appearance, video, transition, persistence, command, and multi-window behavior.
+### Highlights
+
+- Make Veil noticeably lighter during everyday use by coalescing rapid Settings slider changes, caching document context, Scene/Automation resolution, and wallpaper source lookups, and replacing repeated workspace leaf scans with a live document registry.
+- Redesign Wallpaper Pool configuration around an explicit **Wallpaper folder**, optional **Include subfolders**, and automatic **Change interval** rotation while preserving the previously selected wallpaper file and Wallpaper Library state when the pool is enabled.
+- Keep old pool configurations compatible by deriving the new folder from the existing wallpaper path when needed, including Scene pools, without discarding legacy data.
+- Simplify Settings into four primary tabs: **Wallpaper**, **Appearance**, **Automation**, and **Data**. Behavior is folded into Wallpaper; Scenes and Routing are grouped under Automation; Data & recovery gets its own dedicated tab.
+- Preserve existing Scenes, Routing rules, opacity exclusions, Wallpaper Library data, import/export data, and persisted settings while reorganizing the UI.
+- Improve pool rotation efficiency with one-shot scheduling so idle Veil does not poll continuously and only documents using a due pool context are refreshed.
+- Extend development profiling with context-build, Scene-resolution, and source-lookup counters and make `npm run perf` compare directly against the released 1.6.0 baseline.
+- Retain the full 1.6 stability contract: unchanged media is reused, unrelated events stay scoped, idle work remains minimal, and persisted migrations remain deterministic.
 
 ## 1.6.0
 
-- Rework Veil around smaller ownership-focused runtime and Settings modules without expanding the core feature surface.
-- Scope context, Settings, vault, pool, layout, metadata, and theme invalidation to only the documents or caches whose resolved output can change.
-- Separate media identity from appearance and playback state so unchanged image and video sources are reused without redundant reloads, allocations, or crossfades.
-- Add deterministic persisted-data schema migrations with explicit migration regression coverage.
-- Reduce Settings and Wallpaper Library DOM churn with local state refreshes and card-level patch fast paths instead of unnecessary full rerenders.
-- Add development-only runtime work profiling and regression gates for no-op work while keeping profiler commands and debug markers out of production bundles.
-- Harden idle behavior by pausing hidden animated effects, avoiding recurring polling, retaining routing timers only for real time boundaries, and limiting infinite CSS animation/compositing to active effects.
-- Establish the Veil 1.6 stability contract as a regression gate for no-op refreshes, unchanged media, scoped invalidation, vault cache churn, idle work, and deterministic migrations.
-- Harden release version derivation against stale candidate metadata by computing future release versions from the highest published semantic release.
+### Highlights
+
+- Rework Veil into smaller ownership-focused runtime and Settings modules so context, layout, metadata, theme, pool, vault, and Settings changes invalidate only the documents or caches that can actually change.
+- Separate media identity from appearance and playback state so unchanged images and videos are reused instead of being reloaded, reallocated, or crossfaded unnecessarily.
+- Add deterministic persisted-data schema migrations and regression coverage for safe upgrades.
+- Reduce Settings and Wallpaper Library DOM work with local refreshes and card-level patches instead of broad rerenders.
+- Add development-only runtime work profiling and stability gates for no-op refreshes, media reuse, scoped invalidation, vault cache churn, idle work, and migration behavior.
+- Harden idle behavior by pausing hidden animated effects, avoiding unnecessary recurring work, and retaining routing timers only for meaningful time boundaries.
 
 ## 1.5.3
 
-- Promote the smoke-tested prerelease state to the stable release channel.
+### Highlights
+
+- Make `prerelease` the mandatory smoke-test gate before stable promotion and require the stable source tree to match the smoke-tested prerelease candidate exactly.
+- Move stable publishing into a self-contained promotion workflow that verifies source provenance and the production build before creating release artifacts.
+- Add workflow regression tests for the `dev → prerelease → stable` release path and keep the public release branch tied to verified source.
 
 ## 1.5.2
 
-- Promote the verified development state to the stable release channel.
+### Highlights
+
+- Harden release automation with CI coverage for development and stable branches, automated semantic versioning/tagging, and explicit separation between verification and release-write permissions.
+- Retain failed verification logs as short-lived artifacts to make release failures easier to diagnose.
+- Refresh project documentation and Wiki coverage, including routing documentation regression anchors and repository-hosted support assets.
 
 ## 1.5.1
 
-- Fix the Wallpaper Library toolbar spacing CSS to avoid Obsidian Community CSS lint reporting partial `multicolumn` support.
-- Replace separate row/column gap declarations with the equivalent `gap` shorthand so the layout stays unchanged while remaining lint-compatible.
+### Highlights
+
+- Fix Wallpaper Library toolbar spacing so Obsidian Community CSS lint no longer reports partial `multicolumn` support.
+- Preserve the same visual layout by replacing separate row/column gap declarations with the equivalent `gap` shorthand.
 
 ## 1.5.0
 
-- Add an optional SFW Wallhaven browser to Wallpaper Library with explicit search, category, minimum-resolution, ratio, and sorting controls.
-- Keep Wallhaven pagination tied to the last explicit search, deduplicate appended results, and import only the wallpaper the user selects.
-- Validate Wallhaven hosts, HTTP status, declared MIME type, and JPEG/PNG file signatures before saving originals into `Wallpapers/Wallhaven/`; Veil then uses the local vault copy for playback.
-- Serialize full-resolution Wallhaven imports, reuse deterministic files that are already present, and prevent slower stale downloads from overriding a newer wallpaper selection.
-- Redesign Wallpaper Library around pagination with 20 wallpapers per page, a five-column desktop grid, larger previews, optional metadata, and current-page Random visible behavior.
-- Regroup Wallpaper Library filters and secondary actions, use content-sized selectors, keep search on its own row, improve responsive wrapping, and remain compatible with Obsidian Community CSS lint rules.
-- Keep the Wallpaper Library modal visually within the Veil settings content lane on desktop instead of overlapping the Settings/plugin sidebar.
-- Scope wallpaper-pool cache invalidation to media changes that affect the relevant pool folders, retain reusable folder scans across pool-setting updates, and reduce metadata-cache hot-path work.
-- Split detailed usage guidance into README/Wiki documentation and keep routing/privacy documentation regression checks aligned with the new structure.
-- Expand regression coverage for Wallhaven search/import hardening, stale-completion protection, pool cache invalidation, runtime hot paths, Wallpaper Library pagination/layout, and Community CSS compatibility.
+### Highlights
+
+- Add an optional SFW Wallhaven browser inside Wallpaper Library with explicit search, category, minimum-resolution, ratio, sorting, and pagination controls.
+- Validate Wallhaven hosts, responses, MIME types, and JPEG/PNG signatures before importing selected originals into `Wallpapers/Wallhaven/`, after which Veil uses the local vault copy.
+- Redesign Wallpaper Library around a paginated 20-item desktop view, larger previews, a five-column grid, responsive controls, Favorites/Recent workflows, and current-page **Random visible** behavior.
+- Prevent stale or slower Wallhaven downloads from overriding a newer selection and reuse deterministic local files when possible.
+- Tighten wallpaper-pool cache invalidation so only media changes affecting relevant folders invalidate candidate scans.
+- Expand regression coverage for Wallhaven hardening, pool caching, runtime hot paths, Wallpaper Library layout, and Community CSS compatibility.
 
 ## 1.4.0
 
+### Highlights
+
 - Add reusable **Scenes** that save wallpaper, framing, opacity, effects, transitions, and video behavior together.
-- Let routing rules switch complete Scenes or keep the legacy inline-wallpaper behavior from 1.3.
-- Add frontmatter property routing and adaptive `@theme`, `@time`, `@day`, and `@schedule` fallbacks, including overnight schedules.
-- Add a session-only Scene switcher with **Follow context rules** to return to automatic routing.
-- Add wallpaper pools for the default appearance and Scenes, with optional subfolders, stable selections, and manual shuffle.
-- Add a visual Wallpaper Library with search, Favorites, Recently Selected, filters, sorting, target selection, and **Random visible**.
-- Add horizontal and vertical focal points, 100–200% zoom, and configurable wallpaper crossfades.
-- Keep the last working wallpaper visible during rapid navigation or when a configured source is temporarily unavailable.
-- Improve multi-window and pop-out handling so each window resolves its own note and system context correctly.
-- Add **Duplicate scene** for copying a complete Scene to a new independent Scene.
-- Add circular and elliptical vignette shapes, color overlays with blend modes, and Retro, Glitch, and TV Noise effects.
-- Improve the Settings experience with a task-oriented five-tab layout: **Wallpaper → Appearance → Behavior → Scenes → Routing**. Data/recovery and About/support remain shared sections below the selected tab.
-- Keep Settings descriptions short and make the tab strip frameless and centered.
-- Fix Wallpaper Library thumbnail sizing so themes cannot collapse previews to button height.
-- Add configurable video autoplay, loop, muted playback, hidden-window pausing, and reduced-motion handling.
-- Keep wallpaper media inside the vault and preserve desktop pop-out support.
+- Expand Routing with frontmatter-property matching and adaptive `@theme`, `@time`, `@day`, and `@schedule` system contexts, including overnight schedules.
+- Add session-only Scene switching with **Follow context rules** to return to automatic routing.
+- Add wallpaper pools for the default appearance and Scenes, optional subfolders, stable selections, and manual shuffle.
+- Add the visual Wallpaper Library with search, Favorites, Recently Selected, filters, sorting, target selection, and **Random visible**.
+- Add focal-point controls, 100–200% zoom, configurable crossfades, circular/elliptical vignette shapes, color overlays, and Retro/Glitch/TV Noise effects.
+- Improve multi-window and pop-out handling, video playback controls, reduced-motion behavior, and fallback handling when a configured source is temporarily unavailable.
+- Introduce a task-oriented Settings layout while keeping data/recovery and support workflows accessible.
 
 ## 1.3.0
 
-- Add note-aware wallpaper routing by note name, path, folder, and tag.
-- Add additive pane-opacity exclusions by note name, path, folder, and tag.
+### Highlights
+
+- Add note-aware wallpaper routing by note name, exact path, folder, and tag.
+- Add additive pane-opacity exclusions using the same note-context matching model.
 - Add a live active-context inspector and drag-and-drop ordering for routing and exclusion rules.
-- Add export, import, and restore-default actions in Settings.
-- Add Reload wallpaper to the Command Palette and Settings.
-- Refresh routed wallpaper state when metadata changes.
-- Harden route and exclusion rules with dedicated limits, missing-match status warnings, and visible delete controls.
-- Normalize imported routing collections without changing their configured order.
-- Document routing and opacity-exclusion behavior in the README.
-- Harden local wallpaper paths against traversal-like, absolute, and URL-shaped values.
+- Add Settings export/import, restore defaults, and Reload wallpaper actions.
+- Refresh routed state on metadata changes and harden rule limits, validation warnings, delete controls, imported collection ordering, and local wallpaper path handling.
 
 ## 1.2.0
 
-- Add JPEG XL (`.jxl`) image support.
-- Add animated PNG (`.apng`) image support.
-- Add support for the PNG/JPEG/WebP formats that Obsidian currently accepts in image embeds.
+### Highlights
+
+- Expand image support with JPEG XL (`.jxl`) and animated PNG (`.apng`).
+- Align PNG, JPEG, and WebP support with formats accepted by current Obsidian image embeds.
 
 ## 1.1.1
 
-- Ensure pane surfaces, nested workspaces, and note content follow the configured opacity more consistently.
+### Highlights
+
+- Make pane surfaces, nested workspaces, and note content follow configured opacity more consistently.
 - Keep sidebar title bars, split handles, and status surfaces visually aligned with pane transparency.
 
 ## 1.1.0
 
-- Add a separate pane content opacity control.
-- Allow the whole pane group, including visible text and content, to fade independently from pane surface opacity.
+### Highlights
+
+- Add a separate pane-content opacity control.
+- Allow the entire pane group, including visible text and content, to fade independently from pane-surface opacity.
 
 ## 1.0.0
 
-- Initial public release.
-- Add vault-local image, animated GIF, and video wallpapers.
-- Add fill, fit, center, stretch, and scale-down display modes.
-- Add wallpaper and pane opacity controls.
-- Add optional nested pane fading.
-- Add circular and elliptical vignette effects.
-- Add blur and dim controls.
-- Add desktop pop-out window support.
-- Pause video playback in hidden windows when enabled.
-- Respect reduced-motion preferences.
+### Highlights
+
+- Initial public release of Veil.
+- Add vault-local image, animated GIF, and video wallpapers with fill, fit, center, stretch, and scale-down display modes.
+- Add wallpaper opacity, pane opacity, optional nested-pane fading, vignette, blur, and dim controls.
+- Support desktop pop-out windows, hidden-window video pausing, and reduced-motion preferences.
