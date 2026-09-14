@@ -23,11 +23,21 @@ export function rewriteSettingsForVaultRename(
     next.wallpaperPath = wallpaperPath;
     changed = true;
   }
+  const wallpaperPoolFolder = rewritePath(next.wallpaperPoolFolder);
+  if (wallpaperPoolFolder !== next.wallpaperPoolFolder) {
+    next.wallpaperPoolFolder = wallpaperPoolFolder;
+    changed = true;
+  }
 
   for (const profile of next.profiles) {
     const path = rewritePath(profile.wallpaperPath);
     if (path !== profile.wallpaperPath) {
       profile.wallpaperPath = path;
+      changed = true;
+    }
+    const poolFolder = rewritePath(profile.wallpaperPoolFolder);
+    if (poolFolder !== profile.wallpaperPoolFolder) {
+      profile.wallpaperPoolFolder = poolFolder;
       changed = true;
     }
   }
