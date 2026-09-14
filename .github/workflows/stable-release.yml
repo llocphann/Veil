@@ -98,18 +98,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
+          mapfile -t PUBLISHED_VERSIONS < <(
+            gh release list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --limit 100 \
+              --json tagName,isDraft,isPrerelease \
+              --jq '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName'
+          )
+          LATEST_PUBLISHED=$(node release-version.mjs --latest "${PUBLISHED_VERSIONS[@]}")
+          VERSION=$(node release-version.mjs "${CURRENT_VERSION}" "${LATEST_PUBLISHED}")
           HAS_TAG=false
           HAS_RELEASE=false
 
-          if git ls-remote --exit-code --tags origin "refs/tags/${CURRENT_VERSION}" >/dev/null 2>&1; then
+          if git ls-remote --exit-code --tags origin "refs/tags/${VERSION}" >/dev/null 2>&1; then
             HAS_TAG=true
-            if gh release view "${CURRENT_VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            if gh release view "${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
               HAS_RELEASE=true
             fi
           fi
 
-          if [ "${HAS_TAG}" = true ] && [ "${HAS_RELEASE}" = true ]; then
-            npm version patch --no-git-tag-version --ignore-scripts
+          if [ "${VERSION}" != "${CURRENT_VERSION}" ]; then
+            npm version "${VERSION}" --no-git-tag-version --ignore-scripts
             node version-bump.mjs
             node <<'NODE'
           const fs = require('node:fs');
@@ -126,16 +135,20 @@ jobs:
             fs.writeFileSync(path, changelog);
           }
           NODE
-            VERSION=$(node -p "require('./package.json').version")
             MODE=bump
-          elif [ "${HAS_TAG}" = true ]; then
-            VERSION=${CURRENT_VERSION}
+          elif [ "${HAS_TAG}" = true ] && [ "${HAS_RELEASE}" = false ]; then
             MODE=recover
+          elif [ "${HAS_RELEASE}" = true ]; then
+            echo "Computed release ${VERSION} is already published; refusing to republish it." >&2
+            exit 1
           else
-            VERSION=${CURRENT_VERSION}
             MODE=current
           fi
 
+          echo "current=${CURRENT_VERSION}"
+          echo "latest_published=${LATEST_PUBLISHED:-none}"
+          echo "version=${VERSION}"
+          echo "mode=${MODE}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "mode=${MODE}" >> "${GITHUB_OUTPUT}"
 
