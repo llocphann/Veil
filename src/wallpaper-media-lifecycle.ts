@@ -1,4 +1,9 @@
 import type { WallpaperDocumentState } from "./wallpaper-document-state";
+import {
+  markWallpaperMediaActive,
+  markWallpaperMediaDisposed,
+  markWallpaperMediaTransitioning,
+} from "./wallpaper-media-phase";
 import { wallpaperPlaybackState } from "./wallpaper-playback-state";
 
 const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
@@ -18,6 +23,7 @@ export function startWallpaperCrossfade(options: CrossfadeOptions): void {
     state.outgoing = null;
     state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
     delete state.layer.dataset.transitionState;
+    markWallpaperMediaActive(state);
     return;
   }
 
@@ -29,9 +35,11 @@ export function startWallpaperCrossfade(options: CrossfadeOptions): void {
     state.outgoing = null;
     state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
     delete state.layer.dataset.transitionState;
+    markWallpaperMediaActive(state);
     return;
   }
 
+  markWallpaperMediaTransitioning(state);
   const durationValue = `${duration}ms`;
   state.layer.style.setProperty("--vdb-transition-duration", durationValue);
   outgoing.layer.style.setProperty("--vdb-transition-duration", durationValue);
@@ -49,10 +57,11 @@ export function startWallpaperCrossfade(options: CrossfadeOptions): void {
 
   state.transitionTimer = window.setTimeout(() => {
     state.transitionTimer = null;
-    if (state.outgoing !== outgoing) return;
+    if (state.outgoing !== outgoing || state.disposed) return;
     disposeWallpaperState(outgoing);
     state.outgoing = null;
     delete state.layer.dataset.transitionState;
+    markWallpaperMediaActive(state);
   }, duration + TRANSITION_CLEANUP_BUFFER);
 }
 
@@ -67,6 +76,7 @@ export function settleWallpaperState(state: WallpaperDocumentState): void {
   }
   state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
   delete state.layer.dataset.transitionState;
+  markWallpaperMediaActive(state);
 }
 
 export interface PlaybackOptions {
@@ -131,7 +141,7 @@ export function syncWallpaperPlayback(options: PlaybackOptions): void {
 
 export function disposeWallpaperState(state: WallpaperDocumentState): void {
   if (state.disposed) return;
-  state.disposed = true;
+  markWallpaperMediaDisposed(state);
   if (state.transitionTimer !== null) {
     window.clearTimeout(state.transitionTimer);
     state.transitionTimer = null;
