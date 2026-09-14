@@ -10,6 +10,7 @@ import {
   type RangeSliderFactory,
   type SliderFactory,
 } from "./settings-appearance-definitions";
+import { renderVaultFolderControl } from "./settings-folder-picker";
 import {
   mediaKind,
   type VeilProfile,
@@ -22,6 +23,7 @@ export interface SceneDefinitionActions {
   deleteScene: (id: string) => void;
   duplicateScene: (id: string) => void;
   copyGlobalAppearanceToScene: (id: string) => void;
+  setControlValue: (key: string, value: unknown) => void;
 }
 
 export function createSceneDefinitions(
@@ -101,11 +103,12 @@ function scenePage(
       {
         name: "Wallpaper folder",
         desc: "Choose the vault folder used by this scene's pool.",
-        control: {
-          type: "text",
-          key: key("wallpaperPoolFolder"),
-          placeholder: "Media/Wallpapers",
-        },
+        render: (setting) => renderVaultFolderControl(
+          app,
+          setting,
+          profile.wallpaperPoolFolder,
+          (path) => actions.setControlValue(key("wallpaperPoolFolder"), path),
+        ),
         visible: () => profile.wallpaperPoolEnabled,
       },
       {
