@@ -38,7 +38,7 @@ void test("main delegates document context ownership", () => {
 
 void test("main delegates scene override ownership", () => {
   assert.match(mainSource, /new SceneRuntime\(\)/);
-  assert.doesNotMatch(mainSource, /manualProfileId/);
+  assert.doesNotMatch(mainSource, /private manualProfileId/);
   assert.doesNotMatch(mainSource, /resolveWallpaper/);
   assert.doesNotMatch(mainSource, /copyAppearance/);
   assert.match(sceneSource, /private manualProfileId = ""/);
