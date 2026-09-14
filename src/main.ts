@@ -232,9 +232,9 @@ export default class VeilPlugin extends Plugin {
     }
 
     const contextKey = this.contextKey(resolved.rule?.id || "", resolved.profile?.id || "");
+    const affectedDocuments = this.documentsUsingPoolContext(contextKey);
     this.wallpaperPools.shuffle(resolved.appearance, contextKey);
-    this.sourceRevision += 1;
-    this.scheduleApplyToWorkspace();
+    if (affectedDocuments.size) this.scheduleApplyToDocuments(affectedDocuments);
   }
 
   public openWallpaperLibrary(): void {
@@ -340,6 +340,24 @@ export default class VeilPlugin extends Plugin {
       ) {
         affected.add(document);
       }
+    }
+    return affected;
+  }
+
+  private documentsUsingPoolContext(contextKey: string): Set<Document> {
+    const affected = new Set<Document>();
+    if (!this.settings.enabled) return affected;
+    for (const document of this.workspaceDocuments()) {
+      if (document.defaultView?.closed) continue;
+      const context = this.documentContexts.contextForDocument(document);
+      const resolved = this.scenes.resolveSnapshot(this.settings, context);
+      const poolAllowed = !resolved.rule || Boolean(resolved.profile);
+      if (!poolAllowed || !resolved.appearance.wallpaperPoolEnabled) continue;
+      const resolvedContextKey = this.contextKey(
+        resolved.rule?.id || "",
+        resolved.profile?.id || "",
+      );
+      if (resolvedContextKey === contextKey) affected.add(document);
     }
     return affected;
   }
