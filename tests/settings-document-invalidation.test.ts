@@ -80,6 +80,67 @@ void test("global appearance changes invalidate a default document", () => {
   );
 });
 
+void test("inline rules ignore global source and pool settings", () => {
+  const previous = settings();
+  previous.wallpaperRules = [{
+    id: "rule-a",
+    enabled: true,
+    matchType: "path",
+    matchValue: context.path,
+    profileId: "",
+    wallpaperPath: "Wallpapers/inline.webp",
+  }];
+  const next = {
+    ...previous,
+    wallpaperPath: "Wallpapers/default-changed.webp",
+    wallpaperPoolEnabled: true,
+    wallpaperPoolIncludeSubfolders: true,
+  };
+
+  assert.equal(
+    resolvedDocumentSettingsChanged(
+      previous,
+      next,
+      context,
+      resolveWallpaper(previous, context),
+      resolveWallpaper(next, context),
+    ),
+    false,
+  );
+});
+
+void test("profile-backed rules ignore legacy fallback wallpaper changes", () => {
+  const previous = settings();
+  const profile = scene(previous);
+  previous.profiles = [profile];
+  previous.wallpaperRules = [{
+    id: "rule-a",
+    enabled: true,
+    matchType: "path",
+    matchValue: context.path,
+    profileId: profile.id,
+    wallpaperPath: "Wallpapers/legacy-a.webp",
+  }];
+  const next: VeilSettings = {
+    ...previous,
+    wallpaperRules: [{
+      ...previous.wallpaperRules[0]!,
+      wallpaperPath: "Wallpapers/legacy-b.webp",
+    }],
+  };
+
+  assert.equal(
+    resolvedDocumentSettingsChanged(
+      previous,
+      next,
+      context,
+      resolveWallpaper(previous, context),
+      resolveWallpaper(next, context),
+    ),
+    false,
+  );
+});
+
 void test("unmatched opacity rule changes do not invalidate the document", () => {
   const previous = settings();
   const next: VeilSettings = {
