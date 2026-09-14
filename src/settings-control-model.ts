@@ -41,12 +41,13 @@ const DYNAMIC_PROFILE_FIELDS = new Set<string>([
   "effectPreset",
 ]);
 
+// Only rule fields that change the definition tree require a full settings
+// rebuild. Enabled/exclusion toggles mutate the existing rule object, so
+// refreshDomState() can update page status/display state without recreating
+// every routing control.
 const DYNAMIC_RULE_FIELDS = new Set<string>([
   "matchType",
-  "enabled",
   "profileId",
-  "excludePaneSurface",
-  "excludePaneContent",
 ]);
 
 export function parseProfileControlKey(key: string): ProfileControlKey | null {
