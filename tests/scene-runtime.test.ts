@@ -82,3 +82,81 @@ void test("clearing a manual scene resumes automatic routing", () => {
   assert.equal(runtime.setManualProfile("", current).kind, "cleared");
   assert.equal(runtime.resolve(current, context).profile?.id, "focus");
 });
+
+void test("unchanged static settings and context reuse one scene resolution", () => {
+  const runtime = new SceneRuntime();
+  const current = settings();
+  const first = runtime.resolve(current, context);
+  const second = runtime.resolve(current, context);
+  assert.equal(second, first);
+  assert.equal(runtime.resolveSnapshot(current, context), first);
+});
+
+void test("settings identity, context identity, and explicit revision invalidate scene resolution", () => {
+  const runtime = new SceneRuntime();
+  const current = settings();
+  const first = runtime.resolve(current, context);
+
+  const equivalentContext: NoteContext = { ...context, tags: [...context.tags] };
+  const contextResolution = runtime.resolve(current, equivalentContext);
+  assert.notEqual(contextResolution, first);
+
+  const equivalentSettings = normalizeSettings(current);
+  const settingsResolution = runtime.resolve(equivalentSettings, context);
+  assert.notEqual(settingsResolution, first);
+
+  runtime.invalidateResolution();
+  const revised = runtime.resolve(current, context);
+  assert.notEqual(revised, first);
+  assert.equal(revised.profile?.id, "focus");
+});
+
+void test("manual scene revision invalidates cached automatic resolution", () => {
+  const runtime = new SceneRuntime();
+  const current = settings();
+  const automatic = runtime.resolve(current, context);
+  assert.equal(automatic.profile?.id, "focus");
+
+  runtime.setManualProfile("calm", current);
+  const manual = runtime.resolve(current, context);
+  assert.notEqual(manual, automatic);
+  assert.equal(manual.profile?.id, "calm");
+
+  runtime.setManualProfile("", current);
+  const restored = runtime.resolve(current, context);
+  assert.notEqual(restored, manual);
+  assert.equal(restored.profile?.id, "focus");
+});
+
+void test("snapshot comparisons never populate cache on a miss", () => {
+  const runtime = new SceneRuntime();
+  const current = settings();
+  const first = runtime.resolveSnapshot(current, context);
+  const second = runtime.resolveSnapshot(current, context);
+  assert.notEqual(second, first);
+  assert.equal(first.profile?.id, "focus");
+  assert.equal(second.profile?.id, "focus");
+});
+
+void test("time-dependent system routing never reuses a stale resolution", () => {
+  const runtime = new SceneRuntime();
+  const current = normalizeSettings({
+    ...settings(),
+    wallpaperRules: [{
+      id: "work-hours",
+      enabled: true,
+      matchType: "property",
+      matchValue: "@time=09:00-17:00",
+      profileId: "focus",
+      wallpaperPath: "",
+    }],
+  });
+  const morning: NoteContext = { ...context, now: new Date(2026, 8, 14, 10, 0) };
+  const evening: NoteContext = { ...context, now: new Date(2026, 8, 14, 20, 0) };
+
+  const first = runtime.resolve(current, morning);
+  const second = runtime.resolve(current, morning);
+  assert.notEqual(second, first);
+  assert.equal(first.profile?.id, "focus");
+  assert.equal(runtime.resolve(current, evening).profile, null);
+});
