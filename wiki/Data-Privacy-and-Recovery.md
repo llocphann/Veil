@@ -1,11 +1,14 @@
 # Data, Privacy, and Recovery
 
+Veil 1.7 groups backup and recovery tools under **Data → Data & recovery**.
+
 ## Export and import
 
-**Data & recovery → Export settings** creates a portable JSON backup containing:
+**Export settings** creates a portable JSON backup containing:
 
-- default appearance;
-- Scenes;
+- default wallpaper/appearance/playback settings;
+- default wallpaper-pool configuration, including folder, subfolder scope, and change interval;
+- Scenes and their pool/appearance/playback settings;
 - wallpaper routing rules;
 - opacity exclusions.
 
@@ -16,6 +19,12 @@ The export does **not** include wallpaper files, Favorites, Recent history, or t
 **Import settings** validates the file before replacing the portable configuration. Veil accepts files up to **1 MB** and enforces the normal limits: 64 Scenes, 96 wallpaper rules, and 96 opacity exclusions.
 
 Older schema-1 Veil backups are migrated while preserving their inline-wallpaper behavior.
+
+## Pool migration in 1.7
+
+Pre-1.7 pools did not store a separate pool folder. When Veil normalizes older persisted settings, it derives the new **Wallpaper folder** from the saved wallpaper path when needed, including Scene pools.
+
+This migration does not intentionally discard the saved wallpaper file. The file remains available when the pool is disabled and as a fallback when no valid pool candidate exists.
 
 ## Restore defaults
 
@@ -29,7 +38,7 @@ It reads only what is needed for configured behavior: wallpaper files, paths, ac
 
 ### Wallhaven
 
-**Wallpaper Library → Wallhaven** is the only built-in feature that intentionally uses the network.
+**Wallpaper → Wallpaper library → Wallhaven** is the only built-in feature that intentionally uses the network.
 
 - No request is made just because Veil or the Library opens.
 - Search starts only when you explicitly search or move to an unloaded result page.
@@ -44,8 +53,8 @@ Downloaded files are validated, saved under `Wallpapers/Wallhaven/`, then used a
 
 Runtime wallpapers must use vault-relative paths. Veil rejects URLs, absolute paths, protocol-prefixed paths, and paths that escape the vault with `..`.
 
-When media or relevant folders are renamed inside Obsidian, Veil updates affected configured paths and Library metadata where possible.
+When media or relevant folders are renamed inside Obsidian, Veil updates affected configured paths and pool selections where possible. Wallpaper Library metadata is also rewritten where supported.
 
 ## Backup recommendation
 
-Export settings after building a large Scene/Routing setup. Back up wallpaper media with the vault itself because the JSON export stores paths, not media files.
+Export settings after building a large Scene/Routing setup or before major configuration changes. Back up wallpaper media with the vault itself because the JSON export stores paths and configuration, not the media files.

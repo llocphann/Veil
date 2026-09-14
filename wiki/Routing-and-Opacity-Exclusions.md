@@ -1,16 +1,16 @@
 # Routing and Opacity Exclusions
 
-Routing lets Veil choose a wallpaper or Scene from the active note and system context.
+Routing lets Veil choose a wallpaper or Scene from the active note and system context. In Veil 1.7, Routing lives under **Automation**.
 
 ## Check Active context first
 
-**Routing → Active context** shows what currently won. Use it first when debugging a rule.
+**Automation → Active context** shows the currently resolved appearance. Use it first when debugging a rule.
 
 ## Priority
 
 1. Manual Scene override.
 2. Ordinary note/path/folder/tag/frontmatter rules — first match wins.
-3. `@theme`, `@time`, `@day`, `@schedule` fallbacks — first match wins.
+3. `@theme`, `@time`, `@day`, and `@schedule` fallbacks — first match wins.
 4. Default appearance.
 
 An adaptive `@...` rule never outranks an ordinary note rule, even if it appears above it in the list.
@@ -38,7 +38,7 @@ featured
 
 ## Adaptive system fallbacks
 
-Use the frontmatter/system-context field with these reserved forms:
+Use the property/system-context field with these reserved forms:
 
 ```text
 @theme=dark
@@ -52,26 +52,30 @@ Use the frontmatter/system-context field with these reserved forms:
 @schedule=mon-fri 22:00-06:00
 ```
 
-Time uses the local computer clock. Overnight ranges are supported. Veil schedules the next meaningful boundary instead of polling continuously.
+Time uses the local computer clock. Overnight ranges are supported. Veil schedules the next meaningful routing boundary instead of continuously polling.
 
 ## Scene or inline source?
 
-A **Scene** route switches the complete appearance, including pool, framing, opacity, effects, transition, and video behavior.
+A **Scene** route switches the complete appearance, including its wallpaper/pool, pool folder and interval, framing, opacity, effects, transition, and video behavior.
 
-**Inline wallpaper — use global appearance** changes only the wallpaper file and keeps the global appearance. Inline rules do not use the global pool.
+**Inline wallpaper — use global appearance** changes only the wallpaper file and keeps the global framing, opacity, effects, transition, and video behavior. Inline rules do not use the global wallpaper pool.
 
-# Opacity exclusions
+## Opacity exclusions
 
-Opacity exclusions use the same match types but do not choose a wallpaper.
+Opacity exclusions are configured under **Automation → Opacity exclusions**. They use the same match types but do not choose a wallpaper.
 
 They can independently keep these at 100% opacity:
 
 - **Pane background**
 - **Pane & content**
 
-## Exclusions are additive
+Every matching enabled exclusion is evaluated, so exclusions are additive. Veil supports up to **96 opacity exclusions**.
 
-Every matching enabled exclusion is evaluated. Veil supports up to **96 opacity exclusions**.
+## Reordering
+
+Within ordinary wallpaper rules, the first matching enabled rule wins. Reorder rules when two ordinary matches can apply to the same note.
+
+System fallbacks are evaluated only after ordinary note/path/folder/tag/frontmatter matches fail, so moving an `@theme`, `@time`, `@day`, or `@schedule` rule above an ordinary rule does not give it higher priority.
 
 ## Common mistakes
 
@@ -79,3 +83,4 @@ Every matching enabled exclusion is evaluated. Veil supports up to **96 opacity 
 - Wallpaper changes but effects do not → the rule is inline; use a Scene.
 - Pool stops on an inline rule → expected; inline rules have no pool.
 - Duplicate note names match the wrong note → use **Exact path**.
+- A Scene pool is active but does not rotate → verify its **Wallpaper folder**, candidate count, and **Change interval** under **Automation → Scenes**.

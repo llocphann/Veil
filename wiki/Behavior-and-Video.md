@@ -1,15 +1,20 @@
 # Behavior and Video
 
-The **Behavior** tab controls wallpaper transitions, video/motion handling, and quick actions.
+Veil 1.7 no longer has a separate **Behavior** tab. These controls are grouped under **Wallpaper**:
+
+- **Playback & motion** — wallpaper transition, hidden-window video handling, and reduced-motion behavior.
+- **Quick actions** — Reload wallpaper and Shuffle wallpaper pool.
 
 ## Wallpaper transition
 
 **Wallpaper transition** ranges from 0–2000 ms.
 
 - `0 ms` — switch immediately.
-- Higher values — crossfade to the new wallpaper.
+- Higher values — crossfade when the resolved wallpaper actually changes.
 
-Veil keeps the previous working wallpaper visible while the incoming media loads. If the new source fails, the previous wallpaper stays visible.
+Veil keeps the previous working wallpaper visible while incoming media loads. If the new source fails, the previous working wallpaper remains visible.
+
+Appearance-only updates do not intentionally reload unchanged media.
 
 ## Video
 
@@ -31,12 +36,18 @@ When enabled, Veil follows `prefers-reduced-motion`:
 
 Animated GIFs cannot be paused reliably by Veil.
 
+When wallpaper opacity is `0%`, Veil treats wallpaper motion as visually inactive and avoids unnecessary motion work.
+
 ## Quick actions
 
-**Reload wallpaper** — request the current wallpaper again. Useful after replacing a file or retrying video playback.
+**Reload wallpaper** — force the current source to be requested again. Useful after replacing a file or retrying video playback.
 
-**Shuffle wallpaper pool** — choose another candidate from the currently active default/Scene pool. Inline wallpaper rules do not have a pool.
+**Shuffle wallpaper pool** — invalidate the current selection for the active default/Scene pool so another candidate can be selected. When multiple candidates exist, Veil avoids immediately repeating the previous selection when possible.
 
-When wallpaper opacity is `0%`, Veil treats wallpaper motion as visually inactive and stops unnecessary motion work.
+Inline wallpaper rules do not own a pool, so Shuffle has no pool to operate on while an inline route is active.
 
-Scenes store their own transition and video/motion behavior, so a Scene can behave differently from the default appearance.
+## Scene behavior
+
+Scenes store their own transition and video/motion settings. Edit them under **Automation → Scenes**. A Scene can therefore use different playback behavior from the default appearance.
+
+Scene pools also store their own **Change interval** from 5 to 120 minutes.
