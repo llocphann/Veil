@@ -48,18 +48,31 @@ void test("2.0 invariant 2: unchanged media returns before replacement allocatio
   assert.doesNotMatch(reuseBranch, /\.load\(\)/);
 });
 
-void test("2.0 invariant 3: note context events stay document-scoped", () => {
+void test("2.0 invariant 3: context and layout events stay document-scoped", () => {
   const activeLeaf = main.match(
     /this\.registerEvent\(this\.app\.workspace\.on\("active-leaf-change"[\s\S]*?\n {4}\}\)\);/,
   )?.[0] || "";
   assert.match(activeLeaf, /scheduleApplyToDocuments\(\[document\]\)/);
   assert.doesNotMatch(activeLeaf, /refreshWallpaper\(\)/);
 
+  const layout = main.match(
+    /this\.registerEvent\(this\.app\.workspace\.on\("layout-change"[\s\S]*?\n {4}\}\)\);/,
+  )?.[0] || "";
+  assert.match(layout, /documentsAffectedByLayoutChange\(\)/);
+  assert.match(layout, /scheduleApplyToDocuments\(affected\)/);
+  assert.doesNotMatch(layout, /refreshWallpaper\(\)/);
+
   const metadata = main.match(
     /this\.app\.metadataCache\.on\("changed"[\s\S]*?\n {6}\}\),/,
   )?.[0] || "";
   assert.match(metadata, /documentsForFile\(file\)/);
   assert.match(metadata, /scheduleApplyToDocuments/);
+
+  const cssChange = main.match(
+    /this\.registerEvent\(this\.app\.workspace\.on\("css-change"[\s\S]*?\n {4}\}\)\);/,
+  )?.[0] || "";
+  assert.match(cssChange, /contextRulesDependOnTheme/);
+  assert.doesNotMatch(cssChange, /refreshWallpaper\(\)/);
 });
 
 void test("2.0 invariant 4: vault cache invalidation ignores unrelated file churn", () => {
