@@ -32,7 +32,7 @@ void test("verification and release jobs have bounded runtimes", () => {
   const stableRelease = fs.readFileSync(".github/workflows/stable-release.yml", "utf8");
   assert.equal(ci.split("timeout-minutes: 10").length - 1, 1);
   assert.equal(release.split("timeout-minutes: 10").length - 1, 2);
-  assert.equal(stableRelease.split("timeout-minutes: 10").length - 1, 2);
+  assert.equal(stableRelease.split("timeout-minutes: 10").length - 1, 3);
 });
 
 void test("development CI cancels superseded verification runs", () => {
@@ -101,25 +101,43 @@ void test("release publishing permissions are isolated from dependency execution
   assert.doesNotMatch(publishJob, /npm ci|Check out repository|Set up Node\.js/);
 });
 
-void test("stable promotion verifies source before the write-capable version job", () => {
+void test("stable promotion verifies source before release writes", () => {
   const source = fs.readFileSync(".github/workflows/stable-release.yml", "utf8");
   const verifyIndex = source.indexOf("  verify:\n");
   const versionIndex = source.indexOf("  version:\n");
+  const publishIndex = source.indexOf("  publish:\n");
   assert.ok(verifyIndex >= 0, "stable verification job is missing");
   assert.ok(versionIndex > verifyIndex, "stable version job must follow verification");
+  assert.ok(publishIndex > versionIndex, "stable publish job must follow versioning");
   assert.match(source, /branches:\n[ ]{6}- stable/);
   assert.match(source, /github\.actor != 'github-actions\[bot\]'/);
 
   const verifyJob = source.slice(verifyIndex, versionIndex);
-  const versionJob = source.slice(versionIndex);
+  const versionJob = source.slice(versionIndex, publishIndex);
+  const publishJob = source.slice(publishIndex);
   assert.match(verifyJob, /permissions:\n[ ]{6}contents: read/);
   assert.match(verifyJob, /npm ci/);
   assert.match(verifyJob, /npm run check/);
+  assert.match(verifyJob, /veil-stable-runtime-/);
+
   assert.match(versionJob, /needs: verify/);
   assert.match(versionJob, /permissions:\n[ ]{6}contents: write/);
   assert.doesNotMatch(versionJob, /npm ci|npm run check/);
   assert.match(versionJob, /npm version patch --no-git-tag-version --ignore-scripts/);
   assert.match(versionJob, /node version-bump\.mjs/);
+  assert.match(versionJob, /gh release view/);
   assert.match(versionJob, /git push origin HEAD:stable/);
   assert.match(versionJob, /git push origin "\$\{VERSION\}"/);
+  assert.match(versionJob, /veil-stable-manifest-/);
+
+  assert.match(publishJob, /needs:/);
+  assert.match(publishJob, /- verify/);
+  assert.match(publishJob, /- version/);
+  assert.match(publishJob, /contents: write/);
+  assert.match(publishJob, /id-token: write/);
+  assert.match(publishJob, /attestations: write/);
+  assert.match(publishJob, /actions\/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131/);
+  assert.match(publishJob, /actions\/attest@1e69f48acb82d1966a394da916b4c1698aa569d6/);
+  assert.match(publishJob, /gh release create/);
+  assert.doesNotMatch(publishJob, /npm ci|npm run check|Check out promoted source/);
 });
