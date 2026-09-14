@@ -4,6 +4,7 @@ import { normalizeSettings } from "../src/settings";
 import {
   rewriteWallpaperPoolSelectionPaths,
   rewriteWallpaperPoolSelectionsForRename,
+  staleWallpaperPoolCandidateCacheKeys,
   wallpaperPoolConfiguration,
   wallpaperPoolConfigurationChanged,
   wallpaperPoolConfigurationChanges,
@@ -85,6 +86,55 @@ void test("changing one scene pool does not invalidate unrelated scene selection
   assert.deepEqual(changes, ["profile:focus"]);
   assert.equal(changes.includes("profile:reading"), false);
   assert.equal(changes.includes("default"), false);
+});
+
+void test("candidate cache eviction keeps reusable folder scans", () => {
+  const previous = fixture();
+  const sameFolder = normalizeSettings({
+    ...previous,
+    profiles: previous.profiles.map((profile) =>
+      profile.id === "focus"
+        ? { ...profile, wallpaperPath: "Media/Focus/alternate.webp" }
+        : profile,
+    ),
+  });
+  assert.deepEqual(staleWallpaperPoolCandidateCacheKeys(previous, sameFolder), []);
+
+  const movedFolder = normalizeSettings({
+    ...previous,
+    profiles: previous.profiles.map((profile) =>
+      profile.id === "focus"
+        ? { ...profile, wallpaperPath: "Other/Focus/focus.webp" }
+        : profile,
+    ),
+  });
+  assert.deepEqual(
+    staleWallpaperPoolCandidateCacheKeys(previous, movedFolder),
+    ["Media/Focus|recursive"],
+  );
+
+  const sharedPrevious = normalizeSettings({
+    ...previous,
+    profiles: [
+      ...previous.profiles,
+      {
+        id: "cinema",
+        name: "Cinema",
+        wallpaperPath: "Media/Focus/cinema.webp",
+        wallpaperPoolEnabled: true,
+        wallpaperPoolIncludeSubfolders: true,
+      },
+    ],
+  });
+  const sharedNext = normalizeSettings({
+    ...sharedPrevious,
+    profiles: sharedPrevious.profiles.map((profile) =>
+      profile.id === "focus"
+        ? { ...profile, wallpaperPath: "Other/Focus/focus.webp" }
+        : profile,
+    ),
+  });
+  assert.deepEqual(staleWallpaperPoolCandidateCacheKeys(sharedPrevious, sharedNext), []);
 });
 
 void test("scene reordering does not invalidate stable pool selections", () => {
