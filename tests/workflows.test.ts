@@ -107,16 +107,16 @@ void test("stable promotion verifies source before the write-capable version job
   const versionIndex = source.indexOf("  version:\n");
   assert.ok(verifyIndex >= 0, "stable verification job is missing");
   assert.ok(versionIndex > verifyIndex, "stable version job must follow verification");
-  assert.match(source, /branches:\n      - stable/);
+  assert.match(source, /branches:\n[ ]{6}- stable/);
   assert.match(source, /github\.actor != 'github-actions\[bot\]'/);
 
   const verifyJob = source.slice(verifyIndex, versionIndex);
   const versionJob = source.slice(versionIndex);
-  assert.match(verifyJob, /permissions:\n      contents: read/);
+  assert.match(verifyJob, /permissions:\n[ ]{6}contents: read/);
   assert.match(verifyJob, /npm ci/);
   assert.match(verifyJob, /npm run check/);
   assert.match(versionJob, /needs: verify/);
-  assert.match(versionJob, /permissions:\n      contents: write/);
+  assert.match(versionJob, /permissions:\n[ ]{6}contents: write/);
   assert.doesNotMatch(versionJob, /npm ci|npm run check/);
   assert.match(versionJob, /npm version patch --no-git-tag-version --ignore-scripts/);
   assert.match(versionJob, /node version-bump\.mjs/);
