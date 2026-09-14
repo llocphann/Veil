@@ -11,6 +11,10 @@ const poolSource = readFileSync(
   new URL("../src/wallpaper-pool-runtime.ts", import.meta.url),
   "utf8",
 );
+const librarySource = readFileSync(
+  new URL("../src/wallpaper-library-runtime.ts", import.meta.url),
+  "utf8",
+);
 const persistenceSource = readFileSync(
   new URL("../src/settings-persistence.ts", import.meta.url),
   "utf8",
@@ -38,6 +42,18 @@ void test("main delegates wallpaper pool runtime ownership", () => {
   assert.match(poolSource, /private readonly previousSelections/);
   assert.match(poolSource, /reconcileSettings\(/);
   assert.match(poolSource, /pathForAppearance\(/);
+});
+
+void test("main delegates wallpaper library state ownership", () => {
+  assert.match(mainSource, /new WallpaperLibraryRuntime\(\)/);
+  assert.doesNotMatch(mainSource, /normalizeWallpaperLibraryState/);
+  assert.doesNotMatch(mainSource, /rememberRecentWallpaper/);
+  assert.doesNotMatch(mainSource, /toggleFavoriteWallpaper/);
+  assert.doesNotMatch(mainSource, /pruneWallpaperLibrary/);
+  assert.match(librarySource, /private state: WallpaperLibraryState/);
+  assert.match(librarySource, /rememberSettingsChanges\(/);
+  assert.match(librarySource, /rewritePaths\(/);
+  assert.match(librarySource, /prune\(path: string\)/);
 });
 
 void test("main delegates settings persistence ownership", () => {

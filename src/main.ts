@@ -28,12 +28,7 @@ import {
   workingWallpaperFallback,
 } from "./transition-lifecycle";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
-import {
-  normalizeWallpaperLibraryState,
-  rememberRecentWallpaper,
-  toggleFavoriteWallpaper,
-  type WallpaperLibraryState,
-} from "./wallpaper-library-state";
+import { WallpaperLibraryRuntime } from "./wallpaper-library-runtime";
 import {
   wallpaperLibraryTargetPatch,
   wallpaperLibraryTargets,
@@ -90,10 +85,10 @@ export default class VeilPlugin extends Plugin {
   private readonly documents = new Map<Document, DocumentState>();
   private readonly documentContexts = new DocumentContextResolver(this.app);
   private readonly wallpaperPools = new WallpaperPoolRuntime(this.app);
-  private wallpaperLibrary: WallpaperLibraryState = { favorites: [], recent: [] };
+  private readonly wallpaperLibrary = new WallpaperLibraryRuntime();
   private readonly settingsPersistence = new SettingsPersistence(
     () => this.settings,
-    () => this.wallpaperLibrary,
+    () => this.wallpaperLibrary.getState(),
     (data) => this.saveData(data),
     (error) => {
       console.error("[veil] Could not save settings", error);
@@ -119,7 +114,7 @@ export default class VeilPlugin extends Plugin {
       const libraryData = typeof storedData === "object" && storedData !== null
         ? (storedData as Record<string, unknown>).wallpaperLibrary
         : null;
-      this.wallpaperLibrary = normalizeWallpaperLibraryState(libraryData, normalizePath);
+      this.wallpaperLibrary.load(libraryData);
     } catch (error) {
       console.error("[veil] Could not load settings", error);
       new Notice("Veil settings could not be loaded. Using defaults.");
@@ -202,7 +197,7 @@ export default class VeilPlugin extends Plugin {
     if (this.unloaded) return;
     const previous = this.settings;
     const next = normalizeSettings({ ...previous, ...patch }, normalizePath);
-    if (rememberRecent) this.rememberChangedWallpaperPaths(previous, next);
+    if (rememberRecent) this.wallpaperLibrary.rememberSettingsChanges(previous, next);
     this.settings = next;
     if (this.manualProfileId && !next.profiles.some((profile) => profile.id === this.manualProfileId)) {
       this.manualProfileId = "";
@@ -249,13 +244,13 @@ export default class VeilPlugin extends Plugin {
   public openWallpaperLibrary(): void {
     new WallpaperLibraryModal(this.app, {
       getTargets: () => wallpaperLibraryTargets(this.settings),
-      getState: () => this.wallpaperLibrary,
+      getState: () => this.wallpaperLibrary.getState(),
       selectWallpaper: (targetId, path) => {
         const patch = wallpaperLibraryTargetPatch(this.settings, targetId, path);
         if (patch) this.updateSettings(patch);
       },
       toggleFavorite: (path) => {
-        this.wallpaperLibrary = toggleFavoriteWallpaper(this.wallpaperLibrary, path, normalizePath);
+        this.wallpaperLibrary.toggleFavorite(path);
         this.scheduleSave();
       },
     }).open();
@@ -329,31 +324,6 @@ export default class VeilPlugin extends Plugin {
     this.settingsPersistence.schedule();
   }
 
-  private rememberChangedWallpaperPaths(previous: VeilSettings, next: VeilSettings): void {
-    const paths: string[] = [];
-    if (next.wallpaperPath && next.wallpaperPath !== previous.wallpaperPath) {
-      paths.push(next.wallpaperPath);
-    }
-
-    const previousProfiles = new Map(previous.profiles.map((profile) => [profile.id, profile.wallpaperPath]));
-    for (const profile of next.profiles) {
-      if (profile.wallpaperPath && previousProfiles.get(profile.id) !== profile.wallpaperPath) {
-        paths.push(profile.wallpaperPath);
-      }
-    }
-
-    const previousRules = new Map(previous.wallpaperRules.map((rule) => [rule.id, rule.wallpaperPath]));
-    for (const rule of next.wallpaperRules) {
-      if (rule.wallpaperPath && previousRules.get(rule.id) !== rule.wallpaperPath) {
-        paths.push(rule.wallpaperPath);
-      }
-    }
-
-    for (const path of paths) {
-      this.wallpaperLibrary = rememberRecentWallpaper(this.wallpaperLibrary, path, normalizePath);
-    }
-  }
-
   private scheduleApplyToWorkspace(): void {
     if (this.refreshFrame !== null || this.unloaded) return;
     this.refreshFrame = window.requestAnimationFrame(() => {
@@ -390,7 +360,7 @@ export default class VeilPlugin extends Plugin {
           "",
           !(file instanceof TFile),
         );
-        this.pruneWallpaperLibrary(file.path);
+        if (this.wallpaperLibrary.prune(file.path)) this.scheduleSave();
         this.refreshIfWallpaper(file.path);
       }),
     );
@@ -446,15 +416,7 @@ export default class VeilPlugin extends Plugin {
           }
         }
 
-        const renamedLibrary = normalizeWallpaperLibraryState({
-          favorites: this.wallpaperLibrary.favorites.map(rename),
-          recent: this.wallpaperLibrary.recent.map(rename),
-        }, normalizePath);
-        const libraryChanged =
-          renamedLibrary.favorites.join("\n") !== this.wallpaperLibrary.favorites.join("\n")
-          || renamedLibrary.recent.join("\n") !== this.wallpaperLibrary.recent.join("\n");
-        if (libraryChanged) this.wallpaperLibrary = renamedLibrary;
-
+        const libraryChanged = this.wallpaperLibrary.rewritePaths(rename);
         const preservedPoolContexts = this.wallpaperPools.rewriteSelectionsForRename(
           this.settings,
           next,
@@ -468,24 +430,6 @@ export default class VeilPlugin extends Plugin {
         }
       }),
     );
-  }
-
-  private pruneWallpaperLibrary(path: string): void {
-    const prefix = `${path}/`;
-    const next = normalizeWallpaperLibraryState({
-      favorites: this.wallpaperLibrary.favorites.filter(
-        (candidate) => candidate !== path && !candidate.startsWith(prefix),
-      ),
-      recent: this.wallpaperLibrary.recent.filter(
-        (candidate) => candidate !== path && !candidate.startsWith(prefix),
-      ),
-    }, normalizePath);
-    if (
-      next.favorites.length === this.wallpaperLibrary.favorites.length
-      && next.recent.length === this.wallpaperLibrary.recent.length
-    ) return;
-    this.wallpaperLibrary = next;
-    this.scheduleSave();
   }
 
   private refreshIfWallpaper(path: string): void {
