@@ -13,9 +13,8 @@ export interface WallpaperMediaPhaseState {
 }
 
 export function markWallpaperMediaReady(state: WallpaperMediaPhaseState): void {
-  if (state.disposed) return;
+  if (state.disposed || state.failed) return;
   state.ready = true;
-  state.failed = false;
   state.phase = "active";
 }
 
