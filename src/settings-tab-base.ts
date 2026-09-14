@@ -47,6 +47,11 @@ import {
   type SceneDefinitionActions,
 } from "./settings-scene-definitions";
 import {
+  chooseVeilSettingsImportFile,
+  exportVeilSettingsFile,
+  type SettingsTransferIoActions,
+} from "./settings-transfer-io";
+import {
   createActiveContextDefinition,
   createWallpaperDefinitions,
   type WallpaperDefinitionActions,
@@ -55,9 +60,7 @@ import {
   DEFAULT_SETTINGS,
   normalizeSettings,
 } from "./settings";
-import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-transfer";
 
-const MAX_IMPORT_BYTES = 1024 * 1024;
 const MAX_SCENES = 64;
 const MAX_CONTEXT_RULES = 96;
 const SETTINGS_TABS = [
@@ -431,12 +434,29 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       openWallpaperLibrary: () => this.plugin.openWallpaperLibrary(),
       reloadWallpaper: () => this.plugin.refreshWallpaper(true),
       shuffleWallpaperPool: () => this.plugin.shuffleWallpaperPool(),
-      exportSettings: () => this.exportSettings(),
-      importSettings: () => this.chooseImportFile(),
+      exportSettings: () => exportVeilSettingsFile(
+        this.containerEl,
+        this.plugin.settings,
+        this.plugin.manifest.version,
+      ),
+      importSettings: () => chooseVeilSettingsImportFile(
+        this.containerEl,
+        this.transferIoActions(),
+      ),
       restoreDefaults: () => {
         this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
         void this.plugin.flushSettings().then(() => this.update());
       },
+    };
+  }
+
+  private transferIoActions(): SettingsTransferIoActions {
+    return {
+      applyImportedSettings: async (settings) => {
+        this.plugin.updateSettings(settings);
+        await this.plugin.flushSettings();
+      },
+      refreshSettings: () => this.update(),
     };
   }
 
@@ -477,57 +497,6 @@ export class WallpaperSettingsTab extends PluginSettingTab {
     if (!opacityExclusions) return;
     this.plugin.updateSettings({ opacityExclusions });
     void this.plugin.flushSettings().then(() => this.update());
-  }
-
-  private exportSettings(): void {
-    const text = serializeVeilSettings(this.plugin.settings, this.plugin.manifest.version);
-    const blob = new Blob([text], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = this.containerEl.createEl("a");
-    link.href = url;
-    link.download = `veil-settings-${new Date().toISOString().slice(0, 10)}.json`;
-    link.hidden = true;
-    link.click();
-    window.setTimeout(() => {
-      link.remove();
-      URL.revokeObjectURL(url);
-    }, 0);
-    new Notice("Veil settings exported.");
-  }
-
-  private chooseImportFile(): void {
-    const input = this.containerEl.createEl("input");
-    input.type = "file";
-    input.accept = ".json,application/json";
-    input.hidden = true;
-    const cleanup = (): void => input.remove();
-    input.addEventListener("cancel", cleanup, { once: true });
-    input.addEventListener("change", () => {
-      const file = input.files?.[0];
-      if (!file) {
-        cleanup();
-        return;
-      }
-      void this.importSettings(file).finally(cleanup);
-    }, { once: true });
-    input.click();
-  }
-
-  private async importSettings(file: File): Promise<void> {
-    if (file.size > MAX_IMPORT_BYTES) {
-      new Notice("Veil settings import is limited to one megabyte.");
-      return;
-    }
-    try {
-      const imported = parseVeilSettingsImport(await file.text(), normalizePath);
-      this.plugin.updateSettings(imported);
-      await this.plugin.flushSettings();
-      this.update();
-      new Notice("Veil settings imported.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown import error.";
-      new Notice(`Veil could not import settings: ${message}`);
-    }
   }
 
   hide(): void {
