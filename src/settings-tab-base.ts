@@ -6,7 +6,6 @@ import type {
   TFile,
 } from "obsidian";
 import type VeilPlugin from "./main";
-import { duplicateSceneProfile } from "./scene-profile-actions";
 import {
   createActionsDefinitions,
   createSupportDefinitions,
@@ -17,8 +16,20 @@ import {
   createVideoDefinitions,
 } from "./settings-appearance-definitions";
 import {
+  appendOpacityExclusion,
+  appendScene,
+  appendWallpaperRule,
+  copyGlobalAppearanceToScene,
+  deleteOpacityExclusion as removeOpacityExclusion,
+  deleteScene as removeScene,
+  deleteWallpaperRule as removeWallpaperRule,
+  duplicateScene as duplicateSceneCollection,
+  reorderOpacityExclusions,
+  reorderScenes,
+  reorderWallpaperRules,
+} from "./settings-collection-model";
+import {
   controlValue,
-  findProfile,
   findRule,
   globalControlRequiresRender,
   parseProfileControlKey,
@@ -39,12 +50,8 @@ import {
 import {
   DEFAULT_SETTINGS,
   DISPLAY_MODES,
-  createOpacityExclusionRule,
-  createProfile,
-  createWallpaperRule,
   mediaKind,
   normalizeSettings,
-  type VeilProfile,
 } from "./settings";
 import { parseVeilSettingsImport, serializeVeilSettings } from "./settings-transfer";
 
@@ -394,19 +401,13 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
       return;
     }
-    const profiles = [
-      ...this.plugin.settings.profiles,
-      createProfile(this.plugin.settings.profiles, this.plugin.settings),
-    ];
-    this.plugin.updateSettings({ profiles });
+    this.plugin.updateSettings({ profiles: appendScene(this.plugin.settings) });
     this.update();
   }
 
   private reorderScene(oldIndex: number, newIndex: number): void {
-    const profiles = [...this.plugin.settings.profiles];
-    const [profile] = profiles.splice(oldIndex, 1);
-    if (!profile) return;
-    profiles.splice(newIndex, 0, profile);
+    const profiles = reorderScenes(this.plugin.settings.profiles, oldIndex, newIndex);
+    if (!profiles) return;
     this.plugin.updateSettings({ profiles });
     this.update();
   }
@@ -466,19 +467,19 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       new Notice(`Veil supports up to ${MAX_CONTEXT_RULES} wallpaper rules.`);
       return;
     }
-    const wallpaperRules = [
-      ...this.plugin.settings.wallpaperRules,
-      createWallpaperRule(this.plugin.settings.wallpaperRules),
-    ];
-    this.plugin.updateSettings({ wallpaperRules });
+    this.plugin.updateSettings({
+      wallpaperRules: appendWallpaperRule(this.plugin.settings.wallpaperRules),
+    });
     this.update();
   }
 
   private reorderWallpaperRule(oldIndex: number, newIndex: number): void {
-    const wallpaperRules = [...this.plugin.settings.wallpaperRules];
-    const [rule] = wallpaperRules.splice(oldIndex, 1);
-    if (!rule) return;
-    wallpaperRules.splice(newIndex, 0, rule);
+    const wallpaperRules = reorderWallpaperRules(
+      this.plugin.settings.wallpaperRules,
+      oldIndex,
+      newIndex,
+    );
+    if (!wallpaperRules) return;
     this.plugin.updateSettings({ wallpaperRules });
     this.update();
   }
@@ -488,19 +489,19 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       new Notice(`Veil supports up to ${MAX_CONTEXT_RULES} opacity exclusions.`);
       return;
     }
-    const opacityExclusions = [
-      ...this.plugin.settings.opacityExclusions,
-      createOpacityExclusionRule(this.plugin.settings.opacityExclusions),
-    ];
-    this.plugin.updateSettings({ opacityExclusions });
+    this.plugin.updateSettings({
+      opacityExclusions: appendOpacityExclusion(this.plugin.settings.opacityExclusions),
+    });
     this.update();
   }
 
   private reorderOpacityExclusion(oldIndex: number, newIndex: number): void {
-    const opacityExclusions = [...this.plugin.settings.opacityExclusions];
-    const [rule] = opacityExclusions.splice(oldIndex, 1);
-    if (!rule) return;
-    opacityExclusions.splice(newIndex, 0, rule);
+    const opacityExclusions = reorderOpacityExclusions(
+      this.plugin.settings.opacityExclusions,
+      oldIndex,
+      newIndex,
+    );
+    if (!opacityExclusions) return;
     this.plugin.updateSettings({ opacityExclusions });
     this.update();
   }
@@ -544,55 +545,36 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       new Notice(`Veil supports up to ${MAX_SCENES} scenes.`);
       return;
     }
-    const index = this.plugin.settings.profiles.findIndex((profile) => profile.id === id);
-    if (index < 0) return;
-    const source = this.plugin.settings.profiles[index];
-    if (!source) return;
-    const duplicate = duplicateSceneProfile(
-      this.plugin.settings.profiles,
-      source,
-      this.plugin.settings,
-    );
-    const profiles = [...this.plugin.settings.profiles];
-    profiles.splice(index + 1, 0, duplicate);
+    const profiles = duplicateSceneCollection(this.plugin.settings, id);
+    if (!profiles) return;
     this.plugin.updateSettings({ profiles });
     void this.plugin.flushSettings().then(() => this.update());
   }
 
   private copyGlobalAppearanceToProfile(id: string): void {
-    const current = findProfile(this.plugin.settings, id);
-    if (!current) return;
-    const copied = createProfile([], this.plugin.settings);
-    const profile: VeilProfile = { ...copied, id: current.id, name: current.name };
-    const profiles = this.plugin.settings.profiles.map((candidate) =>
-      candidate.id === id ? profile : candidate);
+    const profiles = copyGlobalAppearanceToScene(this.plugin.settings, id);
+    if (!profiles) return;
     this.plugin.updateSettings({ profiles });
     void this.plugin.flushSettings().then(() => this.update());
   }
 
   private deleteProfile(id: string): void {
-    const profile = findProfile(this.plugin.settings, id);
-    if (!profile) return;
-    const profiles = this.plugin.settings.profiles.filter((candidate) => candidate.id !== id);
-    const wallpaperRules = this.plugin.settings.wallpaperRules.map((rule) =>
-      rule.profileId === id
-        ? { ...rule, profileId: "", wallpaperPath: profile.wallpaperPath }
-        : rule,
-    );
-    this.plugin.updateSettings({ profiles, wallpaperRules });
+    const collections = removeScene(this.plugin.settings, id);
+    if (!collections) return;
+    this.plugin.updateSettings(collections);
     void this.plugin.flushSettings().then(() => this.update());
   }
 
   private deleteWallpaperRule(id: string): void {
-    const wallpaperRules = this.plugin.settings.wallpaperRules.filter((rule) => rule.id !== id);
-    if (wallpaperRules.length === this.plugin.settings.wallpaperRules.length) return;
+    const wallpaperRules = removeWallpaperRule(this.plugin.settings.wallpaperRules, id);
+    if (!wallpaperRules) return;
     this.plugin.updateSettings({ wallpaperRules });
     void this.plugin.flushSettings().then(() => this.update());
   }
 
   private deleteOpacityRule(id: string): void {
-    const opacityExclusions = this.plugin.settings.opacityExclusions.filter((rule) => rule.id !== id);
-    if (opacityExclusions.length === this.plugin.settings.opacityExclusions.length) return;
+    const opacityExclusions = removeOpacityExclusion(this.plugin.settings.opacityExclusions, id);
+    if (!opacityExclusions) return;
     this.plugin.updateSettings({ opacityExclusions });
     void this.plugin.flushSettings().then(() => this.update());
   }
