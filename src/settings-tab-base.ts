@@ -314,6 +314,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
 
   private wallpaperDefinitions(): SettingDefinitionItem<string> {
     return createWallpaperDefinitions(
+      this.app,
       this.plugin.settings,
       this.wallpaperDefinitionActions(),
       (key, name, desc, maximum, unit, disabled) =>
@@ -329,6 +330,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
         this.continuousControls.flush();
         this.plugin.openWallpaperLibrary();
       },
+      setControlValue: (key, value) => this.setControlValue(key, value),
       bindWallpaperStatus: (descEl, settingEl) => {
         this.statusEl = descEl;
         this.statusRowEl = settingEl;
@@ -368,6 +370,7 @@ export class WallpaperSettingsTab extends PluginSettingTab {
       deleteScene: (id) => this.deleteProfile(id),
       duplicateScene: (id) => this.duplicateScene(id),
       copyGlobalAppearanceToScene: (id) => this.copyGlobalAppearanceToProfile(id),
+      setControlValue: (key, value) => this.setControlValue(key, value),
     };
   }
 
