@@ -13,6 +13,7 @@ void test("fresh installs start without vault-specific appearance state", () => 
   assert.equal(DEFAULT_SETTINGS.wallpaperPath, "");
   assert.equal(DEFAULT_SETTINGS.wallpaperPoolEnabled, false);
   assert.equal(DEFAULT_SETTINGS.wallpaperPoolIncludeSubfolders, false);
+  assert.equal(DEFAULT_SETTINGS.wallpaperPoolChangeInterval, 30);
   assert.equal(DEFAULT_SETTINGS.wallpaperPositionX, 50);
   assert.equal(DEFAULT_SETTINGS.wallpaperPositionY, 50);
   assert.equal(DEFAULT_SETTINGS.wallpaperZoom, 100);
@@ -24,6 +25,14 @@ void test("fresh installs start without vault-specific appearance state", () => 
   assert.deepEqual(DEFAULT_SETTINGS.profiles, []);
   assert.deepEqual(DEFAULT_SETTINGS.wallpaperRules, []);
   assert.deepEqual(DEFAULT_SETTINGS.opacityExclusions, []);
+});
+
+void test("pool rotation intervals stay within the five to 120 minute range", () => {
+  assert.equal(normalizeSettings({ wallpaperPoolChangeInterval: 0 }).wallpaperPoolChangeInterval, 30);
+  assert.equal(normalizeSettings({ wallpaperPoolChangeInterval: 4 }).wallpaperPoolChangeInterval, 5);
+  assert.equal(normalizeSettings({ wallpaperPoolChangeInterval: 5 }).wallpaperPoolChangeInterval, 5);
+  assert.equal(normalizeSettings({ wallpaperPoolChangeInterval: 120 }).wallpaperPoolChangeInterval, 120);
+  assert.equal(normalizeSettings({ wallpaperPoolChangeInterval: 999 }).wallpaperPoolChangeInterval, 120);
 });
 
 void test("settings use bounded numbers and allowed enum values", () => {
@@ -124,6 +133,7 @@ void test("older data keeps its values and receives neutral framing and pool def
   assert.equal(settings.wallpaperPath, "Media/scene.gif");
   assert.equal(settings.wallpaperPoolEnabled, false);
   assert.equal(settings.wallpaperPoolIncludeSubfolders, false);
+  assert.equal(settings.wallpaperPoolChangeInterval, 30);
   assert.equal(settings.wallpaperPositionX, 50);
   assert.equal(settings.wallpaperPositionY, 50);
   assert.equal(settings.wallpaperZoom, 100);
@@ -209,6 +219,7 @@ void test("profiles and context rules normalize without losing order or compatib
   assert.equal(settings.profiles[0]?.wallpaperPath, "Media/focus.webp");
   assert.equal(settings.profiles[0]?.wallpaperPoolEnabled, true);
   assert.equal(settings.profiles[0]?.wallpaperPoolIncludeSubfolders, true);
+  assert.equal(settings.profiles[0]?.wallpaperPoolChangeInterval, 30);
   assert.equal(settings.profiles[0]?.wallpaperPositionX, 0);
   assert.equal(settings.profiles[0]?.wallpaperPositionY, 100);
   assert.equal(settings.profiles[0]?.wallpaperZoom, 200);
@@ -249,6 +260,7 @@ void test("new scenes copy the complete current global appearance", () => {
   assert.equal(profile.wallpaperPath, "Media/default.webp");
   assert.equal(profile.wallpaperPoolEnabled, true);
   assert.equal(profile.wallpaperPoolIncludeSubfolders, true);
+  assert.equal(profile.wallpaperPoolChangeInterval, 30);
   assert.equal(profile.wallpaperPositionX, 28);
   assert.equal(profile.wallpaperPositionY, 73);
   assert.equal(profile.wallpaperZoom, 135);

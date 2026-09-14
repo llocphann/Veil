@@ -12,7 +12,7 @@ void test("legacy global pools derive an explicit folder without changing the sa
   assert.equal(settings.wallpaperPath, "Media/Wallpapers/legacy.webp");
   assert.equal(settings.wallpaperPoolFolder, "Media/Wallpapers");
   assert.equal(settings.wallpaperPoolIncludeSubfolders, true);
-  assert.equal(settings.wallpaperPoolChangeInterval, 0);
+  assert.equal(settings.wallpaperPoolChangeInterval, 30);
 });
 
 void test("legacy scene pools derive their own folder and keep scene wallpaper fallback data", () => {
@@ -29,7 +29,7 @@ void test("legacy scene pools derive their own folder and keep scene wallpaper f
   assert.ok(scene);
   assert.equal(scene.wallpaperPath, "Media/Focus/legacy.webp");
   assert.equal(scene.wallpaperPoolFolder, "Media/Focus");
-  assert.equal(scene.wallpaperPoolChangeInterval, 0);
+  assert.equal(scene.wallpaperPoolChangeInterval, 30);
 });
 
 void test("an explicitly selected vault-root pool is not replaced by the wallpaper file folder", () => {

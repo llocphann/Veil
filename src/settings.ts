@@ -57,7 +57,7 @@ export interface VeilProfile {
   wallpaperPoolEnabled: boolean;
   wallpaperPoolFolder: string;
   wallpaperPoolIncludeSubfolders: boolean;
-  /** Automatic pool rotation interval in minutes. Zero disables rotation. */
+  /** Automatic pool rotation interval in minutes, from 5 through 120. */
   wallpaperPoolChangeInterval: number;
   displayMode: DisplayMode;
   wallpaperPositionX: number;
@@ -105,7 +105,7 @@ export interface VeilSettings {
   wallpaperPoolEnabled: boolean;
   wallpaperPoolFolder: string;
   wallpaperPoolIncludeSubfolders: boolean;
-  /** Automatic pool rotation interval in minutes. Zero disables rotation. */
+  /** Automatic pool rotation interval in minutes, from 5 through 120. */
   wallpaperPoolChangeInterval: number;
   displayMode: DisplayMode;
   wallpaperPositionX: number;
@@ -143,7 +143,7 @@ export const DEFAULT_SETTINGS: Readonly<VeilSettings> = Object.freeze({
   wallpaperPoolEnabled: false,
   wallpaperPoolFolder: "",
   wallpaperPoolIncludeSubfolders: false,
-  wallpaperPoolChangeInterval: 0,
+  wallpaperPoolChangeInterval: 30,
   displayMode: "cover",
   wallpaperPositionX: 50,
   wallpaperPositionY: 50,
@@ -220,6 +220,13 @@ export function boundedNumber(
   return Number.isFinite(number)
     ? Math.round(Math.max(minimum, Math.min(maximum, number)))
     : fallback;
+}
+
+function normalizeWallpaperPoolChangeInterval(value: unknown, fallback: number): number {
+  if (value === null || value === "" || typeof value === "boolean") return fallback;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return Math.round(Math.max(5, Math.min(120, number)));
 }
 
 export function normalizeWallpaperPath(
@@ -363,11 +370,9 @@ function normalizeAppearance(
   ] as const) {
     appearance[key] = boundedNumber(value[key], fallback[key], 0, 100);
   }
-  appearance.wallpaperPoolChangeInterval = boundedNumber(
+  appearance.wallpaperPoolChangeInterval = normalizeWallpaperPoolChangeInterval(
     value.wallpaperPoolChangeInterval,
     fallback.wallpaperPoolChangeInterval,
-    0,
-    1440,
   );
   appearance.wallpaperZoom = boundedNumber(value.wallpaperZoom, fallback.wallpaperZoom, 100, 200);
   appearance.transitionDuration = boundedNumber(

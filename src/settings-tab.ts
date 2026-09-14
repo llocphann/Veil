@@ -1,4 +1,5 @@
 import { setIcon, type SettingDefinitionItem } from "obsidian";
+import { SettingsPoolVisibilityTransition } from "./settings-pool-visibility-transition";
 import { WallpaperSettingsTab as BaseWallpaperSettingsTab } from "./settings-tab-base";
 
 const SETTINGS_SECTIONS = [
@@ -39,7 +40,9 @@ const SIMPLE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "Wallpaper file": "Choose an image, GIF, or video.",
   "Wallpaper library": "Browse and choose wallpapers.",
   "Wallpaper pool": "Randomly use media from the wallpaper folder.",
+  "Wallpaper folder": "Choose the folder used by the wallpaper pool.",
   "Include subfolders": "Include media from subfolders.",
+  "Change interval": "Choose how often the pool changes wallpaper.",
   "Display mode": "Choose how media fits the screen.",
   "Horizontal focal point": "Move the focus left or right.",
   "Vertical focal point": "Move the focus up or down.",
@@ -147,6 +150,11 @@ function compact(
     Boolean(definition));
 }
 
+function isPoolToggleKey(key: string): boolean {
+  return key === "wallpaperPoolEnabled"
+    || /^profile:[^:]+:wallpaperPoolEnabled$/.test(key);
+}
+
 /**
  * Presentation adapter for Veil settings.
  *
@@ -157,6 +165,31 @@ function compact(
  */
 export class WallpaperSettingsTab extends BaseWallpaperSettingsTab {
   private activeSection: SettingsSectionId = "wallpaper";
+  private animateNextPoolUpdate = false;
+  private readonly poolVisibilityTransition = new SettingsPoolVisibilityTransition(
+    () => this.containerEl,
+  );
+
+  override setControlValue(key: string, value: unknown): void {
+    if (isPoolToggleKey(key) && this.getControlValue(key) !== value) {
+      this.animateNextPoolUpdate = true;
+    }
+    super.setControlValue(key, value);
+  }
+
+  override update(): void {
+    if (!this.animateNextPoolUpdate) {
+      super.update();
+      return;
+    }
+    this.animateNextPoolUpdate = false;
+    this.poolVisibilityTransition.run(() => super.update());
+  }
+
+  override hide(): void {
+    this.poolVisibilityTransition.clear();
+    super.hide();
+  }
 
   override getSettingDefinitions(): SettingDefinitionItem<string>[] {
     const base = super.getSettingDefinitions();

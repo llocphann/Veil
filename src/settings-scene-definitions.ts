@@ -119,14 +119,14 @@ function scenePage(
       },
       {
         name: "Change interval",
-        desc: "Automatically choose another pool wallpaper; 0 disables rotation.",
+        desc: "Automatically choose another pool wallpaper every 5 to 120 minutes.",
         control: {
           type: "slider",
           key: key("wallpaperPoolChangeInterval"),
-          min: 0,
-          max: 1440,
+          min: 5,
+          max: 120,
           step: 1,
-          displayFormat: (value) => value === 0 ? "Off" : `${value} min`,
+          displayFormat: (value) => `${value} min`,
         },
         visible: () => profile.wallpaperPoolEnabled,
       },

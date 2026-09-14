@@ -53,8 +53,10 @@ void test("wallpaper pool hides file and library without clearing them and expos
     wallpaperSource,
     /actions\.setControlValue\("wallpaperPoolFolder", path\)/,
   );
-  assert.match(wallpaperSource, /key: "wallpaperPoolChangeInterval"/);
-  assert.match(wallpaperSource, /value === 0 \? "Off" : `\$\{value\} min`/);
+  assert.match(
+    wallpaperSource,
+    /key: "wallpaperPoolChangeInterval"[\s\S]*?min: 5,[\s\S]*?max: 120,[\s\S]*?displayFormat: \(value\) => `\$\{value\} min`/,
+  );
   assert.doesNotMatch(wallpaperSource, /wallpaperPath\s*[:=]\s*""/);
 });
 
@@ -69,7 +71,10 @@ void test("scene pool controls follow the same folder then subfolder then interv
     /name: "Wallpaper file"[\s\S]*?visible: \(\) => !profile\.wallpaperPoolEnabled/,
   );
   assert.match(sceneSource, /key\("wallpaperPoolFolder"\)/);
-  assert.match(sceneSource, /key\("wallpaperPoolChangeInterval"\)/);
+  assert.match(
+    sceneSource,
+    /key: key\("wallpaperPoolChangeInterval"\)[\s\S]*?min: 5,[\s\S]*?max: 120,[\s\S]*?displayFormat: \(value\) => `\$\{value\} min`/,
+  );
 });
 
 void test("base retains only status DOM registration lifecycle", () => {
