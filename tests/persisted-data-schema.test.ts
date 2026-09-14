@@ -79,12 +79,6 @@ void test("persisted snapshots always write the current schema and clone library
     VEIL_PERSISTED_DATA_SCHEMA_VERSION,
   );
   assert.deepEqual(snapshot.wallpaperLibrary, library);
-  assert.notEqual(
-    (snapshot.wallpaperLibrary as typeof library).favorites,
-    library.favorites,
-  );
-  assert.notEqual(
-    (snapshot.wallpaperLibrary as typeof library).recent,
-    library.recent,
-  );
+  assert.notEqual(snapshot.wallpaperLibrary.favorites, library.favorites);
+  assert.notEqual(snapshot.wallpaperLibrary.recent, library.recent);
 });
