@@ -8,28 +8,53 @@ import type { NoteContext } from "./context-rules";
 
 export class DocumentContextResolver {
   private readonly activeRootLeaves = new Map<Document, WorkspaceLeaf>();
+  private readonly workspaceDocumentRegistry = new Set<Document>();
 
-  constructor(private readonly app: App) {}
+  constructor(private readonly app: App) {
+    this.rememberDocument(this.app.workspace.containerEl.ownerDocument);
+  }
+
+  initializeDocuments(): void {
+    this.rememberDocument(this.app.workspace.containerEl.ownerDocument);
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      this.rememberDocument(leaf.view.containerEl.ownerDocument);
+    });
+  }
+
+  rememberDocument(document: Document): void {
+    if (!document.defaultView?.closed) this.workspaceDocumentRegistry.add(document);
+  }
+
+  workspaceDocuments(): ReadonlySet<Document> {
+    return this.workspaceDocumentRegistry;
+  }
 
   rememberActiveRootLeaf(leaf: WorkspaceLeaf | null): Document | null {
     if (!leaf) return null;
     const document = leaf.view.containerEl.ownerDocument;
     if (!this.isRootLeafForDocument(leaf, document)) return null;
+    this.rememberDocument(document);
     this.activeRootLeaves.set(document, leaf);
     return document;
   }
 
   forgetDocument(document: Document): void {
     this.activeRootLeaves.delete(document);
+    this.workspaceDocumentRegistry.delete(document);
   }
 
   clear(): void {
     this.activeRootLeaves.clear();
+    this.workspaceDocumentRegistry.clear();
   }
 
   documentsAffectedByLayoutChange(): Document[] {
     const affected: Document[] = [];
-    for (const document of this.workspaceDocuments()) {
+    for (const document of this.workspaceDocumentRegistry) {
+      if (document.defaultView?.closed) {
+        this.forgetDocument(document);
+        continue;
+      }
       const remembered = this.activeRootLeaves.get(document) || null;
       if (this.isRootLeafForDocument(remembered, document)) continue;
 
@@ -70,18 +95,12 @@ export class DocumentContextResolver {
   }
 
   documentsForFile(file: TFile): Document[] {
-    const documents = this.workspaceDocuments();
-    return documents.filter((document) => this.fileForDocument(document)?.path === file.path);
+    return Array.from(this.workspaceDocumentRegistry)
+      .filter((document) => this.fileForDocument(document)?.path === file.path);
   }
 
   isActiveFile(file: TFile): boolean {
     return this.documentsForFile(file).length > 0;
-  }
-
-  private workspaceDocuments(): Document[] {
-    const documents = new Set<Document>([this.app.workspace.containerEl.ownerDocument]);
-    this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    return Array.from(documents);
   }
 
   private fileForDocument(document: Document): TFile | null {
