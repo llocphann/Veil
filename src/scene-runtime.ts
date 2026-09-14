@@ -17,6 +17,8 @@ interface CachedSceneResolution {
   resolved: ResolvedWallpaper;
 }
 
+const DYNAMIC_SYSTEM_RULE = /^\s*@(time|day|schedule)\s*=/i;
+
 export class SceneRuntime {
   private manualProfileId = "";
   private resolutionRevision = 0;
@@ -61,42 +63,18 @@ export class SceneRuntime {
   }
 
   resolveSnapshot(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
-    if (this.manualProfileId) {
-      const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
-      if (profile) {
-        return {
-          rule: null,
-          profile,
-          path: profile.wallpaperPath,
-          appearance: copyAppearance(profile),
-        };
-      }
-    }
-    return resolveWallpaper(settings, context);
+    const cached = this.cachedResolution(settings, context);
+    if (cached) return cached;
+    return this.resolveUncached(settings, context);
   }
 
   resolve(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
     this.reconcileSettings(settings);
-    const cached = context
-      ? this.contextResolutionCache.get(settings)?.get(context)
-      : this.workspaceResolutionCache.get(settings);
-    if (cached?.revision === this.resolutionRevision) return cached.resolved;
+    const cached = this.cachedResolution(settings, context);
+    if (cached) return cached;
 
-    const resolved = this.resolveSnapshot(settings, context);
-    const entry: CachedSceneResolution = {
-      revision: this.resolutionRevision,
-      resolved,
-    };
-    if (context) {
-      let cache = this.contextResolutionCache.get(settings);
-      if (!cache) {
-        cache = new WeakMap<NoteContext, CachedSceneResolution>();
-        this.contextResolutionCache.set(settings, cache);
-      }
-      cache.set(context, entry);
-    } else {
-      this.workspaceResolutionCache.set(settings, entry);
-    }
+    const resolved = this.resolveUncached(settings, context);
+    if (this.cacheAllowed(settings, context)) this.storeResolution(settings, context, resolved);
     return resolved;
   }
 
@@ -117,5 +95,62 @@ export class SceneRuntime {
     if (!context?.path) return "Workspace → default appearance";
     const pool = resolved.appearance.wallpaperPoolEnabled ? " · pool" : "";
     return `${context.path} → default appearance${pool}`;
+  }
+
+  private resolveUncached(settings: VeilSettings, context: NoteContext | null): ResolvedWallpaper {
+    if (this.manualProfileId) {
+      const profile = settings.profiles.find((candidate) => candidate.id === this.manualProfileId);
+      if (profile) {
+        return {
+          rule: null,
+          profile,
+          path: profile.wallpaperPath,
+          appearance: copyAppearance(profile),
+        };
+      }
+    }
+    return resolveWallpaper(settings, context);
+  }
+
+  private cacheAllowed(settings: VeilSettings, context: NoteContext | null): boolean {
+    if (context?.now) return false;
+    return !settings.wallpaperRules.some((rule) =>
+      rule.enabled
+      && rule.matchType === "property"
+      && DYNAMIC_SYSTEM_RULE.test(rule.matchValue),
+    );
+  }
+
+  private cachedResolution(
+    settings: VeilSettings,
+    context: NoteContext | null,
+  ): ResolvedWallpaper | null {
+    if (!this.cacheAllowed(settings, context)) return null;
+    const cached = context
+      ? this.contextResolutionCache.get(settings)?.get(context)
+      : this.workspaceResolutionCache.get(settings);
+    return cached?.revision === this.resolutionRevision ? cached.resolved : null;
+  }
+
+  private storeResolution(
+    settings: VeilSettings,
+    context: NoteContext | null,
+    resolved: ResolvedWallpaper,
+  ): void {
+    const entry: CachedSceneResolution = {
+      revision: this.resolutionRevision,
+      resolved,
+    };
+    if (!context) {
+      this.workspaceResolutionCache.set(settings, entry);
+      return;
+    }
+
+    let cache = this.contextResolutionCache.get(settings);
+    if (!cache) {
+      cache = new WeakMap<NoteContext, CachedSceneResolution>();
+      this.contextResolutionCache.set(settings, cache);
+    }
+    cache.set(context, entry);
   }
 }
