@@ -130,7 +130,9 @@ export class WallpaperSourceResolver {
     ) {
       return cached;
     }
-    if (__VEIL_DEV__) runtimeWorkProfiler.record("sourceLookup");
+    if (typeof __VEIL_DEV__ !== "undefined" && __VEIL_DEV__) {
+      runtimeWorkProfiler.record("sourceLookup");
+    }
 
     const invalidPath = /(^\/|^[a-z][a-z0-9+.-]*:|(^|\/)\.\.(\/|$))/i.test(path);
     const abstractFile = invalidPath || !path ? null : this.app.vault.getAbstractFileByPath(path);
