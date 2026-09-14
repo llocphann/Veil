@@ -153,6 +153,7 @@ export default class VeilPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       if (this.unloaded) return;
       this.layoutReady = true;
+      this.documentContexts.initializeDocuments();
       this.documentContexts.rememberActiveRootLeaf(this.app.workspace.getMostRecentLeaf());
       this.registerVaultEvents();
       this.systemRouting.reschedule();
@@ -175,6 +176,7 @@ export default class VeilPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.workspace.on("window-open", (_workspaceWindow, window) => {
+        this.documentContexts.rememberDocument(window.document);
         if (this.layoutReady) this.applyToDocument(window.document);
       }),
     );
@@ -334,13 +336,8 @@ export default class VeilPlugin extends Plugin {
     else this.refreshWallpaper();
   }
 
-  private workspaceDocuments(): Set<Document> {
-    const documents = new Set(this.documents.keys());
-    documents.add(this.app.workspace.containerEl.ownerDocument);
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      documents.add(leaf.view.containerEl.ownerDocument);
-    });
-    return documents;
+  private workspaceDocuments(): ReadonlySet<Document> {
+    return this.documentContexts.workspaceDocuments();
   }
 
   private documentsAffectedBySettings(
