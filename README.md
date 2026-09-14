@@ -60,14 +60,18 @@ Start with:
 
 Veil 2.0 is planned as a refinement release rather than a feature-expansion release. The current feature set already covers the main wallpaper workflow, so development from 1.6 onward will prioritize lower runtime cost, cleaner internal boundaries, deterministic state handling, and stronger regression guarantees.
 
-### 1.6 — Architecture decomposition
+### 1.6 — Architecture decomposition — complete on `dev`
+
+Architecture decomposition is complete on the development branch. The main runtime and Settings hotspot have been reduced into smaller ownership-focused modules while preserving behavior under the full verification suite.
 
 - Reduce the amount of orchestration and state ownership concentrated in `main.ts`.
 - Split settings and Wallpaper Library responsibilities into smaller, independently testable modules.
 - Preserve existing behavior while clarifying ownership between context resolution, wallpaper pools, media lifecycle, document application, and persistence.
 - Avoid user-facing feature additions unless they are required to complete the refactor safely.
 
-### 1.7 — Runtime invalidation and no-op fast paths
+### 1.7 — Runtime invalidation and no-op fast paths — in progress on `dev`
+
+Current development already skips unchanged document appearance DOM work, avoids redundant playback mutations, and retains an existing system-routing timer when its absolute boundary has not changed.
 
 - Replace broad refresh work with explicit invalidation for context, source, appearance, playback, layout, and pool state.
 - Add stable runtime signatures so unchanged context or appearance produces no DOM or media work.
