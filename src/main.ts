@@ -26,6 +26,12 @@ import {
   applyDocumentAppearance,
   restoreDocumentAppearance,
 } from "./wallpaper-document-appearance";
+import {
+  disposeWallpaperState,
+  settleWallpaperState,
+  startWallpaperCrossfade,
+  syncWallpaperPlayback,
+} from "./wallpaper-media-lifecycle";
 import type { WallpaperDocumentState } from "./wallpaper-document-state";
 import { WallpaperLibraryModal } from "./wallpaper-library-modal";
 import { WallpaperLibraryRuntime } from "./wallpaper-library-runtime";
@@ -38,8 +44,6 @@ import { WallpaperSourceResolver } from "./wallpaper-source-resolver";
 import { WallpaperSettingsTab } from "./settings-tab";
 
 const LAYER_CLASS = "vault-dashboard-wallpaper";
-const TRANSITION_OPACITY_VARIABLE = "--vdb-transition-opacity";
-const TRANSITION_CLEANUP_BUFFER = 80;
 
 type DocumentState = WallpaperDocumentState;
 type StatusTone = "info" | "success" | "error";
@@ -572,126 +576,29 @@ export default class VeilPlugin extends Plugin {
   }
 
   private startCrossfade(document: Document, state: DocumentState): void {
-    const outgoing = state.outgoing;
-    if (!outgoing || outgoing.disposed || !outgoing.ready || outgoing.failed) {
-      if (outgoing) this.disposeState(outgoing);
-      state.outgoing = null;
-      state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
-      delete state.layer.dataset.transitionState;
-      return;
-    }
-
-    const reducedMotion =
-      state.appearance.respectReducedMotion && Boolean(state.motionQuery?.matches);
-    const duration = reducedMotion ? 0 : state.appearance.transitionDuration;
-    if (duration <= 0) {
-      this.disposeState(outgoing);
-      state.outgoing = null;
-      state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
-      delete state.layer.dataset.transitionState;
-      return;
-    }
-
-    const durationValue = `${duration}ms`;
-    state.layer.style.setProperty("--vdb-transition-duration", durationValue);
-    outgoing.layer.style.setProperty("--vdb-transition-duration", durationValue);
-    state.layer.dataset.transitionState = "incoming";
-    outgoing.layer.dataset.transitionState = "outgoing";
-    state.layer.setCssProps({ [TRANSITION_OPACITY_VARIABLE]: "0" });
-    outgoing.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
-    void state.layer.offsetWidth;
-
-    window.requestAnimationFrame(() => {
-      if (state.disposed || outgoing.disposed || this.documents.get(document) !== state) return;
-      state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
-      outgoing.layer.setCssProps({ [TRANSITION_OPACITY_VARIABLE]: "0" });
+    startWallpaperCrossfade({
+      document,
+      state,
+      getCurrentState: () => this.documents.get(document) || null,
     });
-
-    state.transitionTimer = window.setTimeout(() => {
-      state.transitionTimer = null;
-      if (state.outgoing !== outgoing) return;
-      this.disposeState(outgoing);
-      state.outgoing = null;
-      delete state.layer.dataset.transitionState;
-    }, duration + TRANSITION_CLEANUP_BUFFER);
   }
 
   private settleState(state: DocumentState): void {
-    if (state.transitionTimer !== null) {
-      window.clearTimeout(state.transitionTimer);
-      state.transitionTimer = null;
-    }
-    if (state.outgoing) {
-      this.disposeState(state.outgoing);
-      state.outgoing = null;
-    }
-    state.layer.style.removeProperty(TRANSITION_OPACITY_VARIABLE);
-    delete state.layer.dataset.transitionState;
+    settleWallpaperState(state);
   }
 
   private syncPlaybackAndMotion(document: Document, state: DocumentState): void {
-    const appearance = state.appearance;
-    const motionPaused =
-      appearance.opacity === 0
-      || (appearance.pauseWhenHidden && document.hidden)
-      || (appearance.respectReducedMotion && Boolean(state.motionQuery?.matches));
-    state.layer.dataset.animationPaused = String(motionPaused);
-    if (state.kind !== "video" || state.disposed || state.failed || this.unloaded) return;
-    const video = state.media as HTMLVideoElement;
-    const shouldPlay =
-      this.settings.enabled &&
-      appearance.opacity > 0 &&
-      !motionPaused;
-    if (!shouldPlay) {
-      video.pause();
-      return;
-    }
-    if (!video.paused || state.playPromise || !video.getAttribute("src")) return;
-
-    try {
-      let interrupted = false;
-      state.playPromise = Promise.resolve(video.play())
-        .catch((error: unknown) => {
-          if (state.disposed || this.unloaded) return;
-          if (error instanceof DOMException && error.name === "AbortError") {
-            interrupted = true;
-            return;
-          }
-          this.setStatus(
-            "Video could not autoplay. Use Reload wallpaper to retry, or check the video codec.",
-            "error",
-          );
-        })
-        .finally(() => {
-          state.playPromise = null;
-          if (interrupted) this.syncPlaybackAndMotion(document, state);
-        });
-    } catch {
-      this.setStatus("Video playback is unavailable in this window.", "error");
-    }
+    syncWallpaperPlayback({
+      document,
+      state,
+      isEnabled: () => this.settings.enabled,
+      isUnloaded: () => this.unloaded,
+      onError: (message) => this.setStatus(message, "error"),
+    });
   }
 
   private disposeState(state: DocumentState): void {
-    if (state.disposed) return;
-    state.disposed = true;
-    if (state.transitionTimer !== null) {
-      window.clearTimeout(state.transitionTimer);
-      state.transitionTimer = null;
-    }
-    if (state.outgoing) {
-      this.disposeState(state.outgoing);
-      state.outgoing = null;
-    }
-    for (const cleanup of state.cleanups) cleanup();
-    if (state.kind === "video") {
-      const video = state.media as HTMLVideoElement;
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    } else {
-      state.media.removeAttribute("src");
-    }
-    state.layer.remove();
+    disposeWallpaperState(state);
   }
 
   private clearDocument(document: Document): void {

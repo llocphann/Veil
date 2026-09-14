@@ -27,6 +27,10 @@ const documentAppearanceSource = readFileSync(
   new URL("../src/wallpaper-document-appearance.ts", import.meta.url),
   "utf8",
 );
+const mediaLifecycleSource = readFileSync(
+  new URL("../src/wallpaper-media-lifecycle.ts", import.meta.url),
+  "utf8",
+);
 const librarySource = readFileSync(
   new URL("../src/wallpaper-library-runtime.ts", import.meta.url),
   "utf8",
@@ -97,6 +101,18 @@ void test("main delegates wallpaper document state and appearance styling", () =
   assert.match(documentAppearanceSource, /--vdb-overlay-opacity/);
   assert.match(documentAppearanceSource, /--vault-dashboard-pane-opacity/);
   assert.match(documentAppearanceSource, /matchingOpacityExclusions\(opacityExclusions, context\)/);
+});
+
+void test("main delegates wallpaper media lifecycle", () => {
+  assert.match(mainSource, /startWallpaperCrossfade\(\{/);
+  assert.match(mainSource, /settleWallpaperState\(state\)/);
+  assert.match(mainSource, /syncWallpaperPlayback\(\{/);
+  assert.match(mainSource, /disposeWallpaperState\(state\)/);
+  assert.doesNotMatch(mainSource, /TRANSITION_OPACITY_VARIABLE/);
+  assert.match(mediaLifecycleSource, /TRANSITION_OPACITY_VARIABLE/);
+  assert.match(mediaLifecycleSource, /state\.transitionTimer = window\.setTimeout/);
+  assert.match(mediaLifecycleSource, /Promise\.resolve\(video\.play\(\)\)/);
+  assert.match(mediaLifecycleSource, /video\.removeAttribute\("src"\)/);
 });
 
 void test("main delegates wallpaper library state ownership", () => {
