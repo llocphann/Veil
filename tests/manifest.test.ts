@@ -16,6 +16,7 @@ function settingsSource(): string {
   return [
     fs.readFileSync("src/settings-tab.ts", "utf8"),
     fs.readFileSync("src/settings-tab-base.ts", "utf8"),
+    fs.readFileSync("src/settings-routing-definitions.ts", "utf8"),
   ].join("\n");
 }
 
