@@ -25,6 +25,16 @@ void test("appearance-only changes avoid scene, pool, and routing work", () => {
   assert.equal(impact.libraryRecent, false);
 });
 
+void test("appearance changes stay idle while Veil remains disabled", () => {
+  const previous = { ...settings(), enabled: false };
+  const next = { ...previous, opacity: previous.opacity + 1 };
+  const impact = classifySettingsChange(previous, next);
+
+  assert.equal(impact.globalAppearance, true);
+  assert.equal(impact.documentResolution, false);
+  assert.equal(impact.routingSchedule, false);
+});
+
 void test("scene name changes reconcile scenes without invalidating pool or timer", () => {
   const previous = settings();
   previous.profiles = [{
