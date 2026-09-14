@@ -73,7 +73,7 @@ The built-in Wallhaven browser is SFW-only and does not use or store a Wallhaven
 If Veil has made your Obsidian workspace more enjoyable, you can support its continued development here.
 
 <a href="https://www.buymeacoffee.com/llocphann">
-  <img src="https://raw.githubusercontent.com/llocphann/Veil/stable/assets/buy-me-a-coffee.svg" alt="Buy Me a Coffee" height="48">
+  <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=llocphann&button_colour=6f5bd3&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" alt="Buy Me a Coffee" height="48">
 </a>
 
 <sub>Your support helps me keep refining Veil, improving wallpaper workflows, routing, visual effects, and documentation.</sub>
