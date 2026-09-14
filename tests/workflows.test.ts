@@ -35,20 +35,24 @@ void test("verification and release jobs have bounded runtimes", () => {
   assert.equal(stableRelease.split("timeout-minutes: 10").length - 1, 3);
 });
 
-void test("development CI cancels superseded verification runs", () => {
+void test("development CI verifies dev and prerelease without duplicating stable release verification", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(source, /concurrency:/);
   assert.match(source, /github\.event\.pull_request\.number \|\| github\.ref/);
   assert.match(source, /cancel-in-progress: true/);
-  assert.match(source, /- dev/);
-  assert.match(source, /- stable/);
+  assert.match(source, /branches:\n[ ]{6}- dev\n[ ]{6}- prerelease/);
+  assert.doesNotMatch(source, /[ ]{6}- main\b/);
+  assert.doesNotMatch(source, /[ ]{6}- stable\b/);
+  assert.doesNotMatch(source, /contents: write/);
 });
 
-void test("development CI publishes a short-lived smoke-test bundle", () => {
+void test("only prerelease publishes a short-lived manual smoke-test bundle", () => {
   const source = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(source, /Upload prerelease smoke-test bundle/);
   assert.match(source, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
   assert.match(source, /github\.ref == 'refs\/heads\/prerelease'/);
-  assert.match(source, /github\.ref == 'refs\/heads\/dev'/);
+  assert.doesNotMatch(source, /github\.ref == 'refs\/heads\/dev'/);
+  assert.match(source, /veil-smoke-prerelease-/);
   assert.match(source, /retention-days: 7/);
   for (const artifact of ["main.js", "manifest.json", "styles.css"]) {
     assert.match(source, new RegExp(`\\b${artifact.replace(".", "\\.")}\\b`));
@@ -101,16 +105,25 @@ void test("release publishing permissions are isolated from dependency execution
   assert.doesNotMatch(publishJob, /npm ci|Check out repository|Set up Node\.js/);
 });
 
-void test("stable promotion verifies source before release writes", () => {
+void test("stable promotion accepts only the smoke-tested prerelease source before release writes", () => {
   const source = fs.readFileSync(".github/workflows/stable-release.yml", "utf8");
   const verifyIndex = source.indexOf("  verify:\n");
   const versionIndex = source.indexOf("  version:\n");
   const publishIndex = source.indexOf("  publish:\n");
+  const provenanceIndex = source.indexOf("- name: Verify prerelease promotion source");
+  const installIndex = source.indexOf("- name: Install dependencies");
   assert.ok(verifyIndex >= 0, "stable verification job is missing");
   assert.ok(versionIndex > verifyIndex, "stable version job must follow verification");
   assert.ok(publishIndex > versionIndex, "stable publish job must follow versioning");
+  assert.ok(provenanceIndex >= 0, "prerelease provenance verification is missing");
+  assert.ok(provenanceIndex < installIndex, "prerelease provenance must be checked before npm ci");
   assert.match(source, /branches:\n[ ]{6}- stable/);
   assert.match(source, /github\.actor != 'github-actions\[bot\]'/);
+  assert.match(source, /git fetch --no-tags origin prerelease:refs\/remotes\/origin\/prerelease/);
+  assert.match(source, /merge-base --is-ancestor "\$\{PRERELEASE_SHA\}" "\$\{GITHUB_SHA\}"/);
+  assert.match(source, /PRERELEASE_TREE=/);
+  assert.match(source, /STABLE_TREE=/);
+  assert.match(source, /Stable source must exactly match the smoke-tested prerelease tree/);
 
   const verifyJob = source.slice(verifyIndex, versionIndex);
   const versionJob = source.slice(versionIndex, publishIndex);
