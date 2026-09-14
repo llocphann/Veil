@@ -10,6 +10,7 @@ export default defineConfig(
     "verify-build.mjs",
     "version-bump.mjs",
     "release-version.mjs",
+    "perf-check.mjs",
     "versions.json",
     "package.json",
     "package-lock.json",
