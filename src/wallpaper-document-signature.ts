@@ -16,23 +16,8 @@ export interface WallpaperDocumentSignatureOptions {
   ready: boolean;
 }
 
-export function wallpaperDocumentApplicationSignature(
-  options: WallpaperDocumentSignatureOptions,
-): string {
-  const {
-    appearance,
-    context,
-    opacityExclusions,
-    profileId,
-    updateProfileId,
-    ready,
-  } = options;
-  const exclusions = matchingOpacityExclusions(opacityExclusions, context);
-
+export function wallpaperRenderAppearanceSignature(appearance: VeilAppearance): string {
   return JSON.stringify([
-    appearance.wallpaperPath,
-    appearance.wallpaperPoolEnabled,
-    appearance.wallpaperPoolIncludeSubfolders,
     appearance.displayMode,
     appearance.wallpaperPositionX,
     appearance.wallpaperPositionY,
@@ -56,6 +41,24 @@ export function wallpaperDocumentApplicationSignature(
     appearance.effectIntensity,
     appearance.pauseWhenHidden,
     appearance.respectReducedMotion,
+  ]);
+}
+
+export function wallpaperDocumentApplicationSignature(
+  options: WallpaperDocumentSignatureOptions,
+): string {
+  const {
+    appearance,
+    context,
+    opacityExclusions,
+    profileId,
+    updateProfileId,
+    ready,
+  } = options;
+  const exclusions = matchingOpacityExclusions(opacityExclusions, context);
+
+  return JSON.stringify([
+    wallpaperRenderAppearanceSignature(appearance),
     exclusions.paneSurface,
     exclusions.paneContent,
     updateProfileId ? profileId || "" : null,
