@@ -44,7 +44,9 @@ void test("unchanged pool boundary keeps one exact timer and inactive state clea
     assert.equal(setCalls, 1);
     assert.equal(clearCalls, 0);
 
-    callback?.();
+    const scheduledCallback = callback as (() => void) | null;
+    assert.ok(scheduledCallback);
+    scheduledCallback();
     assert.equal(rotations, 1);
     assert.equal(clearCalls, 0);
 
