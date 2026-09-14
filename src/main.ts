@@ -521,8 +521,16 @@ export default class VeilPlugin extends Plugin {
 
     let previous = current;
     if (previous?.key === source.key && previous.layer.isConnected) {
+      previous.sourceLabel = source.label;
+      previous.contextLabel = source.contextLabel;
       this.applyOptions(document, previous, context, source.appearance);
-      this.setDocumentStatus(document, `${source.contextLabel} · ${source.label}: ${source.path}`, "success");
+      this.setDocumentStatus(
+        document,
+        previous.ready
+          ? `${source.contextLabel} · ${source.label}: ${source.path}`
+          : `${source.contextLabel} · loading ${source.label.toLowerCase()}: ${source.path}`,
+        previous.ready ? "success" : "info",
+      );
       return;
     }
 
@@ -569,6 +577,8 @@ export default class VeilPlugin extends Plugin {
       key: source.key,
       path: source.path,
       kind: source.kind,
+      sourceLabel: source.label,
+      contextLabel: source.contextLabel,
       layer,
       media,
       vignette,
@@ -603,7 +613,9 @@ export default class VeilPlugin extends Plugin {
       this.startCrossfade(document, activeState);
       this.setDocumentStatus(
         document,
-        `${source.contextLabel} · ${source.label} loaded: ${source.path}`,
+        `${activeState.contextLabel || source.contextLabel} · ${
+          activeState.sourceLabel || source.label
+        } loaded: ${activeState.path}`,
         "success",
       );
     };
@@ -633,8 +645,8 @@ export default class VeilPlugin extends Plugin {
       }
       this.setDocumentStatus(
         document,
-        `Could not load ${source.path}${
-          source.kind === "video"
+        `Could not load ${activeState.path}${
+          activeState.kind === "video"
             ? ". Check the video codec or try MP4/WebM."
             : ". Check that the image is readable."
         }`,
