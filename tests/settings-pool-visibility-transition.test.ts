@@ -30,6 +30,19 @@ void test("pool visibility changes use a bounded slide transition with reduced-m
   assert.doesNotMatch(transitionSource, /setInterval|requestAnimationFrame/);
 });
 
+void test("exit animation effects are released before Obsidian rebuilds setting rows", () => {
+  assert.match(
+    transitionSource,
+    /Promise\.allSettled[\s\S]*?if \(generation !== this\.generation\) return;[\s\S]*?this\.cancelAnimations\(\);[\s\S]*?refresh\(\);[\s\S]*?this\.animateIncoming\(generation\)/,
+  );
+  assert.match(transitionSource, /fill: entering \? "none" : "forwards"/);
+  assert.doesNotMatch(transitionSource, /this\.animations\.clear\(\);\s*refresh\(\)/);
+  assert.match(
+    transitionSource,
+    /animation\.finished\.then\([\s\S]*?this\.animations\.delete\(animation\)[\s\S]*?this\.animations\.delete\(animation\)/,
+  );
+});
+
 void test("only wallpaper pool toggles route settings rebuilds through the visibility transition", () => {
   assert.match(settingsTabSource, /SettingsPoolVisibilityTransition/);
   assert.match(settingsTabSource, /key === "wallpaperPoolEnabled"/);
